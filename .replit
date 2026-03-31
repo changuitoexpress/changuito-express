@@ -1,26 +1,21 @@
-modules = ["nodejs-24"]
+run = "npm run dev"
+entrypoint = "src/main.tsx"
 
-[[artifacts]]
-id = "artifacts/api-server"
-
-[[artifacts]]
-id = "artifacts/mockup-sandbox"
+[nix]
+channel = "stable-23_11"
 
 [deployment]
-router = "application"
-deploymentTarget = "autoscale"
+run = ["sh", "-c", "npm run dev"]
 
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
-
-[workflows]
-runButton = "Project"
+[[ports]]
+localPort = 5173
+externalPort = 80
 
 [agent]
-stack = "PNPM_WORKSPACE"
 expertMode = true
 
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 20000
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://pnkbjegziezjwpvcsykk.supabase.co"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBua2JqZWd6aWV6andwdmNzeWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTU2ODQsImV4cCI6MjA4OTQzMTY4NH0.ugcIVzUj4s42B27kT7ocNPhqtPfh_DJx19jW2P3FpG8"
