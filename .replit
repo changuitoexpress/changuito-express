@@ -1,5 +1,6 @@
 run = "npm run dev"
 entrypoint = "src/main.tsx"
+modules = ["nodejs-20"]
 
 [nix]
 channel = "stable-23_11"
@@ -19,3 +20,27 @@ expertMode = true
 [userenv.shared]
 VITE_SUPABASE_URL = "https://pnkbjegziezjwpvcsykk.supabase.co"
 VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBua2JqZWd6aWV6andwdmNzeWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTU2ODQsImV4cCI6MjA4OTQzMTY4NH0.ugcIVzUj4s42B27kT7ocNPhqtPfh_DJx19jW2P3FpG8"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5173
+
+[workflows.workflow.metadata]
+outputType = "webview"
