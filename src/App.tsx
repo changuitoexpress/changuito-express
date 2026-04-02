@@ -16,16 +16,15 @@ import {
   Star,
   ChevronRight,
 } from 'lucide-react';
+import ErrorConexion from './components/ErrorConexion'; 
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SUPABASE — Configuración Corregida
+//  SUPABASE — Configuración
 // ─────────────────────────────────────────────────────────────────────────────
 const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// ─────────────────────────────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TIPOS
@@ -40,9 +39,12 @@ interface ToastMessage {
 
 interface UserSession {
   user: {
+    id: string; 
     email?: string;
   };
 }
+
+type Rol = 'admin' | 'cliente' | null; 
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HOOK — useToast
@@ -149,7 +151,6 @@ function AuthScreen(props: AuthScreenProps) {
 
       <div style={{ width:'100%', maxWidth:'380px', position:'relative', zIndex:1 }}>
 
-        {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:'36px' }}>
           <div style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:'64px', height:'64px', borderRadius:'20px', background:'#facc15', boxShadow:'0 8px 32px rgba(250,204,21,0.3)', marginBottom:'16px' }}>
             <ShoppingCart style={{ width:'32px', height:'32px', color:'#020617' }} strokeWidth={2.5} />
@@ -162,10 +163,8 @@ function AuthScreen(props: AuthScreenProps) {
           </p>
         </div>
 
-        {/* Card */}
         <div style={{ background:'rgba(15,23,42,0.85)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'28px', padding:'28px', boxShadow:'0 24px 64px rgba(0,0,0,0.5)' }}>
 
-          {/* Tabs */}
           <div style={{ display:'flex', background:'rgba(2,6,23,0.7)', borderRadius:'16px', padding:'4px', marginBottom:'24px', border:'1px solid rgba(255,255,255,0.05)' }}>
             {(['login', 'register'] as AuthMode[]).map(function(m) {
               const active = (mode === m);
@@ -177,10 +176,7 @@ function AuthScreen(props: AuthScreenProps) {
             })}
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-
-            {/* Email */}
             <div style={{ position:'relative' }}>
               <div style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color: focused === 'email' ? '#facc15' : 'rgba(255,255,255,0.2)', pointerEvents:'none' }}>
                 <Mail style={{ width:'16px', height:'16px' }} />
@@ -192,7 +188,6 @@ function AuthScreen(props: AuthScreenProps) {
                 style={inputStyle('email')} />
             </div>
 
-            {/* Password */}
             <div style={{ position:'relative' }}>
               <div style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color: focused === 'password' ? '#facc15' : 'rgba(255,255,255,0.2)', pointerEvents:'none' }}>
                 <Lock style={{ width:'16px', height:'16px' }} />
@@ -204,7 +199,6 @@ function AuthScreen(props: AuthScreenProps) {
                 style={inputStyle('password')} />
             </div>
 
-            {/* Submit */}
             <button type="submit" disabled={loading} style={{ width:'100%', background: loading ? 'rgba(250,204,21,0.5)' : '#facc15', color:'#020617', fontWeight:900, fontSize:'13px', textTransform:'uppercase', letterSpacing:'0.12em', padding:'15px', borderRadius:'14px', border:'none', cursor: loading ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow: loading ? 'none' : '0 8px 24px rgba(250,204,21,0.25)', marginTop:'4px' }}>
               {loading
                 ? <span style={{ width:'18px', height:'18px', border:'2px solid rgba(2,6,23,0.3)', borderTopColor:'#020617', borderRadius:'50%', display:'inline-block', animation:'changuito-spin 0.7s linear infinite' }} />
@@ -231,7 +225,7 @@ function AuthScreen(props: AuthScreenProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  COMPONENTE — Dashboard
+//  COMPONENTE — Dashboard (Exclusivo para ADMIN)
 // ─────────────────────────────────────────────────────────────────────────────
 interface DashboardProps {
   session: UserSession;
@@ -261,8 +255,6 @@ function Dashboard(props: DashboardProps) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#020617', color:'white', padding:'20px', fontFamily:'system-ui,sans-serif' }}>
-
-      {/* Topbar */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'24px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
           <div style={{ width:'40px', height:'40px', borderRadius:'14px', background:'#facc15', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 16px rgba(250,204,21,0.3)' }}>
@@ -281,7 +273,6 @@ function Dashboard(props: DashboardProps) {
         </button>
       </div>
 
-      {/* Banner */}
       <div style={{ position:'relative', overflow:'hidden', borderRadius:'24px', background:'#facc15', padding:'24px', marginBottom:'20px' }}>
         <p style={{ fontSize:'9px', letterSpacing:'0.35em', color:'rgba(2,6,23,0.4)', fontWeight:900, textTransform:'uppercase', margin:'0 0 4px 0' }}>God Mode Activo</p>
         <h2 style={{ fontSize:'22px', fontWeight:900, color:'#020617', margin:'0 0 6px 0', lineHeight:1.1 }}>
@@ -293,8 +284,6 @@ function Dashboard(props: DashboardProps) {
         </div>
       </div>
 
-
-      {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'20px' }}>
         {kpis.map(function(kpi) {
           const IconComp = kpi.Icon;
@@ -312,7 +301,6 @@ function Dashboard(props: DashboardProps) {
         })}
       </div>
 
-      {/* Acciones */}
       <div style={{ background:'#0f172a', border:'1px solid rgba(255,255,255,0.05)', borderRadius:'20px', overflow:'hidden' }}>
         <p style={{ fontSize:'9px', letterSpacing:'0.35em', color:'rgba(255,255,255,0.2)', fontWeight:900, textTransform:'uppercase', padding:'16px 18px 12px', margin:0, borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
           Acciones Rápidas
@@ -329,39 +317,120 @@ function Dashboard(props: DashboardProps) {
           );
         })}
       </div>
-
-      <p style={{ textAlign:'center', fontSize:'9px', letterSpacing:'0.3em', color:'rgba(255,255,255,0.08)', textTransform:'uppercase', marginTop:'24px' }}>
-        Lomas · Clúster Toscana · Delivery Exclusivo
-      </p>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  COMPONENTE RAÍZ — App (exportación default, SIEMPRE al final)
+//  COMPONENTE — BienvenidoCliente (Exclusivo para CLIENTES)
+// ─────────────────────────────────────────────────────────────────────────────
+function BienvenidoCliente(props: { session: UserSession }) {
+  const email = props.session.user.email ?? '';
+  return (
+    <div style={{ minHeight:'100vh', background:'#020617', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui,sans-serif' }}>
+      <div style={{ textAlign:'center', padding:'32px' }}>
+        <div style={{ fontSize:'48px', marginBottom:'16px' }}>🛒</div>
+        <h1 style={{ color:'#facc15', fontWeight:900, fontSize:'22px', margin:'0 0 8px 0' }}>
+          ¡Bienvenido a Changuito Express!
+        </h1>
+        <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:'0 0 24px 0' }}>{email}</p>
+        <button
+          onClick={function() { supabase.auth.signOut(); }}
+          style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.5)', padding:'10px 20px', borderRadius:'12px', fontSize:'12px', fontWeight:700, cursor:'pointer' }}
+        >
+          Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  COMPONENTE RAÍZ — App
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState<UserSession | null>(null);
   const [booting, setBooting] = useState<boolean>(true);
+  const [rol, setRol]         = useState<Rol>(null);
+  const [dbError, setDbError] = useState<boolean>(false);
   const { toasts, addToast }  = useToast();
 
   useEffect(function() {
-    supabase.auth.getSession().then(function(result) {
-      const s = result.data.session;
-      if (s) { setSession({ user: { email: s.user.email } }); }
-      setBooting(false);
-    });
+    let mounted = true; 
 
-    const listener = supabase.auth.onAuthStateChange(function(_event, s) {
-      if (s) { setSession({ user: { email: s.user.email } }); }
-      else   { setSession(null); }
+    async function inicializar() {
+      try {
+        // Timeout de 8 segundos para no quedar bloqueado en "Iniciando..."
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]);
+
+        if (!sessionResult) {
+          // Timeout: mostrar login sin sesión
+          if (mounted) setBooting(false);
+          return;
+        }
+
+        const { data: { session: s }, error } = sessionResult;
+
+        if (error) throw error;
+
+        if (s && mounted) {
+          // Usamos maybeSingle() para que no tire error si no existe el perfil
+          const { data: perfil } = await supabase
+            .from('perfiles')
+            .select('rol')
+            .eq('id', s.user.id)
+            .maybeSingle();
+
+          // Si no hay perfil, asignamos 'cliente' por defecto — no fallamos
+          setSession({ user: { id: s.user.id, email: s.user.email } });
+          setRol(perfil?.rol ?? 'cliente');
+        }
+      } catch {
+        // Error de red u otro: mostramos login limpio, no bloqueamos
+        if (mounted) {
+          setSession(null);
+          setRol(null);
+        }
+      } finally {
+        // GARANTIZADO: la pantalla de carga desaparece siempre
+        if (mounted) setBooting(false);
+      }
+    }
+
+    inicializar();
+
+    const listener = supabase.auth.onAuthStateChange(async function(_event, s) {
+      if (!mounted) return;
+      if (s) {
+        // maybeSingle() nunca falla si no hay fila — devuelve null
+        const { data: perfil } = await supabase
+          .from('perfiles')
+          .select('rol')
+          .eq('id', s.user.id)
+          .maybeSingle();
+        setSession({ user: { id: s.user.id, email: s.user.email } });
+        setRol(perfil?.rol ?? 'cliente');
+      } else {
+        setSession(null);
+        setRol(null);
+      }
     });
 
     return function() {
+      mounted = false;
       listener.data.subscription.unsubscribe();
     };
   }, []);
 
+  // 1. Mostrar Error de Conexión si falla Supabase
+  if (dbError) {
+    return <ErrorConexion onReintentar={() => { setDbError(false); setBooting(true); }} />;
+  }
+
+  // 2. Mostrar pantalla de carga
   if (booting) {
     return (
       <div style={{ minHeight:'100vh', background:'#020617', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui,sans-serif' }}>
@@ -375,12 +444,15 @@ export default function App() {
     );
   }
 
+  // 3. Renderizar la vista correspondiente según Auth y Rol
   return (
     <React.Fragment>
       <ToastRack toasts={toasts} />
-      {session !== null
-        ? <Dashboard session={session} />
-        : <AuthScreen onToast={addToast} />
+      {session === null
+        ? <AuthScreen onToast={addToast} />
+        : rol === 'admin'
+          ? <Dashboard session={session} />
+          : <BienvenidoCliente session={session} />
       }
     </React.Fragment>
   );
