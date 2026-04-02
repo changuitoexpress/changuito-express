@@ -2,7 +2,7 @@
 /* eslint-disable */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import {
   Mail,
   Lock,
@@ -17,14 +17,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import ErrorConexion from './components/ErrorConexion'; 
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  SUPABASE — Configuración
-// ─────────────────────────────────────────────────────────────────────────────
-const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TIPOS
@@ -356,47 +348,50 @@ export default function App() {
   const { toasts, addToast }  = useToast();
 
   useEffect(function() {
-    let mounted = true; 
+    let mounted = true;
+
+    // Busca el rol en la tabla perfiles con timeout de 5s.
+    // Nunca bloquea: si falla o tarda, devuelve 'cliente'.
+    async function fetchRol(userId: string): Promise<string> {
+      try {
+        const result = await Promise.race([
+          supabase.from('perfiles').select('rol').eq('id', userId).maybeSingle(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
+        return (result as any)?.data?.rol ?? 'cliente';
+      } catch {
+        return 'cliente';
+      }
+    }
 
     async function inicializar() {
       try {
-        // Timeout de 8 segundos para no quedar bloqueado en "Iniciando..."
-        const sessionResult = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-        ]);
+        // getSession() lee de localStorage — no necesita timeout propio.
+        const { data: { session: s }, error } = await supabase.auth.getSession();
 
-        if (!sessionResult) {
-          // Timeout: mostrar login sin sesión
-          if (mounted) setBooting(false);
-          return;
-        }
-
-        const { data: { session: s }, error } = sessionResult;
-
+        if (!mounted) return;
         if (error) throw error;
 
-        if (s && mounted) {
-          // Usamos maybeSingle() para que no tire error si no existe el perfil
-          const { data: perfil } = await supabase
-            .from('perfiles')
-            .select('rol')
-            .eq('id', s.user.id)
-            .maybeSingle();
-
-          // Si no hay perfil, asignamos 'cliente' por defecto — no fallamos
+        if (s) {
+          // ── CLAVE: salimos del loading ANTES de buscar el perfil ──
+          // El usuario ve su pantalla de inmediato con rol 'cliente'
+          // y si hay un rol real en la DB, se actualiza solo.
           setSession({ user: { id: s.user.id, email: s.user.email } });
-          setRol(perfil?.rol ?? 'cliente');
+          setRol('cliente');
+          setBooting(false);
+
+          // Actualización de rol en segundo plano — no bloquea nada
+          const rolReal = await fetchRol(s.user.id);
+          if (mounted) setRol(rolReal);
+        } else {
+          setBooting(false);
         }
       } catch {
-        // Error de red u otro: mostramos login limpio, no bloqueamos
         if (mounted) {
           setSession(null);
           setRol(null);
+          setBooting(false);
         }
-      } finally {
-        // GARANTIZADO: la pantalla de carga desaparece siempre
-        if (mounted) setBooting(false);
       }
     }
 
@@ -405,14 +400,11 @@ export default function App() {
     const listener = supabase.auth.onAuthStateChange(async function(_event, s) {
       if (!mounted) return;
       if (s) {
-        // maybeSingle() nunca falla si no hay fila — devuelve null
-        const { data: perfil } = await supabase
-          .from('perfiles')
-          .select('rol')
-          .eq('id', s.user.id)
-          .maybeSingle();
+        // Aplicamos el mismo patrón: sesión inmediata, rol en segundo plano
         setSession({ user: { id: s.user.id, email: s.user.email } });
-        setRol(perfil?.rol ?? 'cliente');
+        setRol('cliente');
+        const rolReal = await fetchRol(s.user.id);
+        if (mounted) setRol(rolReal);
       } else {
         setSession(null);
         setRol(null);
