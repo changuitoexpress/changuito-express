@@ -20,6 +20,13 @@ import ErrorConexion from './components/ErrorConexion';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ADMINISTRADORES — correos que siempre tienen rol 'admin'
+// ─────────────────────────────────────────────────────────────────────────────
+const ADMIN_EMAILS: string[] = [
+  'uliseseven.7@gmail.com',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  TIPOS
 // ─────────────────────────────────────────────────────────────────────────────
 type AuthMode = 'login' | 'register';
@@ -380,8 +387,12 @@ export default function App() {
   useEffect(function() {
     let mounted = true;
 
-    // Busca el rol. Si no hay fila en perfiles, la crea con el rol del metadata.
-    async function fetchRol(userId: string, metadata?: Record<string, any>): Promise<string> {
+    // Busca el rol. Primero verifica la lista de admins hardcodeada,
+    // luego la tabla perfiles, y si no hay fila la crea con el metadata.
+    async function fetchRol(userId: string, email?: string, metadata?: Record<string, any>): Promise<string> {
+      // Correos marcados como admin en el código → acceso garantizado
+      if (email && ADMIN_EMAILS.includes(email.toLowerCase())) return 'admin';
+
       try {
         const result = await Promise.race([
           supabase.from('perfiles').select('rol').eq('id', userId).maybeSingle(),
@@ -414,8 +425,8 @@ export default function App() {
           setRol('cliente');
           setBooting(false);
 
-          const rolReal = await fetchRol(s.user.id);
-          if (mounted) setRol(rolReal);
+          const rolReal = await fetchRol(s.user.id, s.user.email);
+          if (mounted) setRol(rolReal as Rol);
         } else {
           setBooting(false);
         }
@@ -435,7 +446,7 @@ export default function App() {
       if (s) {
         setSession({ user: { id: s.user.id, email: s.user.email } });
         setRol('cliente');
-        const rolReal = await fetchRol(s.user.id, s.user.user_metadata ?? {});
+        const rolReal = await fetchRol(s.user.id, s.user.email, s.user.user_metadata ?? {});
         if (mounted) setRol(rolReal as Rol);
       } else {
         setSession(null);
