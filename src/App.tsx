@@ -16,7 +16,8 @@ import {
   Star,
   ChevronRight,
 } from 'lucide-react';
-import ErrorConexion from './components/ErrorConexion'; 
+import ErrorConexion from './components/ErrorConexion';
+import RoleBasedRedirect from './components/RoleBasedRedirect';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TIPOS
@@ -36,7 +37,7 @@ interface UserSession {
   };
 }
 
-type Rol = 'admin' | 'cliente' | null; 
+type Rol = 'admin' | 'cliente' | 'restaurante' | 'repartidor' | 'vendedor_bazar' | null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HOOK — useToast
@@ -85,12 +86,17 @@ interface AuthScreenProps {
   onToast: (text: string, kind: ToastMessage['kind']) => void;
 }
 
+type TipoRegistro = 'cliente' | 'restaurante';
+
 function AuthScreen(props: AuthScreenProps) {
-  const [mode, setMode]         = useState<AuthMode>('login');
-  const [email, setEmail]       = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [loading, setLoading]   = useState<boolean>(false);
-  const [focused, setFocused]   = useState<string>('');
+  const [mode, setMode]                   = useState<AuthMode>('login');
+  const [email, setEmail]                 = useState<string>('');
+  const [password, setPassword]           = useState<string>('');
+  const [loading, setLoading]             = useState<boolean>(false);
+  const [focused, setFocused]             = useState<string>('');
+  const [tipoRegistro, setTipoRegistro]   = useState<TipoRegistro>('cliente');
+  const [nombreNegocio, setNombreNegocio] = useState<string>('');
+  const [direccion, setDireccion]         = useState<string>('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,14 +108,26 @@ function AuthScreen(props: AuthScreenProps) {
       props.onToast('La contraseña debe tener al menos 6 caracteres.', 'error');
       return;
     }
+    if (mode === 'register' && tipoRegistro === 'restaurante' && !nombreNegocio.trim()) {
+      props.onToast('Ingresá el nombre de tu negocio.', 'error');
+      return;
+    }
     setLoading(true);
     try {
       if (mode === 'register') {
-        const result = await supabase.auth.signUp({ email: email, password: password });
+        const metadata: Record<string, string> = { rol: tipoRegistro };
+        if (tipoRegistro === 'restaurante') {
+          metadata.nombre_negocio = nombreNegocio.trim();
+          metadata.direccion      = direccion.trim();
+        }
+        const result = await supabase.auth.signUp({
+          email, password,
+          options: { data: metadata },
+        });
         if (result.error) { throw result.error; }
         props.onToast('¡Revisá tu email para confirmar tu cuenta!', 'success');
       } else {
-        const result = await supabase.auth.signInWithPassword({ email: email, password: password });
+        const result = await supabase.auth.signInWithPassword({ email, password });
         if (result.error) { throw result.error; }
       }
     } catch (err: any) {
@@ -169,6 +187,26 @@ function AuthScreen(props: AuthScreenProps) {
           </div>
 
           <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+
+            {/* Selector de tipo de cuenta — solo visible en registro */}
+            {!isLogin && (
+              <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                <p style={{ margin:0, fontSize:'10px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(255,255,255,0.25)' }}>Tipo de cuenta</p>
+                <div style={{ display:'flex', gap:'8px' }}>
+                  {(['cliente', 'restaurante'] as TipoRegistro[]).map(function(t) {
+                    const active = (tipoRegistro === t);
+                    const labels: Record<TipoRegistro, string> = { cliente: '🛒 Cliente', restaurante: '🍽️ Restaurante' };
+                    return (
+                      <button key={t} type="button" onClick={function() { setTipoRegistro(t); }}
+                        style={{ flex:1, padding:'10px 8px', borderRadius:'12px', border: active ? '1px solid #facc15' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(250,204,21,0.12)' : 'rgba(2,6,23,0.5)', color: active ? '#facc15' : 'rgba(255,255,255,0.35)', fontSize:'12px', fontWeight:700, cursor:'pointer' }}>
+                        {labels[t]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{ position:'relative' }}>
               <div style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color: focused === 'email' ? '#facc15' : 'rgba(255,255,255,0.2)', pointerEvents:'none' }}>
                 <Mail style={{ width:'16px', height:'16px' }} />
@@ -190,6 +228,22 @@ function AuthScreen(props: AuthScreenProps) {
                 onBlur={function() { setFocused(''); }}
                 style={inputStyle('password')} />
             </div>
+
+            {/* Campos extra para Restaurante */}
+            {!isLogin && tipoRegistro === 'restaurante' && (
+              <>
+                <input type="text" placeholder="Nombre del negocio *" value={nombreNegocio}
+                  onChange={function(e) { setNombreNegocio(e.target.value); }}
+                  onFocus={function() { setFocused('negocio'); }}
+                  onBlur={function() { setFocused(''); }}
+                  style={{ ...inputStyle('negocio'), paddingLeft:'14px' }} />
+                <input type="text" placeholder="Dirección (opcional)" value={direccion}
+                  onChange={function(e) { setDireccion(e.target.value); }}
+                  onFocus={function() { setFocused('dir'); }}
+                  onBlur={function() { setFocused(''); }}
+                  style={{ ...inputStyle('dir'), paddingLeft:'14px' }} />
+              </>
+            )}
 
             <button type="submit" disabled={loading} style={{ width:'100%', background: loading ? 'rgba(250,204,21,0.5)' : '#facc15', color:'#020617', fontWeight:900, fontSize:'13px', textTransform:'uppercase', letterSpacing:'0.12em', padding:'15px', borderRadius:'14px', border:'none', cursor: loading ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow: loading ? 'none' : '0 8px 24px rgba(250,204,21,0.25)', marginTop:'4px' }}>
               {loading
@@ -217,13 +271,13 @@ function AuthScreen(props: AuthScreenProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  COMPONENTE — Dashboard (Exclusivo para ADMIN)
+//  COMPONENTE — AdminDashboard (Renombramos el Dashboard original de Admin)
 // ─────────────────────────────────────────────────────────────────────────────
-interface DashboardProps {
+interface AdminDashboardProps {
   session: UserSession;
 }
 
-function Dashboard(props: DashboardProps) {
+function AdminDashboard(props: AdminDashboardProps) {
   const rawEmail = props.session.user.email || 'admin@changuito.com';
   const username = rawEmail.split('@')[0].toUpperCase();
 
@@ -314,30 +368,6 @@ function Dashboard(props: DashboardProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  COMPONENTE — BienvenidoCliente (Exclusivo para CLIENTES)
-// ─────────────────────────────────────────────────────────────────────────────
-function BienvenidoCliente(props: { session: UserSession }) {
-  const email = props.session.user.email ?? '';
-  return (
-    <div style={{ minHeight:'100vh', background:'#020617', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui,sans-serif' }}>
-      <div style={{ textAlign:'center', padding:'32px' }}>
-        <div style={{ fontSize:'48px', marginBottom:'16px' }}>🛒</div>
-        <h1 style={{ color:'#facc15', fontWeight:900, fontSize:'22px', margin:'0 0 8px 0' }}>
-          ¡Bienvenido a Changuito Express!
-        </h1>
-        <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'13px', margin:'0 0 24px 0' }}>{email}</p>
-        <button
-          onClick={function() { supabase.auth.signOut(); }}
-          style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.5)', padding:'10px 20px', borderRadius:'12px', fontSize:'12px', fontWeight:700, cursor:'pointer' }}
-        >
-          Cerrar Sesión
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  COMPONENTE RAÍZ — App
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -350,15 +380,23 @@ export default function App() {
   useEffect(function() {
     let mounted = true;
 
-    // Busca el rol en la tabla perfiles con timeout de 5s.
-    // Nunca bloquea: si falla o tarda, devuelve 'cliente'.
-    async function fetchRol(userId: string): Promise<string> {
+    // Busca el rol. Si no hay fila en perfiles, la crea con el rol del metadata.
+    async function fetchRol(userId: string, metadata?: Record<string, any>): Promise<string> {
       try {
         const result = await Promise.race([
           supabase.from('perfiles').select('rol').eq('id', userId).maybeSingle(),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
         ]);
-        return (result as any)?.data?.rol ?? 'cliente';
+        const rolExistente = (result as any)?.data?.rol;
+        if (rolExistente) return rolExistente;
+
+        // No hay perfil todavía — lo creamos con el rol elegido en el registro
+        const rolInicial = metadata?.rol ?? 'cliente';
+        const fila: Record<string, any> = { id: userId, rol: rolInicial };
+        if (metadata?.nombre_negocio) fila.nombre_negocio = metadata.nombre_negocio;
+        if (metadata?.direccion)      fila.direccion      = metadata.direccion;
+        await supabase.from('perfiles').upsert(fila);
+        return rolInicial;
       } catch {
         return 'cliente';
       }
@@ -366,21 +404,16 @@ export default function App() {
 
     async function inicializar() {
       try {
-        // getSession() lee de localStorage — no necesita timeout propio.
         const { data: { session: s }, error } = await supabase.auth.getSession();
 
         if (!mounted) return;
         if (error) throw error;
 
         if (s) {
-          // ── CLAVE: salimos del loading ANTES de buscar el perfil ──
-          // El usuario ve su pantalla de inmediato con rol 'cliente'
-          // y si hay un rol real en la DB, se actualiza solo.
           setSession({ user: { id: s.user.id, email: s.user.email } });
           setRol('cliente');
           setBooting(false);
 
-          // Actualización de rol en segundo plano — no bloquea nada
           const rolReal = await fetchRol(s.user.id);
           if (mounted) setRol(rolReal);
         } else {
@@ -400,11 +433,10 @@ export default function App() {
     const listener = supabase.auth.onAuthStateChange(async function(_event, s) {
       if (!mounted) return;
       if (s) {
-        // Aplicamos el mismo patrón: sesión inmediata, rol en segundo plano
         setSession({ user: { id: s.user.id, email: s.user.email } });
         setRol('cliente');
-        const rolReal = await fetchRol(s.user.id);
-        if (mounted) setRol(rolReal);
+        const rolReal = await fetchRol(s.user.id, s.user.user_metadata ?? {});
+        if (mounted) setRol(rolReal as Rol);
       } else {
         setSession(null);
         setRol(null);
@@ -442,9 +474,12 @@ export default function App() {
       <ToastRack toasts={toasts} />
       {session === null
         ? <AuthScreen onToast={addToast} />
-        : rol === 'admin'
-          ? <Dashboard session={session} />
-          : <BienvenidoCliente session={session} />
+        : <RoleBasedRedirect
+            session={session}
+            rol={rol ?? 'cliente'}
+            onSignOut={function() { supabase.auth.signOut(); }}
+            renderAdmin={function() { return <AdminDashboard session={session} />; }}
+          />
       }
     </React.Fragment>
   );
