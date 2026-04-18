@@ -1,0 +1,249 @@
+/* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
+
+/* ═══════════════════════════════════════════════════════════════
+   VARIABLES — MODO CLARO (default)
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg-base:          #f4f4f8;
+  --bg-card:          #ffffff;
+  --bg-card-hover:    #f0f0f5;
+  --bg-input:         #ffffff;
+  --bg-nav:           rgba(255, 255, 255, 0.95);
+
+  --text-primary:     #0a0a0f;
+  --text-secondary:   #5a5a72;
+  --text-muted:       #9999b0;
+  --text-inverse:     #ffffff;
+
+  --color-yellow:     #facc15;
+  --color-yellow-dim: rgba(250, 204, 21, 0.15);
+  --color-red:        #ef4444;
+  --color-red-dim:    rgba(239, 68, 68, 0.15);
+  --color-green:      #22c55e;
+  --color-green-dim:  rgba(34, 197, 94, 0.15);
+  --color-blue:       #3b82f6;
+  --color-blue-dim:   rgba(59, 130, 246, 0.15);
+
+  --border-subtle:    rgba(0, 0, 0, 0.08);
+  --border-medium:    rgba(0, 0, 0, 0.14);
+
+  --shadow-card:      0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-float:     0 8px 32px rgba(0, 0, 0, 0.14);
+
+  --neon-tl: transparent;
+  --neon-tr: transparent;
+  --neon-bl: transparent;
+  --neon-br: transparent;
+  --neon-size: 0px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VARIABLES — MODO OSCURO
+═══════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --bg-base:          #0a0a0f;
+  --bg-card:          #16161e;
+  --bg-card-hover:    #1e1e28;
+  --bg-input:         #16161e;
+  --bg-nav:           rgba(10, 10, 15, 0.97);
+
+  --text-primary:     #f0f0f8;
+  --text-secondary:   #8888aa;
+  --text-muted:       #55556a;
+  --text-inverse:     #0a0a0f;
+
+  --border-subtle:    rgba(255, 255, 255, 0.06);
+  --border-medium:    rgba(255, 255, 255, 0.10);
+
+  --shadow-card:      0 2px 16px rgba(0, 0, 0, 0.4);
+  --shadow-float:     0 8px 40px rgba(0, 0, 0, 0.6);
+
+  --neon-tl:   #facc15;
+  --neon-tr:   #ef4444;
+  --neon-bl:   #22c55e;
+  --neon-br:   #3b82f6;
+  --neon-size: 120px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESET & BASE
+   KEY FIX: la transición va en html y body para que el fondo
+   cambie al mismo tiempo que las tarjetas — sin parpadeo
+═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NEON FRAME — Los 4 resplandores de esquina (solo dark mode)
+═══════════════════════════════════════════════════════════════ */
+#root {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+[data-theme="dark"] #root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background:
+    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 0% 0%,
+      color-mix(in srgb, var(--neon-tl) 55%, transparent), transparent 70%),
+    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 100% 0%,
+      color-mix(in srgb, var(--neon-tr) 50%, transparent), transparent 70%),
+    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 0% 100%,
+      color-mix(in srgb, var(--neon-bl) 50%, transparent), transparent 70%),
+    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 100% 100%,
+      color-mix(in srgb, var(--neon-br) 55%, transparent), transparent 70%);
+  animation: neon-breathe 4s ease-in-out infinite;
+}
+
+@keyframes neon-breathe {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.7; }
+}
+
+[data-theme="dark"] #root::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--bg-base), var(--bg-base)) padding-box,
+    linear-gradient(to bottom right, var(--neon-tl), transparent 35%, transparent 65%, var(--neon-br)) border-box,
+    linear-gradient(to bottom left,  var(--neon-tr), transparent 35%, transparent 65%, var(--neon-bl)) border-box;
+  animation: neon-breathe 4s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILIDADES GLOBALES
+═══════════════════════════════════════════════════════════════ */
+
+/* theme-transition ahora NO tiene transición propia —
+   hereda la del html/body para que todo cambie al mismo tiempo */
+.theme-transition {
+  /* vacío intencionalmente — la transición la maneja html+body */
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.4; }
+}
+
+.skeleton {
+  background: var(--border-subtle);
+  border-radius: 8px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.fade-in {
+  animation: fade-in 0.3s ease forwards;
+}
+
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   MODAL DE DIRECCIÓN — estilos base
+═══════════════════════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border-radius: 28px 28px 0 0;
+  padding: 24px 20px 40px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  transition: background-color 0.2s ease;
+}
+
+.direccion-card {
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 2px solid var(--border-subtle);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  background: var(--bg-base);
+  margin-bottom: 10px;
+}
+
+.direccion-card.activa {
+  border-color: var(--color-yellow);
+  background: var(--color-yellow-dim);
+}
+
+.direccion-card:hover {
+  border-color: var(--color-yellow);
+}
