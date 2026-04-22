@@ -3,7 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from
 import {
   Search, Star, Clock, ChevronRight, WifiOff, RefreshCw, X,
   ChevronDown, ChevronUp, ShoppingBag, Plus, Minus, MessageCircle,
-  Trash2, MapPin, CreditCard, Plus as PlusIcon, Check
+  Trash2, MapPin, CreditCard, Plus as PlusIcon, Check, Menu, LogOut, Store, Bike, ShoppingCart, Briefcase, Sparkles, Shield
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
@@ -48,6 +48,9 @@ interface DashboardProps {
   session:       AppSession;
   theme:         Theme;
   onThemeToggle: () => void;
+  onIrAdmin?:     () => void;
+  onIrBazar?:     () => void;
+  onIrServicios?: () => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -592,6 +595,12 @@ export default function Dashboard(props: DashboardProps) {
   const [carrito, setCarrito]                   = useState<CartItem[]>([]);
   const [modalMandadito, setModalMandadito]     = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout]       = useState(false);
+  const [menuAbierto, setMenuAbierto]           = useState(false);
+  const esAdmin = props.session.user.email === 'uliseseven.7@gmail.com';
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+  }
 
   // FIX PARPADEO: aplicar el tema ANTES del primer paint
   useLayoutEffect(function(){
@@ -762,12 +771,17 @@ export default function Dashboard(props: DashboardProps) {
 
       {/* Header */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border-subtle)', padding:'14px 16px 12px' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
-          <div>
-            <p style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 1px 0' }}>¡Hola, {username}! 👋</p>
-            <h1 style={{ fontSize:'19px', fontWeight:900, color:'var(--text-primary)', margin:0, letterSpacing:'-0.03em', lineHeight:1 }}>¿Qué se te antoja?</h1>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', gap:'10px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', flex:1, minWidth:0 }}>
+            <button onClick={function(){ setMenuAbierto(true); }} aria-label="Abrir menú" style={{ flexShrink:0, width:'40px', height:'40px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)', border:isDark?'1px solid rgba(255,255,255,0.08)':'1px solid rgba(0,0,0,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--text-primary)' }}>
+              <Menu style={{ width:'20px', height:'20px' }} />
+            </button>
+            <div style={{ minWidth:0, overflow:'hidden' }}>
+              <p style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 1px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>¡Hola, {username}! 👋</p>
+              <h1 style={{ fontSize:'19px', fontWeight:900, color:'var(--text-primary)', margin:0, letterSpacing:'-0.03em', lineHeight:1 }}>¿Qué se te antoja?</h1>
+            </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', flexShrink:0 }}>
             {totalItems > 0 && (
               <button onClick={function(){ setModalCheckout(true); }} style={{ position:'relative', background:'var(--color-yellow)', border:'none', borderRadius:'12px', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 4px 12px rgba(250,204,21,0.35)' }}>
                 <ShoppingBag style={{ width:'18px', height:'18px', color:'#020617' }} />
@@ -794,6 +808,68 @@ export default function Dashboard(props: DashboardProps) {
           <button style={tabStyle('tiendita')}     onClick={function(){ setTabActiva('tiendita');     setSearch(''); }}>🛒 Tiendita</button>
         </div>
       </div>
+
+      {/* Hamburger Drawer */}
+      {menuAbierto && (
+        <div style={{ position:'fixed', inset:0, zIndex:1000 }}>
+          <div onClick={function(){ setMenuAbierto(false); }} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(2px)' }} />
+          <div className="fade-in" style={{ position:'absolute', top:0, left:0, bottom:0, width:'82%', maxWidth:'320px', background:'var(--bg-card)', borderRight:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', boxShadow:'8px 0 32px rgba(0,0,0,0.35)' }}>
+            <div style={{ padding:'20px 18px 16px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ minWidth:0 }}>
+                <p style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 2px 0' }}>Sesión</p>
+                <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{props.session.user.email}</p>
+              </div>
+              <button onClick={function(){ setMenuAbierto(false); }} aria-label="Cerrar menú" style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:'4px', lineHeight:0 }}>
+                <X style={{ width:'18px', height:'18px' }} />
+              </button>
+            </div>
+
+            <div style={{ flex:1, overflowY:'auto', padding:'10px 10px' }}>
+              {([
+                { key:'restaurantes', label:'Restaurantes', emoji:'🍽️', icon: Store },
+                { key:'mandaditos',   label:'Mandaditos',   emoji:'🛵', icon: Bike },
+                { key:'tiendita',     label:'Tiendita',     emoji:'🛒', icon: ShoppingCart },
+              ] as const).map(function(it){
+                const Icon = it.icon;
+                return (
+                  <button key={it.key} onClick={function(){ setTabActiva(it.key as MainTab); setSearch(''); setMenuAbierto(false); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                    <Icon style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
+                    <span>{it.label}</span>
+                  </button>
+                );
+              })}
+
+              <div style={{ height:'1px', background:'var(--border-subtle)', margin:'10px 8px' }} />
+
+              <button onClick={function(){ setMenuAbierto(false); props.onIrBazar && props.onIrBazar(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                <Sparkles style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
+                <span>Bazar Vecinal</span>
+              </button>
+              <button onClick={function(){ setMenuAbierto(false); props.onIrServicios && props.onIrServicios(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                <Briefcase style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
+                <span>Servicios</span>
+              </button>
+
+              {esAdmin && (
+                <>
+                  <div style={{ height:'1px', background:'var(--border-subtle)', margin:'10px 8px' }} />
+                  <button onClick={function(){ setMenuAbierto(false); props.onIrAdmin && props.onIrAdmin(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'rgba(250,204,21,0.12)', border:'1px solid rgba(250,204,21,0.35)', cursor:'pointer', color:'var(--color-yellow)', fontSize:'14px', fontWeight:900, textAlign:'left' }}>
+                    <Shield style={{ width:'18px', height:'18px' }} />
+                    <span>God Mode</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div style={{ padding:'12px 14px 18px', borderTop:'1px solid var(--border-subtle)' }}>
+              <button onClick={cerrarSesion} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', padding:'13px 12px', borderRadius:'12px', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.4)', cursor:'pointer', color:'#ef4444', fontSize:'13px', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                <LogOut style={{ width:'15px', height:'15px' }} />
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ paddingTop:'8px' }}>{renderContenido()}</div>
 

@@ -1,35 +1,29 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 
-/* ═══════════════════════════════════════════════════════════════
-   VARIABLES — MODO CLARO (default)
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   MODO CLARO
+═══════════════════════════════════════ */
 :root {
   --bg-base:          #f4f4f8;
   --bg-card:          #ffffff;
   --bg-card-hover:    #f0f0f5;
-  --bg-input:         #ffffff;
-  --bg-nav:           rgba(255, 255, 255, 0.95);
-
+  --bg-nav:           rgba(255,255,255,0.95);
   --text-primary:     #0a0a0f;
   --text-secondary:   #5a5a72;
   --text-muted:       #9999b0;
   --text-inverse:     #ffffff;
-
   --color-yellow:     #facc15;
-  --color-yellow-dim: rgba(250, 204, 21, 0.15);
+  --color-yellow-dim: rgba(250,204,21,0.15);
   --color-red:        #ef4444;
-  --color-red-dim:    rgba(239, 68, 68, 0.15);
+  --color-red-dim:    rgba(239,68,68,0.15);
   --color-green:      #22c55e;
-  --color-green-dim:  rgba(34, 197, 94, 0.15);
+  --color-green-dim:  rgba(34,197,94,0.15);
   --color-blue:       #3b82f6;
-  --color-blue-dim:   rgba(59, 130, 246, 0.15);
-
-  --border-subtle:    rgba(0, 0, 0, 0.08);
-  --border-medium:    rgba(0, 0, 0, 0.14);
-
-  --shadow-card:      0 2px 12px rgba(0, 0, 0, 0.08);
-  --shadow-float:     0 8px 32px rgba(0, 0, 0, 0.14);
-
+  --color-blue-dim:   rgba(59,130,246,0.15);
+  --border-subtle:    rgba(0,0,0,0.08);
+  --border-medium:    rgba(0,0,0,0.14);
+  --shadow-card:      0 2px 12px rgba(0,0,0,0.08);
+  --shadow-float:     0 8px 32px rgba(0,0,0,0.14);
   --neon-tl: transparent;
   --neon-tr: transparent;
   --neon-bl: transparent;
@@ -37,27 +31,22 @@
   --neon-size: 0px;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   VARIABLES — MODO OSCURO
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   MODO OSCURO
+═══════════════════════════════════════ */
 [data-theme="dark"] {
   --bg-base:          #0a0a0f;
   --bg-card:          #16161e;
   --bg-card-hover:    #1e1e28;
-  --bg-input:         #16161e;
-  --bg-nav:           rgba(10, 10, 15, 0.97);
-
+  --bg-nav:           rgba(10,10,15,0.97);
   --text-primary:     #f0f0f8;
   --text-secondary:   #8888aa;
   --text-muted:       #55556a;
   --text-inverse:     #0a0a0f;
-
-  --border-subtle:    rgba(255, 255, 255, 0.06);
-  --border-medium:    rgba(255, 255, 255, 0.10);
-
-  --shadow-card:      0 2px 16px rgba(0, 0, 0, 0.4);
-  --shadow-float:     0 8px 40px rgba(0, 0, 0, 0.6);
-
+  --border-subtle:    rgba(255,255,255,0.06);
+  --border-medium:    rgba(255,255,255,0.10);
+  --shadow-card:      0 2px 16px rgba(0,0,0,0.4);
+  --shadow-float:     0 8px 40px rgba(0,0,0,0.6);
   --neon-tl:   #facc15;
   --neon-tr:   #ef4444;
   --neon-bl:   #22c55e;
@@ -65,11 +54,13 @@
   --neon-size: 120px;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   RESET & BASE
-   KEY FIX: la transición va en html y body para que el fondo
-   cambie al mismo tiempo que las tarjetas — sin parpadeo
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   RESET — SIN NINGUNA TRANSICIÓN
+   El parpadeo viene de transiciones CSS
+   compitiendo con el cambio de atributo.
+   La solución es: CERO transiciones en
+   body, html, y .theme-transition
+═══════════════════════════════════════ */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -80,6 +71,7 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  /* SIN transition — el cambio es instantáneo */
 }
 
 body {
@@ -88,30 +80,22 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
+  /* SIN transition */
 }
+
+/* theme-transition vacío — sin animación */
+.theme-transition {}
 
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
 
-input, button, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
-}
+input, button, select, textarea { font-family: inherit; font-size: inherit; }
+button { cursor: pointer; border: none; background: none; }
+img { display: block; max-width: 100%; }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
-img {
-  display: block;
-  max-width: 100%;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   NEON FRAME — Los 4 resplandores de esquina (solo dark mode)
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   NEON FRAME
+═══════════════════════════════════════ */
 #root {
   position: relative;
   min-height: 100vh;
@@ -137,7 +121,7 @@ img {
 }
 
 @keyframes neon-breathe {
-  0%, 100% { opacity: 1;   }
+  0%, 100% { opacity: 1; }
   50%       { opacity: 0.7; }
 }
 
@@ -155,35 +139,23 @@ img {
   animation: neon-breathe 4s ease-in-out infinite;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   UTILIDADES GLOBALES
-═══════════════════════════════════════════════════════════════ */
-
-/* theme-transition ahora NO tiene transición propia —
-   hereda la del html/body para que todo cambie al mismo tiempo */
-.theme-transition {
-  /* vacío intencionalmente — la transición la maneja html+body */
-}
-
+/* ═══════════════════════════════════════
+   UTILIDADES
+═══════════════════════════════════════ */
 @keyframes skeleton-pulse {
-  0%, 100% { opacity: 1;   }
+  0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
-
 .skeleton {
   background: var(--border-subtle);
   border-radius: 8px;
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+@keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.2);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -192,31 +164,14 @@ img {
 
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.fade-in { animation: fade-in 0.3s ease forwards; }
 
-.fade-in {
-  animation: fade-in 0.3s ease forwards;
-}
-
-.scroll-x {
-  overflow-x: auto;
-  scrollbar-width: none;
-}
+.scroll-x { overflow-x: auto; scrollbar-width: none; }
 .scroll-x::-webkit-scrollbar { display: none; }
 
-/* ═══════════════════════════════════════════════════════════════
-   MODAL DE DIRECCIÓN — estilos base
-═══════════════════════════════════════════════════════════════ */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  z-index: 400;
-  display: flex;
-  align-items: flex-end;
-}
-
+/* Modal sheets */
 .modal-sheet {
   width: 100%;
   max-width: 480px;
@@ -226,7 +181,6 @@ img {
   max-height: 90vh;
   overflow-y: auto;
   background: var(--bg-card);
-  transition: background-color 0.2s ease;
 }
 
 .direccion-card {
@@ -234,16 +188,7 @@ img {
   padding: 14px 16px;
   border: 2px solid var(--border-subtle);
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
   background: var(--bg-base);
   margin-bottom: 10px;
 }
-
-.direccion-card.activa {
-  border-color: var(--color-yellow);
-  background: var(--color-yellow-dim);
-}
-
-.direccion-card:hover {
-  border-color: var(--color-yellow);
-}
+.direccion-card.activa { border-color: var(--color-yellow); background: var(--color-yellow-dim); }
