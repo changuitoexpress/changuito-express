@@ -5,6 +5,7 @@ import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart } from 'lucide-rea
 import Dashboard from './Dashboard';
 import BazarVecinal from './BazarVecinal';
 import Servicios from './Servicios';
+import ChanguiShopping from './ChanguiShopping';
 import AdminGodMode from './AdminGodMode';
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export type Theme = 'light' | 'dark';
 export interface AppSession { user: { id: string; email?: string }; }
 export interface Toast { id: number; text: string; kind: 'error' | 'success' | 'info'; }
-type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'admin';
+type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'shopping' | 'admin';
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -234,7 +235,17 @@ export default function App() {
           onThemeToggle={toggle}
           onIrBazar={function(){ setPantalla('bazar'); }}
           onIrServicios={function(){ setPantalla('servicios'); }}
+          onIrShopping={function(){ setPantalla('shopping'); }}
           onIrAdmin={function(){ setPantalla('admin'); }}
+        />
+      )}
+
+      {pantalla === 'shopping' && (
+        <ChanguiShopping
+          session={session}
+          theme={theme}
+          onThemeToggle={toggle}
+          onVolver={function(){ setPantalla('dashboard'); }}
         />
       )}
 

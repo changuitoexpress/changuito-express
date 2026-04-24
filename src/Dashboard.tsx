@@ -3,7 +3,9 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from
 import {
   Search, Star, Clock, ChevronRight, WifiOff, RefreshCw, X,
   ChevronDown, ChevronUp, ShoppingBag, Plus, Minus, MessageCircle,
-  Trash2, MapPin, CreditCard, Plus as PlusIcon, Check, Menu, LogOut, Store, Bike, ShoppingCart, Briefcase, Sparkles, Shield
+  Trash2, MapPin, CreditCard, Plus as PlusIcon, Check,
+  Menu, LogOut, Store, Bike, ShoppingCart, Briefcase, Sparkles, Shield,
+  Home, Building2, Car
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
@@ -48,9 +50,10 @@ interface DashboardProps {
   session:       AppSession;
   theme:         Theme;
   onThemeToggle: () => void;
-  onIrAdmin?:     () => void;
   onIrBazar?:     () => void;
   onIrServicios?: () => void;
+  onIrAdmin?:     () => void;
+  onIrShopping?:  () => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -826,9 +829,9 @@ export default function Dashboard(props: DashboardProps) {
 
             <div style={{ flex:1, overflowY:'auto', padding:'10px 10px' }}>
               {([
-                { key:'restaurantes', label:'Restaurantes', emoji:'🍽️', icon: Store },
-                { key:'mandaditos',   label:'Mandaditos',   emoji:'🛵', icon: Bike },
-                { key:'tiendita',     label:'Tiendita',     emoji:'🛒', icon: ShoppingCart },
+                { key:'restaurantes', label:'Restaurantes', icon: Store },
+                { key:'mandaditos',   label:'Mandaditos',   icon: Bike },
+                { key:'tiendita',     label:'Tiendita',     icon: ShoppingCart },
               ] as const).map(function(it){
                 const Icon = it.icon;
                 return (
@@ -848,6 +851,23 @@ export default function Dashboard(props: DashboardProps) {
               <button onClick={function(){ setMenuAbierto(false); props.onIrServicios && props.onIrServicios(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
                 <Briefcase style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
                 <span>Servicios</span>
+              </button>
+              <button onClick={function(){ setMenuAbierto(false); props.onIrShopping && props.onIrShopping(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                <ShoppingBasket style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
+                <span>ChanguiShopping</span>
+              </button>
+
+              <div style={{ height:'1px', background:'var(--border-subtle)', margin:'10px 8px' }} />
+
+              <button disabled style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'not-allowed', color:'var(--text-muted)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                <Building2 style={{ width:'18px', height:'18px' }} />
+                <span style={{ flex:1 }}>Bienes Raíces</span>
+                <span style={{ fontSize:'9px', fontWeight:900, padding:'2px 7px', borderRadius:'8px', background:'var(--bg-base)', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Pronto</span>
+              </button>
+              <button disabled style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'not-allowed', color:'var(--text-muted)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
+                <Car style={{ width:'18px', height:'18px' }} />
+                <span style={{ flex:1 }}>Autos</span>
+                <span style={{ fontSize:'9px', fontWeight:900, padding:'2px 7px', borderRadius:'8px', background:'var(--bg-base)', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Pronto</span>
               </button>
 
               {esAdmin && (
@@ -871,7 +891,7 @@ export default function Dashboard(props: DashboardProps) {
         </div>
       )}
 
-      <div style={{ paddingTop:'8px' }}>{renderContenido()}</div>
+      <div style={{ paddingTop:'8px', paddingBottom:'90px' }}>{renderContenido()}</div>
 
       {/* Barra carrito flotante */}
       {totalItems > 0 && (
@@ -902,6 +922,25 @@ export default function Dashboard(props: DashboardProps) {
           onPedidoOk={function(){ setCarrito([]); setModalCheckout(false); }}
         />
       )}
+
+      {/* Bottom Navigation Bar */}
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:'480px', zIndex:90, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderTop:'1px solid var(--border-subtle)', padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0px))', display:'flex', justifyContent:'space-around' }}>
+        {([
+          { key:'inicio',    label:'Inicio',   emoji:'🍽️', onClick: function(){ setTabActiva('restaurantes'); setSearch(''); } },
+          { key:'tiendita',  label:'Tiendita', emoji:'🛒', onClick: function(){ setTabActiva('tiendita');     setSearch(''); } },
+          { key:'shopping',  label:'Shopping', emoji:'🛍️', onClick: function(){ props.onIrShopping  && props.onIrShopping();  } },
+          { key:'bazar',     label:'Bazar',    emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
+          { key:'servicios', label:'Servicios',emoji:'🛠️', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
+        ] as const).map(function(it){
+          const activo = it.key === 'inicio' && tabActiva === 'restaurantes' || it.key === 'tiendita' && tabActiva === 'tiendita';
+          return (
+            <button key={it.key} onClick={it.onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'6px 2px', background:'transparent', border:'none', cursor:'pointer', color:activo?'var(--color-yellow)':'var(--text-muted)' }}>
+              <span style={{ fontSize:'18px', lineHeight:1 }}>{it.emoji}</span>
+              <span style={{ fontSize:'9px', fontWeight:800, letterSpacing:'0.04em' }}>{it.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <style>{`::-webkit-scrollbar{display:none;}*{-webkit-tap-highlight-color:transparent;box-sizing:border-box;}button{font-family:inherit;}`}</style>
     </div>
