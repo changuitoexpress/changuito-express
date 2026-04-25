@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, ShoppingBag, Plus, Minus, MessageCircle,
   Trash2, MapPin, CreditCard, Plus as PlusIcon, Check,
   Menu, LogOut, Store, Bike, ShoppingCart, Briefcase, Sparkles, Shield,
-  Home, Building2, Car
+  Building2, Car, ShoppingBasket
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
@@ -814,9 +814,16 @@ export default function Dashboard(props: DashboardProps) {
 
       {/* Hamburger Drawer */}
       {menuAbierto && (
-        <div style={{ position:'fixed', inset:0, zIndex:1000 }}>
-          <div onClick={function(){ setMenuAbierto(false); }} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.55)', backdropFilter:'blur(2px)' }} />
-          <div className="fade-in" style={{ position:'absolute', top:0, left:0, bottom:0, width:'82%', maxWidth:'320px', background:'var(--bg-card)', borderRight:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', boxShadow:'8px 0 32px rgba(0,0,0,0.35)' }}>
+        <div
+          style={{ position:'fixed', inset:0, zIndex:200, display:'flex' }}
+          onClick={function(){ setMenuAbierto(false); }}
+        >
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)', backdropFilter:'blur(2px)' }} />
+          <div
+            className="fade-in"
+            style={{ position:'relative', width:'280px', maxWidth:'82%', height:'100%', background:'var(--bg-card)', borderRight:'1px solid var(--border-subtle)', zIndex:201, display:'flex', flexDirection:'column', boxShadow:'8px 0 32px rgba(0,0,0,0.35)' }}
+            onClick={function(e){ e.stopPropagation(); }}
+          >
             <div style={{ padding:'20px 18px 16px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <div style={{ minWidth:0 }}>
                 <p style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 2px 0' }}>Sesión</p>
@@ -932,7 +939,7 @@ export default function Dashboard(props: DashboardProps) {
           { key:'bazar',     label:'Bazar',    emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
           { key:'servicios', label:'Servicios',emoji:'🛠️', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
         ] as const).map(function(it){
-          const activo = it.key === 'inicio' && tabActiva === 'restaurantes' || it.key === 'tiendita' && tabActiva === 'tiendita';
+          const activo = (it.key === 'inicio' && tabActiva === 'restaurantes') || (it.key === 'tiendita' && tabActiva === 'tiendita');
           return (
             <button key={it.key} onClick={it.onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'6px 2px', background:'transparent', border:'none', cursor:'pointer', color:activo?'var(--color-yellow)':'var(--text-muted)' }}>
               <span style={{ fontSize:'18px', lineHeight:1 }}>{it.emoji}</span>
