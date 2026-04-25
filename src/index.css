@@ -4,6 +4,7 @@
    MODO CLARO
 ═══════════════════════════════════════ */
 :root {
+  color-scheme: light;
   --bg-base:          #f4f4f8;
   --bg-card:          #ffffff;
   --bg-card-hover:    #f0f0f5;
@@ -35,6 +36,7 @@
    MODO OSCURO
 ═══════════════════════════════════════ */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-base:          #0a0a0f;
   --bg-card:          #16161e;
   --bg-card-hover:    #1e1e28;
