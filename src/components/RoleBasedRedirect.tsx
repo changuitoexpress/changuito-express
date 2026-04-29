@@ -5,14 +5,20 @@ import { LogOut, Clock } from "lucide-react";
 import DashboardMarketplace from "../Dashboard";
 
 interface UserSession {
-  user: { id: string; email?: string };
+  user: { id: string; email?: string; aud: string; created_at: string };
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
 }
 
 interface Props {
-  session: UserSession;
+  session: any;
   rol: string;
   onSignOut: () => void;
   renderAdmin: () => React.ReactNode;
+  theme?: 'light' | 'dark';
+  onThemeToggle?: () => void;
 }
 
 // Pantalla placeholder para roles aún sin dashboard propio
@@ -111,7 +117,10 @@ function ProximamenteDashboard(props: {
 //  RoleBasedRedirect — enruta según el rol del usuario
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RoleBasedRedirect(props: Props) {
-  const { session, rol, onSignOut, renderAdmin } = props;
+  const { session, rol, onSignOut, renderAdmin, theme, onThemeToggle } = props;
+  const themeValue = theme ?? 'dark';
+  const onThemeToggleFn = onThemeToggle ?? function(){};
+  void onSignOut;
 
   switch (rol) {
     case "admin":
@@ -149,6 +158,12 @@ export default function RoleBasedRedirect(props: Props) {
 
     case "cliente":
     default:
-      return <DashboardMarketplace session={session} onSignOut={onSignOut} />;
+      return (
+        <DashboardMarketplace
+          session={session}
+          theme={themeValue}
+          onThemeToggle={onThemeToggleFn}
+        />
+      );
   }
 }
