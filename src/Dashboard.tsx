@@ -216,7 +216,7 @@ function SeccionH(props: { titulo: string; emoji: string; merchants: Merchant[];
 function Banner() {
   const [slide, setSlide] = useState(0);
   const slides = [
-    { bg:'linear-gradient(135deg,#facc15,#f59e0b)', t:'⭐ Espacio Patrocinado',  s:'Tu negocio aquí · 222-100-0014' },
+    { bg:'linear-gradient(135deg,#facc15,#f59e0b)', t:'⭐ Espacio Patrocinado',  s:'Tu negocio aquí · 222-858-6650' },
     { bg:'linear-gradient(135deg,#ef4444,#b91c1c)', t:'🚀 ¿Tienes un negocio?',  s:'Únete a Changuito Express' },
     { bg:'linear-gradient(135deg,#22c55e,#15803d)', t:'📍 Zona Lomas y Toscana', s:'Cobertura exclusiva residencial' },
     { bg:'linear-gradient(135deg,#3b82f6,#1d4ed8)', t:'💎 Delivery de Lujo',     s:'Para residentes de alto nivel' },

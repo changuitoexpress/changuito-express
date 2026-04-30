@@ -281,13 +281,11 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   }
 
   function agregar(product: Product) {
-    setCarritoLocal(function (prev) {
-      const existe = prev.find(function (i) {
-        return i.id === product.id;
-      });
+    setCarritoLocal(function(prev) {
+      const existe = prev.find(function(i) { return i.id === product.id; });
       let nuevo: CartItem[];
       if (existe) {
-        nuevo = prev.map(function (i) {
+        nuevo = prev.map(function(i) {
           return i.id === product.id ? { ...i, cantidad: i.cantidad + 1 } : i;
         });
       } else {
@@ -299,26 +297,28 @@ export default function VistaNegocio(props: VistaNegocioProps) {
           negocio: m.name,
           negocio_id: m.id,
           phone_number: phoneNegocio,
-          tipo: "producto",
+          tipo: 'producto',
           emoji: getEmoji(product.category),
         };
         nuevo = [...prev, item];
       }
-      actualizarCarritoGlobal(nuevo);
+      if (props.onUpdateCarritoGlobal && props.carritoGlobal) {
+        const otros = props.carritoGlobal.filter(function(i) { return i.negocio_id !== m.id; });
+        props.onUpdateCarritoGlobal([...otros, ...nuevo]);
+      }
       return nuevo;
     });
   }
 
   function quitar(productId: string) {
-    setCarritoLocal(function (prev) {
+    setCarritoLocal(function(prev) {
       const nuevo = prev
-        .map(function (i) {
-          return i.id === productId ? { ...i, cantidad: i.cantidad - 1 } : i;
-        })
-        .filter(function (i) {
-          return i.cantidad > 0;
-        });
-      actualizarCarritoGlobal(nuevo);
+        .map(function(i) { return i.id === productId ? { ...i, cantidad: i.cantidad - 1 } : i; })
+        .filter(function(i) { return i.cantidad > 0; });
+      if (props.onUpdateCarritoGlobal && props.carritoGlobal) {
+        const otros = props.carritoGlobal.filter(function(i) { return i.negocio_id !== m.id; });
+        props.onUpdateCarritoGlobal([...otros, ...nuevo]);
+      }
       return nuevo;
     });
   }
