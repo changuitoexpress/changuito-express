@@ -50,10 +50,12 @@ interface DashboardProps {
   session:       AppSession;
   theme:         Theme;
   onThemeToggle: () => void;
-  onIrBazar?:     () => void;
-  onIrServicios?: () => void;
-  onIrAdmin?:     () => void;
-  onIrShopping?:  () => void;
+  onIrBazar?:              () => void;
+  onIrServicios?:          () => void;
+  onIrAdmin?:              () => void;
+  onIrShopping?:           () => void;
+  carritoGlobal:           CartItem[];
+  onUpdateCarritoGlobal:   (items: CartItem[]) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -595,7 +597,6 @@ export default function Dashboard(props: DashboardProps) {
   const [search, setSearch]                     = useState<string>('');
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [seccionAbierta, setSeccionAbierta]     = useState<string | null>(null);
-  const [carrito, setCarrito]                   = useState<CartItem[]>([]);
   const [modalMandadito, setModalMandadito]     = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout]       = useState(false);
   const [menuAbierto, setMenuAbierto]           = useState(false);
@@ -612,8 +613,8 @@ export default function Dashboard(props: DashboardProps) {
 
   const isDark   = props.theme === 'dark';
   const username = props.session.user.email?.split('@')[0] ?? 'usuario';
-  const totalItems = carrito.reduce(function(a,i){ return a+i.cantidad; }, 0);
-  const totalPrecio = carrito.reduce(function(a,i){ return a+i.precio*i.cantidad; }, 0) + COSTO_ENVIO;
+  const totalItems = props.carritoGlobal.reduce(function(a,i){ return a+i.cantidad; }, 0);
+  const totalPrecio = props.carritoGlobal.reduce(function(a,i){ return a+i.precio*i.cantidad; }, 0) + COSTO_ENVIO;
 
   const fetchMerchants = useCallback(async function(){
     setLoading(true); setError('');
@@ -641,8 +642,8 @@ export default function Dashboard(props: DashboardProps) {
         theme={props.theme}
         onThemeToggle={props.onThemeToggle}
         clienteEmail={props.session.user.email}
-        carritoGlobal={carrito}
-        onUpdateCarritoGlobal={setCarrito}
+        carritoGlobal={props.carritoGlobal}
+        onUpdateCarritoGlobal={props.onUpdateCarritoGlobal}
         onVolver={function(){ setSelectedMerchant(null); }}
       />
     );
@@ -669,7 +670,7 @@ export default function Dashboard(props: DashboardProps) {
       phone_number: merchant.phone_number ?? PHONE_OPERATIVO,
       tipo: 'mandadito', emoji: '📝',
     };
-    setCarrito(function(prev){ return [...prev, item]; });
+    props.onUpdateCarritoGlobal([...props.carritoGlobal, item]);
   }
 
   function tabStyle(t: MainTab): React.CSSProperties {
@@ -922,11 +923,11 @@ export default function Dashboard(props: DashboardProps) {
 
       {modalCheckout && (
         <ModalCheckout
-          carrito={carrito}
+          carrito={props.carritoGlobal}
           clienteId={props.session.user.id}
           clienteEmail={props.session.user.email ?? ''}
           onClose={function(){ setModalCheckout(false); }}
-          onPedidoOk={function(){ setCarrito([]); setModalCheckout(false); }}
+          onPedidoOk={function(){ props.onUpdateCarritoGlobal([]); setModalCheckout(false); }}
         />
       )}
 
