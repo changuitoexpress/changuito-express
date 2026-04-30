@@ -3,6 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
 import Dashboard from './Dashboard';
+import type { CartItem } from './Dashboard';
 import BazarVecinal from './BazarVecinal';
 import Servicios from './Servicios';
 import ChanguiShopping from './ChanguiShopping';
@@ -181,6 +182,7 @@ export default function App() {
   const [session, setSession]     = useState<AppSession | null>(null);
   const [booting, setBooting]     = useState<boolean>(true);
   const [pantalla, setPantalla]   = useState<Pantalla>('dashboard');
+  const [carritoGlobal, setCarritoGlobal] = useState<CartItem[]>([]);
   const { theme, toggle }         = useTheme();
   const { toasts, push }          = useToast();
 
@@ -233,6 +235,8 @@ export default function App() {
           session={session}
           theme={theme}
           onThemeToggle={toggle}
+          carritoGlobal={carritoGlobal}
+          onUpdateCarritoGlobal={setCarritoGlobal}
           onIrBazar={function(){ setPantalla('bazar'); }}
           onIrServicios={function(){ setPantalla('servicios'); }}
           onIrShopping={function(){ setPantalla('shopping'); }}
