@@ -380,6 +380,10 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         porNegocio[item.negocio].push(item);
       });
 
+      const numRestaurantes = Object.keys(porNegocio).length;
+      const costoEnvioDinamico = COSTO_ENVIO + Math.max(0, numRestaurantes - 1) * 15;
+      const totalConEnvioDinamico = todosLosItems.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0) + costoEnvioDinamico;
+
       const linea = '━━━━━━━━━━━━━━━━━━━━━━';
       let msg = '*🛵 CHANGUITO EXPRESS*\n' + linea + '\n';
       msg += '👤 *Cliente:* ' + clienteEmail + '\n' + linea + '\n\n';
@@ -396,8 +400,13 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         msg += linea + '\n';
       });
 
-      msg += '\n🚚 *Envío:* $' + COSTO_ENVIO.toFixed(2) + '\n';
-      msg += '*💰 TOTAL: $' + totalGlobal.toFixed(2) + '*';
+      if (numRestaurantes > 1) {
+        msg += '\n🚚 *Envío base:* $' + COSTO_ENVIO.toFixed(2) + '\n';
+        msg += '➕ *Envío adicional (' + (numRestaurantes - 1) + ' restaurante' + (numRestaurantes > 2 ? 's' : '') + ' extra):* $' + ((numRestaurantes - 1) * 15).toFixed(2) + '\n';
+      } else {
+        msg += '\n🚚 *Envío:* $' + costoEnvioDinamico.toFixed(2) + '\n';
+      }
+      msg += '*💰 TOTAL: $' + totalConEnvioDinamico.toFixed(2) + '*';
 
       window.open(
         "https://wa.me/" + PHONE_SOPORTE + "?text=" + encodeURIComponent(msg),

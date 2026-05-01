@@ -73,7 +73,9 @@ const FORMAS_PAGO = [
 const SECCIONES_REST = [
   { titulo: 'Desayunos y Comidas', cats: ['desayunos y comidas'],   emoji: '🍳' },
   { titulo: 'Cemitas',             cats: ['cemitas'],               emoji: '🫓' },
-  { titulo: 'Tortas',              cats: ['tortas', 'cemitas'],     emoji: '🥖' },
+  { titulo: 'Tortas',              cats: ['tortas'],                emoji: '🥖' },
+  { titulo: 'Crepas',              cats: ['crepas'],                emoji: '🥞' },
+  { titulo: 'Memelas',             cats: ['memelas'],               emoji: '🫔' },
   { titulo: 'Taquerías',           cats: ['taqueria'],              emoji: '🌮' },
   { titulo: 'Pizzerías',           cats: ['pizzeria'],              emoji: '🍕' },
   { titulo: 'Hamburguesas',        cats: ['hamburguesas'],          emoji: '🍔' },
@@ -858,7 +860,7 @@ export default function Dashboard(props: DashboardProps) {
               </button>
               <button onClick={function(){ setMenuAbierto(false); props.onIrServicios && props.onIrServicios(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
                 <Briefcase style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
-                <span>Servicios</span>
+                <span>Directorio Telefónico</span>
               </button>
               <button onClick={function(){ setMenuAbierto(false); props.onIrShopping && props.onIrShopping(); }} style={{ width:'100%', display:'flex', alignItems:'center', gap:'12px', padding:'13px 12px', borderRadius:'12px', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-primary)', fontSize:'14px', fontWeight:700, textAlign:'left' }}>
                 <ShoppingBasket style={{ width:'18px', height:'18px', color:'var(--color-yellow)' }} />
@@ -938,7 +940,7 @@ export default function Dashboard(props: DashboardProps) {
           { key:'tiendita',  label:'Tiendita', emoji:'🛒', onClick: function(){ setTabActiva('tiendita');     setSearch(''); } },
           { key:'shopping',  label:'Shopping', emoji:'🛍️', onClick: function(){ props.onIrShopping  && props.onIrShopping();  } },
           { key:'bazar',     label:'Bazar',    emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
-          { key:'servicios', label:'Servicios',emoji:'🛠️', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
+          { key:'servicios', label:'Directorio',emoji:'📞', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
         ] as const).map(function(it){
           const activo = (it.key === 'inicio' && tabActiva === 'restaurantes') || (it.key === 'tiendita' && tabActiva === 'tiendita');
           return (
