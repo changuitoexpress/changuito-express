@@ -341,10 +341,17 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         data: { session },
       } = await supabase.auth.getSession();
       const clienteId = session?.user?.id ?? null;
-      const detalle = carritoLocal
-        .map(function (i) {
-          return i.nombre + " x" + i.cantidad;
-        })
+
+      const todosLosItems = props.carritoGlobal && props.carritoGlobal.length > 0
+        ? props.carritoGlobal
+        : carritoLocal;
+
+      const totalGlobal = todosLosItems.reduce(function(a, i) {
+        return a + i.precio * i.cantidad;
+      }, 0) + COSTO_ENVIO;
+
+      const detalle = todosLosItems
+        .map(function(i) { return i.nombre + " x" + i.cantidad; })
         .join(", ");
 
       const { error: insertError } = await supabase.from("pedidos").insert({
@@ -352,9 +359,9 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         negocio_id: m.id,
         negocio_nombre: m.name,
         detalle: detalle,
-        subtotal: subtotal,
+        subtotal: todosLosItems.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0),
         costo_envio: COSTO_ENVIO,
-        total: totalConEnvio,
+        total: totalGlobal,
         estatus: "pendiente",
         canal: "webapp",
         cliente_email: clienteEmail,
@@ -367,26 +374,40 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         console.error("[VistaNegocio]", insertError.message);
       }
 
-      const mensaje = formatWhatsApp({
-        negocio: m.name,
-        email: clienteEmail,
-        items: carritoLocal,
-        subtotal,
-        envio: COSTO_ENVIO,
-        total: totalConEnvio,
+      const porNegocio: Record<string, typeof todosLosItems> = {};
+      todosLosItems.forEach(function(item) {
+        if (!porNegocio[item.negocio]) porNegocio[item.negocio] = [];
+        porNegocio[item.negocio].push(item);
       });
 
+      const linea = '━━━━━━━━━━━━━━━━━━━━━━';
+      let msg = '*🛵 CHANGUITO EXPRESS*\n' + linea + '\n';
+      msg += '👤 *Cliente:* ' + clienteEmail + '\n' + linea + '\n\n';
+
+      Object.entries(porNegocio).forEach(function([negocio, items]) {
+        msg += '🍽️ *' + negocio.toUpperCase() + '*\n';
+        items.forEach(function(item) {
+          if (item.tipo === 'mandadito') {
+            msg += '   📝 ' + item.nombre + '\n';
+          } else {
+            msg += '   • ' + item.nombre + ' x' + item.cantidad + ' = $' + (item.precio * item.cantidad).toFixed(2) + '\n';
+          }
+        });
+        msg += linea + '\n';
+      });
+
+      msg += '\n🚚 *Envío:* $' + COSTO_ENVIO.toFixed(2) + '\n';
+      msg += '*💰 TOTAL: $' + totalGlobal.toFixed(2) + '*';
+
       window.open(
-        "https://wa.me/" +
-          phoneNegocio +
-          "?text=" +
-          encodeURIComponent(mensaje),
+        "https://wa.me/" + PHONE_SOPORTE + "?text=" + encodeURIComponent(msg),
         "_blank",
       );
 
-      // Limpiar carrito local Y actualizar global
+      if (props.onUpdateCarritoGlobal) {
+        props.onUpdateCarritoGlobal([]);
+      }
       setCarritoLocal([]);
-      actualizarCarritoGlobal([]);
       setModalOpen(false);
     } catch (err: any) {
       setErrorPedido(
