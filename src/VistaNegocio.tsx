@@ -323,13 +323,15 @@ export default function VistaNegocio(props: VistaNegocioProps) {
     });
   }
 
-  const totalItems = carritoLocal.reduce(function (a, i) {
-    return a + i.cantidad;
-  }, 0);
-  const subtotal = carritoLocal.reduce(function (a, i) {
-    return a + i.precio * i.cantidad;
-  }, 0);
-  const totalConEnvio = subtotal + COSTO_ENVIO;
+  const carritoParaMostrar = props.carritoGlobal && props.carritoGlobal.length > 0
+    ? props.carritoGlobal
+    : carritoLocal;
+  const totalItems = carritoParaMostrar.reduce(function(a, i) { return a + i.cantidad; }, 0);
+  const subtotalGlobal = carritoParaMostrar.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0);
+  const subtotal = carritoLocal.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0);
+  const negociosCount = new Set(carritoParaMostrar.map(function(i){ return i.negocio_id; })).size;
+  const costoEnvioActual = COSTO_ENVIO + Math.max(0, negociosCount - 1) * 15;
+  const totalConEnvio = subtotalGlobal + costoEnvioActual;
 
   // ── Confirmar pedido ──────────────────────────────────────────────────────────
   async function confirmarPedido() {
@@ -1136,69 +1138,42 @@ export default function VistaNegocio(props: VistaNegocioProps) {
             >
               Tu Pedido
             </h2>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--text-muted)",
-                margin: "0 0 16px 0",
-              }}
-            >
-              {m.name}
+            <p style={{ fontSize:'12px', color:'var(--text-muted)', margin:'0 0 16px 0' }}>
+              {negociosCount > 1 ? negociosCount + ' negocios en el pedido' : m.name}
             </p>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                marginBottom: "16px",
-              }}
-            >
-              {carritoLocal.map(function (item) {
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                  >
-                    <span style={{ fontSize: "22px" }}>
-                      {item.emoji ?? "🍽️"}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <p
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "var(--text-primary)",
-                          margin: "0 0 1px 0",
-                        }}
-                      >
-                        {item.nombre}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--text-muted)",
-                          margin: 0,
-                        }}
-                      >
-                        x{item.cantidad} · ${item.precio.toFixed(2)} c/u
-                      </p>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'16px' }}>
+              {(function() {
+                const grupos: Record<string, typeof carritoParaMostrar> = {};
+                carritoParaMostrar.forEach(function(i) {
+                  if (!grupos[i.negocio]) grupos[i.negocio] = [];
+                  grupos[i.negocio].push(i);
+                });
+                return Object.entries(grupos).map(function([negocio, items]) {
+                  return (
+                    <div key={negocio}>
+                      {negociosCount > 1 && (
+                        <p style={{ fontSize:'10px', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--color-yellow)', margin:'0 0 6px 0' }}>
+                          🍽️ {negocio}
+                        </p>
+                      )}
+                      {items.map(function(item) {
+                        return (
+                          <div key={item.id} style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
+                            <span style={{ fontSize:'22px' }}>{item.emoji ?? '🍽️'}</span>
+                            <div style={{ flex:1 }}>
+                              <p style={{ fontSize:'13px', fontWeight:700, color:'var(--text-primary)', margin:'0 0 1px 0' }}>{item.nombre}</p>
+                              <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>x{item.cantidad} · ${item.precio.toFixed(2)} c/u</p>
+                            </div>
+                            <span style={{ fontSize:'14px', fontWeight:800, color:'var(--color-yellow)' }}>
+                              ${(item.precio * item.cantidad).toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 800,
-                        color: "var(--color-yellow)",
-                      }}
-                    >
-                      ${(item.precio * item.cantidad).toFixed(2)}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
             <div
               style={{
@@ -1228,7 +1203,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                     color: "var(--text-primary)",
                   }}
                 >
-                  ${subtotal.toFixed(2)}
+                  ${subtotalGlobal.toFixed(2)}
                 </span>
               </div>
               <div
@@ -1248,7 +1223,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                     color: "var(--text-primary)",
                   }}
                 >
-                  ${COSTO_ENVIO.toFixed(2)}
+                  ${costoEnvioActual.toFixed(2)}{negociosCount > 1 ? ' (+$' + ((negociosCount-1)*15).toFixed(0) + ' multi)' : ''}
                 </span>
               </div>
               <div

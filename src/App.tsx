@@ -272,6 +272,9 @@ export default function App() {
           theme={theme}
           onThemeToggle={toggle}
           onVolver={function(){ setPantalla('dashboard'); }}
+          onIrDashboard={function(){ setPantalla('dashboard'); }}
+          onIrServicios={function(){ setPantalla('servicios'); }}
+          onIrShopping={function(){ setPantalla('shopping'); }}
         />
       )}
 
@@ -281,6 +284,9 @@ export default function App() {
           theme={theme}
           onThemeToggle={toggle}
           onVolver={function(){ setPantalla('dashboard'); }}
+          onIrDashboard={function(){ setPantalla('dashboard'); }}
+          onIrBazar={function(){ setPantalla('bazar'); }}
+          onIrShopping={function(){ setPantalla('shopping'); }}
         />
       )}
     </>
