@@ -1,7 +1,7 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
+import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart, Eye, EyeOff } from 'lucide-react';
 import Dashboard from './Dashboard';
 import type { CartItem } from './Dashboard';
 import BazarVecinal from './BazarVecinal';
@@ -96,6 +96,7 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [focused, setFocused]   = useState('');
+  const [showPass, setShowPass] = useState(false);
   const isDark = props.theme === 'dark';
   const isLogin = mode === 'login';
 
@@ -137,8 +138,8 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
           <h1 style={{ fontSize:'26px', fontWeight:900, color:'var(--text-primary)', letterSpacing:'-0.04em', lineHeight:1, margin:0 }}>
             CHANGUITO<br /><span style={{ color:'#facc15' }}>EXPRESS</span>
           </h1>
-          <p style={{ fontSize:'10px', letterSpacing:'0.35em', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', marginTop:'8px' }}>
-            Lomas · Clúster Toscana
+          <p style={{ fontSize:'10px', letterSpacing:'0.25em', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', marginTop:'8px' }}>
+            • LOMAS 1-2-3 • LA VISTA •
           </p>
         </div>
         <div style={{ background:isDark?'#16161e':'#ffffff', border:isDark?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(0,0,0,0.08)', borderRadius:'28px', padding:'28px', boxShadow:'var(--shadow-float)' }}>
@@ -162,13 +163,16 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
             </div>
             <div style={{ position:'relative' }}>
               <Lock style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', width:'15px', height:'15px', color:focused==='pass'?'#facc15':'var(--text-muted)', pointerEvents:'none' }} />
-              <input type="password" placeholder="Contraseña (mín. 6 caracteres)" autoComplete={isLogin?'current-password':'new-password'} value={password}
+              <input type={showPass?'text':'password'} placeholder="Contraseña (mín. 6 caracteres)" autoComplete={isLogin?'current-password':'new-password'} value={password}
                 onChange={function(e) { setPassword(e.target.value); }}
                 onFocus={function() { setFocused('pass'); }} onBlur={function() { setFocused(''); }}
-                style={{ width:'100%', boxSizing:'border-box', background:inputBg, border:ib('pass'), borderRadius:'14px', padding:'14px 14px 14px 40px', color:'var(--text-primary)', fontSize:'14px', outline:'none' }} />
+                style={{ width:'100%', boxSizing:'border-box', background:inputBg, border:ib('pass'), borderRadius:'14px', padding:'14px 44px 14px 40px', color:'var(--text-primary)', fontSize:'14px', outline:'none' }} />
+              <button type="button" onClick={function(){ setShowPass(function(p){ return !p; }); }} tabIndex={-1} style={{ position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:'4px', lineHeight:0 }}>
+                {showPass ? <EyeOff style={{ width:'15px', height:'15px' }} /> : <Eye style={{ width:'15px', height:'15px' }} />}
+              </button>
             </div>
             <button type="submit" disabled={loading} style={{ width:'100%', background:loading?'rgba(250,204,21,0.5)':'#facc15', color:'#020617', fontWeight:900, fontSize:'13px', textTransform:'uppercase', letterSpacing:'0.12em', padding:'15px', borderRadius:'14px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', boxShadow:loading?'none':'0 6px 20px rgba(250,204,21,0.35)', marginTop:'4px', cursor:loading?'not-allowed':'pointer' }}>
-              {loading ? <span className="spinner" style={{ borderTopColor:'#020617', borderColor:'rgba(2,6,23,0.25)' }} /> : isLogin ? <><LogIn style={{ width:'15px', height:'15px' }} /> Entrar al Bazar</> : <><UserPlus style={{ width:'15px', height:'15px' }} /> Crear Cuenta VIP</>}
+              {loading ? <span className="spinner" style={{ borderTopColor:'#020617', borderColor:'rgba(2,6,23,0.25)' }} /> : isLogin ? <><LogIn style={{ width:'15px', height:'15px' }} /> ENTRAR A LA APP</> : <><UserPlus style={{ width:'15px', height:'15px' }} /> Crear cuenta</>}
             </button>
           </form>
         </div>
