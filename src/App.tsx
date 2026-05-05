@@ -16,7 +16,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Theme = 'light' | 'dark';
-export interface AppSession { user: { id: string; email?: string }; }
+export interface AppSession { user: { id: string; email?: string; nombre?: string }; }
 export interface Toast { id: number; text: string; kind: 'error' | 'success' | 'info'; }
 type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'shopping' | 'admin';
 
@@ -94,6 +94,7 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
   const [mode, setMode]         = useState<'login'|'register'>('login');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const [nombre, setNombre]     = useState('');
   const [loading, setLoading]   = useState(false);
   const [focused, setFocused]   = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -103,12 +104,16 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password) { props.onToast('Completá todos los campos.', 'error'); return; }
+    if (!isLogin && !nombre.trim()) { props.onToast('Ingresa tu nombre completo.', 'error'); return; }
     if (password.length < 6)  { props.onToast('Mínimo 6 caracteres.', 'error'); return; }
     setLoading(true);
     try {
       if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data: authData, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        if (authData.user) {
+          await supabase.from('perfiles').insert({ id: authData.user.id, nombre: nombre.trim() });
+        }
         props.onToast('Revisá tu email para confirmar.', 'success');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -161,6 +166,15 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
                 onFocus={function() { setFocused('email'); }} onBlur={function() { setFocused(''); }}
                 style={{ width:'100%', boxSizing:'border-box', background:inputBg, border:ib('email'), borderRadius:'14px', padding:'14px 14px 14px 40px', color:'var(--text-primary)', fontSize:'14px', outline:'none' }} />
             </div>
+            {!isLogin && (
+              <div style={{ position:'relative' }}>
+                <UserPlus style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', width:'15px', height:'15px', color:focused==='nombre'?'#facc15':'var(--text-muted)', pointerEvents:'none' }} />
+                <input type="text" placeholder="Nombre completo" autoComplete="name" value={nombre}
+                  onChange={function(e) { setNombre(e.target.value); }}
+                  onFocus={function() { setFocused('nombre'); }} onBlur={function() { setFocused(''); }}
+                  style={{ width:'100%', boxSizing:'border-box', background:inputBg, border:ib('nombre'), borderRadius:'14px', padding:'14px 14px 14px 40px', color:'var(--text-primary)', fontSize:'14px', outline:'none' }} />
+              </div>
+            )}
             <div style={{ position:'relative' }}>
               <Lock style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', width:'15px', height:'15px', color:focused==='pass'?'#facc15':'var(--text-muted)', pointerEvents:'none' }} />
               <input type={showPass?'text':'password'} placeholder="Contraseña (mín. 6 caracteres)" autoComplete={isLogin?'current-password':'new-password'} value={password}
@@ -190,19 +204,34 @@ export default function App() {
   const { theme, toggle }         = useTheme();
   const { toasts, push }          = useToast();
 
+  async function fetchNombre(userId: string): Promise<string | undefined> {
+    try {
+      const { data } = await supabase.from('perfiles').select('nombre').eq('id', userId).single();
+      return data?.nombre ?? undefined;
+    } catch { return undefined; }
+  }
+
   useEffect(function() {
     let mounted = true;
     async function init() {
       try {
         const { data: { session: s } } = await supabase.auth.getSession();
-        if (mounted && s) setSession({ user: { id: s.user.id, email: s.user.email } });
+        if (mounted && s) {
+          const nombre = await fetchNombre(s.user.id);
+          setSession({ user: { id: s.user.id, email: s.user.email, nombre } });
+        }
       } catch { } finally { if (mounted) setBooting(false); }
     }
     init();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(function(_ev, s) {
       if (!mounted) return;
-      if (s) setSession({ user: { id: s.user.id, email: s.user.email } });
-      else   setSession(null);
+      if (s) {
+        fetchNombre(s.user.id).then(function(nombre) {
+          if (mounted) setSession({ user: { id: s.user.id, email: s.user.email, nombre } });
+        });
+      } else {
+        setSession(null);
+      }
     });
     return function() { mounted = false; subscription.unsubscribe(); };
   }, []);
