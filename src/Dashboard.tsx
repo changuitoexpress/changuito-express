@@ -90,6 +90,7 @@ interface DashboardProps {
   onIrServicios?: () => void;
   onIrAdmin?: () => void;
   onIrShopping?: () => void;
+  onIrNegocio?: () => void; // <-- NUEVO: Para ir al panel de socios
   carritoGlobal: CartItem[];
   onUpdateCarritoGlobal: (items: CartItem[]) => void;
 }
@@ -465,8 +466,8 @@ function Banner() {
     },
     {
       bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
-      t: "💎 Publica tus Productos en Nuestro Bazar",
-      s: "Solo para residentes en Lomas y La Vista",
+      t: "💎 Publica tus Productos",
+      s: "En el Bazar Vecinal Exclusivo",
     },
   ];
   useEffect(function () {
@@ -757,7 +758,7 @@ function ModalCheckout(props: {
         calle,
         numero_casa: numero,
         referencias,
-        preferencias_entrega: preferencias,
+        referencias_entrega: preferencias,
         es_principal: direcciones.length === 0,
       })
       .select()
@@ -2762,6 +2763,32 @@ export default function Dashboard(props: DashboardProps) {
                 }}
               />
 
+              {/* BOTÓN NUEVO: PANEL DE NEGOCIO */}
+              <button
+                onClick={function () {
+                  setMenuAbierto(false);
+                  props.onIrNegocio && props.onIrNegocio();
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "13px 12px",
+                  borderRadius: "12px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  textAlign: "left",
+                }}
+              >
+                <Store style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <span>Panel de Negocio</span>
+              </button>
+
               <button
                 disabled
                 style={{
@@ -2782,41 +2809,6 @@ export default function Dashboard(props: DashboardProps) {
               >
                 <Building2 style={{ width: "18px", height: "18px" }} />
                 <span style={{ flex: 1 }}>Bienes Raíces</span>
-                <span
-                  style={{
-                    fontSize: "9px",
-                    fontWeight: 900,
-                    padding: "2px 7px",
-                    borderRadius: "8px",
-                    background: "var(--bg-base)",
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  Pronto
-                </span>
-              </button>
-              <button
-                disabled
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "not-allowed",
-                  color: "var(--text-muted)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <Car style={{ width: "18px", height: "18px" }} />
-                <span style={{ flex: 1 }}>Autos</span>
                 <span
                   style={{
                     fontSize: "9px",

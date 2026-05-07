@@ -1,3 +1,4 @@
+```react
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -8,6 +9,7 @@ import BazarVecinal from './BazarVecinal';
 import Servicios from './Servicios';
 import ChanguiShopping from './ChanguiShopping';
 import AdminGodMode from './AdminGodMode';
+import DashboardNegocio from './DashboardNegocio'; // <-- Integración del Panel de Negocio
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL: string      = import.meta.env.VITE_SUPABASE_URL      ?? '';
@@ -18,7 +20,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export type Theme = 'light' | 'dark';
 export interface AppSession { user: { id: string; email?: string; nombre?: string }; }
 export interface Toast { id: number; text: string; kind: 'error' | 'success' | 'info'; }
-type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'shopping' | 'admin';
+// Agregamos 'negocio' a los tipos de pantalla válidos
+type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'shopping' | 'admin' | 'negocio';
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -274,6 +277,20 @@ export default function App() {
           onIrServicios={function(){ setPantalla('servicios'); }}
           onIrShopping={function(){ setPantalla('shopping'); }}
           onIrAdmin={function(){ setPantalla('admin'); }}
+          // @ts-ignore: Permite pasar la función aunque la interfaz en Dashboard no la defina aún
+          onIrNegocio={function(){ setPantalla('negocio'); }}
+        />
+      )}
+
+      {/* ─── Nueva Pantalla: Dashboard de Negocios ─── */}
+      {pantalla === 'negocio' && (
+        <DashboardNegocio
+          session={session}
+          onCerrarSesion={async function() { 
+            await supabase.auth.signOut(); 
+            setSession(null); 
+          }}
+          onVolver={function(){ setPantalla('dashboard'); }}
         />
       )}
 
@@ -321,3 +338,5 @@ export default function App() {
     </>
   );
 }
+
+```
