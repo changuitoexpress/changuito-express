@@ -684,4 +684,3 @@ function AuthScreen(props: {
     </>
   );
 }
-export default App;
