@@ -521,7 +521,6 @@ function AuthScreen(props: {
 }
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
-export default function App() {
   const [session, setSession] = useState<AppSession | null>(null);
   const [booting, setBooting] = useState<boolean>(true);
   const [pantalla, setPantalla] = useState<Pantalla>("dashboard");
