@@ -1144,13 +1144,13 @@ function ModalCheckout(props: {
                 </p>
                 {[
                   {
-                    label: "Alias (Casa, Trabajo...)",
+                    label: "Alias / Nombre (Casa, Trabajo...)",
                     val: alias,
                     set: setAlias,
-                    ph: "Casa",
+                    ph: "Casa, Trabajo",
                   },
                   {
-                    label: "Calle *",
+                    label: "Calle / Torre *",
                     val: calle,
                     set: setCalle,
                     ph: "Av. Principal",
@@ -1159,19 +1159,19 @@ function ModalCheckout(props: {
                     label: "Número / Depto *",
                     val: numero,
                     set: setNumero,
-                    ph: "123 Torre A",
+                    ph: "#123, Depto #123",
                   },
                   {
                     label: "Referencias",
                     val: referencias,
                     set: setReferencias,
-                    ph: "Junto al parque",
+                    ph: "Opcional",
                   },
                   {
                     label: "Instrucciones de entrega",
                     val: preferencias,
                     set: setPreferencias,
-                    ph: "No tocar timbre",
+                    ph: "Opcional",
                   },
                 ].map(function (f) {
                   return (
@@ -2785,7 +2785,13 @@ export default function Dashboard(props: DashboardProps) {
                   textAlign: "left",
                 }}
               >
-                <Store style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <Store
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "var(--color-yellow)",
+                  }}
+                />
                 <span>Panel de Negocio</span>
               </button>
 
