@@ -34,8 +34,6 @@ interface BazarProps {
 // ─── Categorías ───────────────────────────────────────────────────────────────
 const CATEGORIAS = [
   { id:'todos',       label:'Todos',        Icon: Package  },
-  { id:'inmuebles',   label:'Inmuebles',    Icon: Home     },
-  { id:'autos',       label:'Autos',        Icon: Car      },
   { id:'ropa',        label:'Ropa',         Icon: Shirt    },
   { id:'tecnologia',  label:'Tecnología',   Icon: Smartphone },
   { id:'libros',      label:'Libros',       Icon: BookOpen },
@@ -43,7 +41,7 @@ const CATEGORIAS = [
 ];
 
 const EMOJI_CAT: Record<string, string> = {
-  inmuebles:'🏠', autos:'🚗', ropa:'👗', tecnologia:'📱', libros:'📚', general:'📦',
+  ropa:'👗', tecnologia:'📱', libros:'📚', general:'📦',
 };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -298,8 +296,6 @@ function ModalPublicar(props: {
             <label style={labelStyle}>Categoría</label>
             <select value={categoria} onChange={function(e){ setCategoria(e.target.value); }} style={{ ...inputStyle }}>
               <option value="general">General</option>
-              <option value="inmuebles">Inmuebles</option>
-              <option value="autos">Autos</option>
               <option value="ropa">Ropa y accesorios</option>
               <option value="tecnologia">Tecnología</option>
               <option value="libros">Libros</option>

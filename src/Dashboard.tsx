@@ -90,7 +90,8 @@ interface DashboardProps {
   onIrServicios?: () => void;
   onIrAdmin?: () => void;
   onIrShopping?: () => void;
-  onIrNegocio?: () => void; // <-- NUEVO: Para ir al panel de socios
+  onIrNegocio?: () => void;
+  onIrRepas?: () => void;
   carritoGlobal: CartItem[];
   onUpdateCarritoGlobal: (items: CartItem[]) => void;
 }
@@ -1142,68 +1143,60 @@ function ModalCheckout(props: {
                 >
                   Nueva dirección
                 </p>
+                {/* Alias field */}
+                <div style={{ marginBottom: "10px" }}>
+                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>Alias / Nombre (Casa, Trabajo...)</p>
+                  <input value={alias} onChange={function(e){ setAlias(e.target.value); }} placeholder="Casa, Trabajo"
+                    style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none" }} />
+                </div>
+                {/* Fraccionamiento selector */}
+                <div style={{ marginBottom:"10px" }}>
+                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>🏘️ Zona de entrega</p>
+                  {fraccionamientoSel ? (
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderRadius:"12px", border:"2px solid var(--color-yellow)", background:"var(--color-yellow-dim)" }}>
+                      <span style={{ fontSize:"13px", fontWeight:800, color:textPrim }}>{fraccionamientoSel.nombre}</span>
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                        <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${fraccionamientoSel.costo_envio}</span>
+                        <button onClick={function(){ setFraccionamientoSel(null); setCostoEnvio(50); setFracSearch(""); }} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", padding:0, lineHeight:0 }}>
+                          <X style={{ width:"14px", height:"14px" }} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <input value={fracSearch} onChange={function(e){ setFracSearch(e.target.value); }} placeholder="Buscar fraccionamiento..."
+                        style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none", marginBottom:"4px" }} />
+                      {fracSearch.trim() !== "" && (
+                        <div style={{ maxHeight:"140px", overflowY:"auto", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)" }}>
+                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).map(function(f){
+                            return (
+                              <div key={f.id} onClick={function(){ setFraccionamientoSel(f); setCostoEnvio(f.costo_envio); setFracSearch(""); }}
+                                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", cursor:"pointer", borderBottom:`1px solid ${border}` }}>
+                                <span style={{ fontSize:"13px", fontWeight:700, color:textPrim }}>{f.nombre}</span>
+                                <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${f.costo_envio}</span>
+                              </div>
+                            );
+                          })}
+                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).length === 0 && (
+                            <p style={{ fontSize:"12px", color:"var(--text-muted)", padding:"10px 14px", margin:0 }}>Sin resultados</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Remaining address fields */}
                 {[
-                  {
-                    label: "Alias / Nombre (Casa, Trabajo...)",
-                    val: alias,
-                    set: setAlias,
-                    ph: "Casa, Trabajo",
-                  },
-                  {
-                    label: "Calle / Torre *",
-                    val: calle,
-                    set: setCalle,
-                    ph: "Av. Principal",
-                  },
-                  {
-                    label: "Número / Depto *",
-                    val: numero,
-                    set: setNumero,
-                    ph: "#123, Depto #123",
-                  },
-                  {
-                    label: "Referencias",
-                    val: referencias,
-                    set: setReferencias,
-                    ph: "Opcional",
-                  },
-                  {
-                    label: "Instrucciones de entrega",
-                    val: preferencias,
-                    set: setPreferencias,
-                    ph: "Opcional",
-                  },
+                  { label: "Calle / Torre *",          val: calle,       set: setCalle,       ph: "Av. Principal"  },
+                  { label: "Número / Depto *",          val: numero,      set: setNumero,      ph: "#123, Depto #123" },
+                  { label: "Referencias",               val: referencias, set: setReferencias, ph: "Opcional"       },
+                  { label: "Instrucciones de entrega",  val: preferencias,set: setPreferencias,ph: "Opcional"       },
                 ].map(function (f) {
                   return (
                     <div key={f.label} style={{ marginBottom: "10px" }}>
-                      <p
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          color: textMuted,
-                          margin: "0 0 4px 0",
-                        }}
-                      >
-                        {f.label}
-                      </p>
-                      <input
-                        value={f.val}
-                        onChange={function (e) {
-                          f.set(e.target.value);
-                        }}
-                        placeholder={f.ph}
-                        style={{
-                          width: "100%",
-                          boxSizing: "border-box",
-                          padding: "11px 14px",
-                          borderRadius: "12px",
-                          border: `1px solid ${border}`,
-                          background: "var(--bg-card)",
-                          color: textPrim,
-                          fontSize: "13px",
-                          outline: "none",
-                        }}
-                      />
+                      <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>{f.label}</p>
+                      <input value={f.val} onChange={function(e){ f.set(e.target.value); }} placeholder={f.ph}
+                        style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none" }} />
                     </div>
                   );
                 })}
@@ -1240,172 +1233,6 @@ function ModalCheckout(props: {
                 {error}
               </p>
             )}
-
-            {/* Fraccionamiento / zona de entrega */}
-            <div style={{ marginBottom: "16px" }}>
-              <p
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: textPrim,
-                  margin: "0 0 8px 0",
-                }}
-              >
-                🏘️ Zona de entrega
-              </p>
-              {fraccionamientoSel ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 14px",
-                    borderRadius: "12px",
-                    border: "2px solid var(--color-yellow)",
-                    background: "var(--color-yellow-dim)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 800,
-                      color: textPrim,
-                    }}
-                  >
-                    {fraccionamientoSel.nombre}
-                  </span>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 800,
-                        color: "var(--color-yellow)",
-                      }}
-                    >
-                      ${fraccionamientoSel.costo_envio}
-                    </span>
-                    <button
-                      onClick={function () {
-                        setFraccionamientoSel(null);
-                        setCostoEnvio(50);
-                        setFracSearch("");
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--text-muted)",
-                        padding: 0,
-                        lineHeight: 0,
-                      }}
-                    >
-                      <X style={{ width: "14px", height: "14px" }} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <input
-                    value={fracSearch}
-                    onChange={function (e) {
-                      setFracSearch(e.target.value);
-                    }}
-                    placeholder="Buscar fraccionamiento..."
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      padding: "11px 14px",
-                      borderRadius: "12px",
-                      border: `1px solid ${border}`,
-                      background: "var(--bg-card)",
-                      color: textPrim,
-                      fontSize: "13px",
-                      outline: "none",
-                      marginBottom: "6px",
-                    }}
-                  />
-                  {fracSearch.trim() !== "" && (
-                    <div
-                      style={{
-                        maxHeight: "160px",
-                        overflowY: "auto",
-                        borderRadius: "12px",
-                        border: `1px solid ${border}`,
-                        background: "var(--bg-card)",
-                      }}
-                    >
-                      {fraccionamientos
-                        .filter(function (f) {
-                          return f.nombre
-                            .toLowerCase()
-                            .includes(fracSearch.toLowerCase());
-                        })
-                        .map(function (f) {
-                          return (
-                            <div
-                              key={f.id}
-                              onClick={function () {
-                                setFraccionamientoSel(f);
-                                setCostoEnvio(f.costo_envio);
-                                setFracSearch("");
-                              }}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "10px 14px",
-                                cursor: "pointer",
-                                borderBottom: `1px solid ${border}`,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "13px",
-                                  fontWeight: 700,
-                                  color: textPrim,
-                                }}
-                              >
-                                {f.nombre}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 800,
-                                  color: "var(--color-yellow)",
-                                }}
-                              >
-                                ${f.costo_envio}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      {fraccionamientos.filter(function (f) {
-                        return f.nombre
-                          .toLowerCase()
-                          .includes(fracSearch.toLowerCase());
-                      }).length === 0 && (
-                        <p
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--text-muted)",
-                            padding: "10px 14px",
-                            margin: 0,
-                          }}
-                        >
-                          Sin resultados
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
 
             <button
               onClick={function () {
@@ -2831,6 +2658,31 @@ export default function Dashboard(props: DashboardProps) {
                 </span>
               </button>
 
+              <button
+                onClick={function () {
+                  setMenuAbierto(false);
+                  props.onIrRepas && props.onIrRepas();
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "13px 12px",
+                  borderRadius: "12px",
+                  background: "rgba(34,197,94,0.12)",
+                  border: "1px solid rgba(34,197,94,0.35)",
+                  cursor: "pointer",
+                  color: "var(--color-green)",
+                  fontSize: "14px",
+                  fontWeight: 900,
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontSize: "18px" }}>🛵</span>
+                <span>Panel Repartidor</span>
+              </button>
+
               {esAdmin && (
                 <>
                   <div
@@ -3053,7 +2905,7 @@ export default function Dashboard(props: DashboardProps) {
             {
               key: "servicios",
               label: "Directorio",
-              emoji: "📞",
+              emoji: "📱",
               onClick: function () {
                 props.onIrServicios && props.onIrServicios();
               },

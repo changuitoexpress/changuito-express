@@ -11,12 +11,39 @@ import {
   Phone,
   RefreshCw,
   WifiOff,
+  MapPin,
+  Check,
+  X,
+  Trash2,
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { Theme } from "./App";
 import type { Merchant, CartItem } from "./Dashboard";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+interface Direccion {
+  id: string;
+  alias: string;
+  calle: string;
+  numero_casa: string;
+  referencias: string | null;
+  preferencias_entrega: string | null;
+  es_principal: boolean;
+}
+
+interface Fraccionamiento {
+  id: string;
+  nombre: string;
+  costo_envio: number;
+}
+
+const FORMAS_PAGO_VN = [
+  { id: 'efectivo',       label: 'Efectivo',         emoji: '💵' },
+  { id: 'tarjeta',        label: 'Tarjeta',          emoji: '💳' },
+  { id: 'transferencia',  label: 'Transferencia',    emoji: '📲' },
+  { id: 'en_linea',       label: 'Pago en línea',    emoji: '🌐' },
+];
+
 interface Product {
   id: string;
   merchant_id: string;
@@ -33,6 +60,7 @@ interface VistaNegocioProps {
   theme: Theme;
   onThemeToggle: () => void;
   clienteEmail?: string;
+  clienteId?: string;
   onVolver: () => void;
   carritoGlobal?: CartItem[];
   onUpdateCarritoGlobal?: (items: CartItem[]) => void;
@@ -205,6 +233,22 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   const [enviando, setEnviando] = useState<boolean>(false);
   const [errorPedido, setErrorPedido] = useState<string>("");
 
+  // 3-step checkout state
+  const [paso, setPaso] = useState<'direccion'|'pago'|'resumen'>('direccion');
+  const [direcciones, setDirecciones] = useState<Direccion[]>([]);
+  const [dirSeleccionada, setDirSel] = useState<Direccion | null>(null);
+  const [formaNueva, setFormaNueva] = useState(false);
+  const [aliasDir, setAliasDir] = useState('Casa');
+  const [calleDir, setCalleDir] = useState('');
+  const [numeroDir, setNumeroDir] = useState('');
+  const [referenciasDir, setReferenciasDir] = useState('');
+  const [preferenciasDir, setPreferenciasDir] = useState('');
+  const [formaPago, setFormaPago] = useState('efectivo');
+  const [fraccionamientos, setFraccionamientos] = useState<Fraccionamiento[]>([]);
+  const [fraccionamientoSel, setFraccionamientoSel] = useState<Fraccionamiento | null>(null);
+  const [fracSearch, setFracSearch] = useState('');
+  const [costoEnvioModal, setCostoEnvioModal] = useState(COSTO_ENVIO);
+
   // Sincronizar carritoLocal con carritoGlobal al montar
   useEffect(function () {
     if (props.carritoGlobal) {
@@ -215,6 +259,49 @@ export default function VistaNegocio(props: VistaNegocioProps) {
       );
     }
   }, []);
+
+  // Fetch direcciones y fraccionamientos cuando abre el modal
+  useEffect(function () {
+    if (!modalOpen) return;
+    setPaso('direccion');
+    setFraccionamientoSel(null);
+    setCostoEnvioModal(COSTO_ENVIO);
+    setFracSearch('');
+    setFormaPago('efectivo');
+    setErrorPedido('');
+    async function loadDirecciones() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        if (!uid) { setFormaNueva(true); return; }
+        const { data } = await supabase
+          .from('direcciones_cliente')
+          .select('*')
+          .eq('cliente_id', uid)
+          .order('es_principal', { ascending: false });
+        if (data && data.length > 0) {
+          setDirecciones(data as Direccion[]);
+          setDirSel((data.find(function(d: any){ return d.es_principal; }) ?? data[0]) as Direccion);
+          setFormaNueva(false);
+        } else {
+          setDirecciones([]);
+          setDirSel(null);
+          setFormaNueva(true);
+        }
+      } catch { setFormaNueva(true); }
+    }
+    async function loadFraccionamientos() {
+      try {
+        const { data } = await supabase
+          .from('fraccionamientos')
+          .select('id,nombre,costo_envio')
+          .order('nombre', { ascending: true });
+        if (data) setFraccionamientos(data as Fraccionamiento[]);
+      } catch { /* ignore */ }
+    }
+    loadDirecciones();
+    loadFraccionamientos();
+  }, [modalOpen]);
 
   // Fetch productos
   async function fetchProducts() {
@@ -333,66 +420,98 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   const costoEnvioActual = COSTO_ENVIO + Math.max(0, negociosCount - 1) * 15;
   const totalConEnvio = subtotalGlobal + costoEnvioActual;
 
-  // ── Confirmar pedido ──────────────────────────────────────────────────────────
+  // ── Confirmar pedido (3-step) ─────────────────────────────────────────────────
   async function confirmarPedido() {
-    if (carritoLocal.length === 0) return;
     setEnviando(true);
-    setErrorPedido("");
+    setErrorPedido('');
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const clienteId = session?.user?.id ?? null;
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id ?? null;
+
+      // Resolve address string
+      let dirString = '';
+      let zonaStr = '';
+      if (formaNueva) {
+        if (!calleDir.trim() || !numeroDir.trim()) {
+          setErrorPedido('Ingresa calle y número de tu dirección.');
+          setEnviando(false);
+          return;
+        }
+        dirString = calleDir.trim() + ' ' + numeroDir.trim() + (referenciasDir.trim() ? ', ' + referenciasDir.trim() : '');
+        // Save new address
+        await supabase.from('direcciones_cliente').insert({
+          cliente_id: uid,
+          alias: aliasDir || 'Casa',
+          calle: calleDir.trim(),
+          numero_casa: numeroDir.trim(),
+          referencias: referenciasDir.trim() || null,
+          preferencias_entrega: preferenciasDir.trim() || null,
+          es_principal: direcciones.length === 0,
+        });
+      } else if (dirSeleccionada) {
+        dirString = dirSeleccionada.calle + ' ' + dirSeleccionada.numero_casa + (dirSeleccionada.referencias ? ', ' + dirSeleccionada.referencias : '');
+      } else {
+        setErrorPedido('Selecciona una dirección de entrega.');
+        setEnviando(false);
+        return;
+      }
+
+      if (fraccionamientoSel) zonaStr = fraccionamientoSel.nombre;
 
       const todosLosItems = props.carritoGlobal && props.carritoGlobal.length > 0
         ? props.carritoGlobal
         : carritoLocal;
 
-      const totalGlobal = todosLosItems.reduce(function(a, i) {
-        return a + i.precio * i.cantidad;
-      }, 0) + COSTO_ENVIO;
+      const subtotalItems = todosLosItems.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0);
+      const negCount = new Set(todosLosItems.map(function(i) { return i.negocio_id; })).size;
+      const baseEnvio = fraccionamientoSel ? fraccionamientoSel.costo_envio : costoEnvioModal;
+      const totalEnvio = baseEnvio + Math.max(0, negCount - 1) * 15;
+      const totalFinal = subtotalItems + totalEnvio;
 
-      const detalle = todosLosItems
-        .map(function(i) { return i.nombre + " x" + i.cantidad; })
-        .join(", ");
-
-      const { error: insertError } = await supabase.from("pedidos").insert({
-        cliente_id: clienteId,
-        negocio_id: m.id,
-        negocio_nombre: m.name,
-        detalle: detalle,
-        subtotal: todosLosItems.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0),
-        costo_envio: COSTO_ENVIO,
-        total: totalGlobal,
-        estatus: "pendiente",
-        canal: "webapp",
-        cliente_email: clienteEmail,
-      });
-
-      if (insertError) {
-        setErrorPedido(
-          "No se registró en el sistema. El pedido igual se enviará por WhatsApp.",
-        );
-        console.error("[VistaNegocio]", insertError.message);
-      }
-
+      // Group by negocio
       const porNegocio: Record<string, typeof todosLosItems> = {};
       todosLosItems.forEach(function(item) {
-        if (!porNegocio[item.negocio]) porNegocio[item.negocio] = [];
-        porNegocio[item.negocio].push(item);
+        if (!porNegocio[item.negocio_id]) porNegocio[item.negocio_id] = [];
+        porNegocio[item.negocio_id].push(item);
       });
 
-      const numRestaurantes = Object.keys(porNegocio).length;
-      const costoEnvioDinamico = COSTO_ENVIO + Math.max(0, numRestaurantes - 1) * 15;
-      const totalConEnvioDinamico = todosLosItems.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0) + costoEnvioDinamico;
+      // Insert one pedido per negocio
+      for (const negId of Object.keys(porNegocio)) {
+        const items = porNegocio[negId];
+        const sub = items.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0);
+        await supabase.from('pedidos').insert({
+          cliente_id: uid,
+          negocio_id: negId,
+          negocio_nombre: items[0].negocio,
+          detalle: items.map(function(i) { return i.nombre + (i.tipo === 'producto' ? ' x' + i.cantidad : ''); }).join(', '),
+          subtotal: sub,
+          costo_envio: totalEnvio,
+          total: sub + totalEnvio,
+          estatus: 'pendiente',
+          canal: 'webapp',
+          cliente_email: clienteEmail,
+          forma_pago: formaPago,
+          direccion: dirString,
+        });
+      }
 
+      // Build WhatsApp message
+      const PAGO_LABELS: Record<string, string> = {
+        efectivo: '💵 Efectivo', tarjeta: '💳 Tarjeta',
+        transferencia: '📲 Transferencia', en_linea: '🌐 Pago en línea',
+      };
       const linea = '━━━━━━━━━━━━━━━━━━━━━━';
       let msg = '*🛵 CHANGUITO EXPRESS*\n' + linea + '\n';
-      msg += '👤 *Cliente:* ' + clienteEmail + '\n' + linea + '\n\n';
+      msg += '👤 *Cliente:* ' + clienteEmail + '\n';
+      msg += '📍 *Dirección:* ' + dirString + '\n';
+      if (zonaStr) msg += '🏘️ *Zona:* ' + zonaStr + '\n';
+      msg += '💳 *Pago:* ' + (PAGO_LABELS[formaPago] ?? formaPago) + '\n';
+      msg += linea + '\n\n';
 
-      Object.entries(porNegocio).forEach(function([negocio, items]) {
-        msg += '🍽️ *' + negocio.toUpperCase() + '*\n';
-        items.forEach(function(item) {
+      Object.entries(porNegocio).forEach(function([_, items]) {
+        const negName = (items[0] as CartItem).negocio;
+        msg += '🍽️ *' + negName.toUpperCase() + '*\n';
+        (items as CartItem[]).forEach(function(item) {
           if (item.tipo === 'mandadito') {
             msg += '   📝 ' + item.nombre + '\n';
           } else {
@@ -402,28 +521,18 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         msg += linea + '\n';
       });
 
-      if (numRestaurantes > 1) {
-        msg += '\n🚚 *Envío base:* $' + COSTO_ENVIO.toFixed(2) + '\n';
-        msg += '➕ *Envío adicional (' + (numRestaurantes - 1) + ' restaurante' + (numRestaurantes > 2 ? 's' : '') + ' extra):* $' + ((numRestaurantes - 1) * 15).toFixed(2) + '\n';
-      } else {
-        msg += '\n🚚 *Envío:* $' + costoEnvioDinamico.toFixed(2) + '\n';
-      }
-      msg += '*💰 TOTAL: $' + totalConEnvioDinamico.toFixed(2) + '*';
+      msg += '\n🚚 *Envío:* $' + totalEnvio.toFixed(2);
+      if (zonaStr) msg += ' (' + zonaStr + ')';
+      if (negCount > 1) msg += ' [+$' + ((negCount - 1) * 15).toFixed(0) + ' multi]';
+      msg += '\n*💰 TOTAL: $' + totalFinal.toFixed(2) + '*';
 
-      window.open(
-        "https://wa.me/" + PHONE_SOPORTE + "?text=" + encodeURIComponent(msg),
-        "_blank",
-      );
+      window.open('https://wa.me/' + PHONE_SOPORTE + '?text=' + encodeURIComponent(msg), '_blank');
 
-      if (props.onUpdateCarritoGlobal) {
-        props.onUpdateCarritoGlobal([]);
-      }
+      if (props.onUpdateCarritoGlobal) props.onUpdateCarritoGlobal([]);
       setCarritoLocal([]);
       setModalOpen(false);
     } catch (err: any) {
-      setErrorPedido(
-        "Error inesperado: " + (err.message ?? "intenta de nuevo."),
-      );
+      setErrorPedido('Error inesperado: ' + (err.message ?? 'intenta de nuevo.'));
     } finally {
       setEnviando(false);
     }
@@ -1088,244 +1197,261 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         </div>
       )}
 
-      {/* Modal carrito local */}
+      {/* Modal checkout 3 pasos */}
       {modalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.72)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "flex-end",
-          }}
-          onClick={function () {
-            setModalOpen(false);
-          }}
-        >
-          <div
-            className="theme-transition"
-            style={{
-              width: "100%",
-              maxWidth: "480px",
-              margin: "0 auto",
-              background: isDark ? "#1e1e28" : "#ffffff",
-              borderRadius: "28px 28px 0 0",
-              padding: "24px 20px 40px",
-              maxHeight: "80vh",
-              overflowY: "auto",
-            }}
-            onClick={function (e) {
-              e.stopPropagation();
-            }}
-          >
-            <div
-              style={{
-                width: "40px",
-                height: "4px",
-                borderRadius: "2px",
-                background: "var(--border-medium)",
-                margin: "0 auto 20px",
-              }}
-            />
-            <h2
-              style={{
-                fontSize: "18px",
-                fontWeight: 900,
-                color: "var(--text-primary)",
-                margin: "0 0 4px 0",
-              }}
-            >
-              Tu Pedido
-            </h2>
-            <p style={{ fontSize:'12px', color:'var(--text-muted)', margin:'0 0 16px 0' }}>
-              {negociosCount > 1 ? negociosCount + ' negocios en el pedido' : m.name}
-            </p>
-            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'16px' }}>
-              {(function() {
-                const grupos: Record<string, typeof carritoParaMostrar> = {};
-                carritoParaMostrar.forEach(function(i) {
-                  if (!grupos[i.negocio]) grupos[i.negocio] = [];
-                  grupos[i.negocio].push(i);
-                });
-                return Object.entries(grupos).map(function([negocio, items]) {
-                  return (
-                    <div key={negocio}>
-                      {negociosCount > 1 && (
-                        <p style={{ fontSize:'10px', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--color-yellow)', margin:'0 0 6px 0' }}>
-                          🍽️ {negocio}
-                        </p>
-                      )}
-                      {items.map(function(item) {
-                        return (
-                          <div key={item.id} style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
-                            <span style={{ fontSize:'22px' }}>{item.emoji ?? '🍽️'}</span>
-                            <div style={{ flex:1 }}>
-                              <p style={{ fontSize:'13px', fontWeight:700, color:'var(--text-primary)', margin:'0 0 1px 0' }}>{item.nombre}</p>
-                              <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>x{item.cantidad} · ${item.precio.toFixed(2)} c/u</p>
-                            </div>
-                            <span style={{ fontSize:'14px', fontWeight:800, color:'var(--color-yellow)' }}>
-                              ${(item.precio * item.cantidad).toFixed(2)}
-                            </span>
-                          </div>
-                        );
-                      })}
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:200, display:"flex", alignItems:"flex-end" }}
+          onClick={function(){ setModalOpen(false); }}>
+          <div className="theme-transition"
+            style={{ width:"100%", maxWidth:"480px", margin:"0 auto", background:isDark?"#1e1e28":"#ffffff", borderRadius:"28px 28px 0 0", padding:"24px 20px 40px", maxHeight:"90vh", overflowY:"auto" }}
+            onClick={function(e){ e.stopPropagation(); }}>
+            {/* Handle */}
+            <div style={{ width:"40px", height:"4px", borderRadius:"2px", background:"var(--border-medium)", margin:"0 auto 20px" }} />
+
+            {/* Step indicators */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"6px", marginBottom:"20px" }}>
+              {(['direccion','pago','resumen'] as const).map(function(s, i) {
+                const done = paso === 'resumen' || (paso === 'pago' && i === 0) || (paso === 'direccion' && false);
+                const active = paso === s;
+                const labels = ['Dirección','Pago','Confirmar'];
+                return (
+                  <React.Fragment key={s}>
+                    {i > 0 && <div style={{ height:"1px", width:"24px", background:i <= (['direccion','pago','resumen'].indexOf(paso)) ? "var(--color-yellow)" : "var(--border-subtle)" }} />}
+                    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"2px" }}>
+                      <div style={{ width:"26px", height:"26px", borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", background: active ? "var(--color-yellow)" : (i < ['direccion','pago','resumen'].indexOf(paso) ? "rgba(250,204,21,0.3)" : "var(--bg-card)"), border: active ? "none" : "1px solid var(--border-subtle)" }}>
+                        {i < ['direccion','pago','resumen'].indexOf(paso)
+                          ? <Check style={{ width:"12px", height:"12px", color:"var(--color-yellow)" }} />
+                          : <span style={{ fontSize:"11px", fontWeight:900, color: active ? "#020617" : "var(--text-muted)" }}>{i+1}</span>
+                        }
+                      </div>
+                      <span style={{ fontSize:"8px", fontWeight:700, color: active ? "var(--color-yellow)" : "var(--text-muted)", textTransform:"uppercase", letterSpacing:"0.06em" }}>{labels[i]}</span>
                     </div>
-                  );
-                });
-              })()}
+                  </React.Fragment>
+                );
+              })}
             </div>
-            <div
-              style={{
-                background: isDark
-                  ? "rgba(255,255,255,0.04)"
-                  : "rgba(0,0,0,0.03)",
-                borderRadius: "14px",
-                padding: "14px",
-                marginBottom: "14px",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "8px",
-                }}
-              >
-                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                  Subtotal
-                </span>
-                <span
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  ${subtotalGlobal.toFixed(2)}
-                </span>
+
+            {/* ── PASO 1: Dirección ─────────────────────────────────────────── */}
+            {paso === 'direccion' && (
+              <div>
+                <h2 style={{ fontSize:"18px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 4px 0" }}>¿A dónde entregamos?</h2>
+                <p style={{ fontSize:"12px", color:"var(--text-muted)", margin:"0 0 16px 0" }}>Elige o agrega una dirección</p>
+
+                {/* Saved addresses */}
+                {direcciones.length > 0 && !formaNueva && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:"8px", marginBottom:"12px" }}>
+                    {direcciones.map(function(d) {
+                      const sel = dirSeleccionada?.id === d.id;
+                      return (
+                        <div key={d.id} onClick={function(){ setDirSel(d); }}
+                          style={{ display:"flex", alignItems:"flex-start", gap:"10px", padding:"12px 14px", borderRadius:"14px", border: sel ? "2px solid var(--color-yellow)" : "1px solid var(--border-subtle)", background: sel ? "var(--color-yellow-dim)" : "var(--bg-card)", cursor:"pointer" }}>
+                          <MapPin style={{ width:"16px", height:"16px", color: sel ? "var(--color-yellow)" : "var(--text-muted)", marginTop:"1px", flexShrink:0 }} />
+                          <div style={{ flex:1 }}>
+                            <p style={{ fontSize:"13px", fontWeight:800, color:"var(--text-primary)", margin:"0 0 2px 0" }}>{d.alias}</p>
+                            <p style={{ fontSize:"11px", color:"var(--text-muted)", margin:0 }}>{d.calle} {d.numero_casa}{d.referencias ? ' · ' + d.referencias : ''}</p>
+                          </div>
+                          {sel && <Check style={{ width:"16px", height:"16px", color:"var(--color-yellow)", flexShrink:0, marginTop:"1px" }} />}
+                        </div>
+                      );
+                    })}
+                    <button onClick={function(){ setFormaNueva(true); setDirSel(null); }}
+                      style={{ display:"flex", alignItems:"center", gap:"8px", padding:"10px 14px", borderRadius:"12px", background:"transparent", border:"1px dashed var(--border-subtle)", cursor:"pointer", color:"var(--text-muted)", fontSize:"13px", fontWeight:600, width:"100%", justifyContent:"center" }}>
+                      + Nueva dirección
+                    </button>
+                  </div>
+                )}
+
+                {/* New address form */}
+                {(formaNueva || direcciones.length === 0) && (
+                  <div style={{ marginBottom:"12px" }}>
+                    {direcciones.length > 0 && (
+                      <button onClick={function(){ setFormaNueva(false); setDirSel(direcciones[0]); }}
+                        style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"12px", background:"none", border:"none", cursor:"pointer", color:"var(--color-yellow)", fontSize:"12px", fontWeight:700, padding:0 }}>
+                        ← Mis direcciones guardadas
+                      </button>
+                    )}
+                    <p style={{ fontSize:"12px", fontWeight:700, color:"var(--text-muted)", margin:"0 0 8px 0", textTransform:"uppercase", letterSpacing:"0.06em" }}>Nueva dirección</p>
+                    {[
+                      { label:"Alias", val:aliasDir, set:setAliasDir, ph:"Casa, Trabajo…" },
+                      { label:"Calle / Torre *", val:calleDir, set:setCalleDir, ph:"Av. Principal" },
+                      { label:"Número / Depto *", val:numeroDir, set:setNumeroDir, ph:"#123" },
+                      { label:"Referencias", val:referenciasDir, set:setReferenciasDir, ph:"Opcional" },
+                      { label:"Instrucciones de entrega", val:preferenciasDir, set:setPreferenciasDir, ph:"Opcional" },
+                    ].map(function(f) {
+                      return (
+                        <div key={f.label} style={{ marginBottom:"8px" }}>
+                          <p style={{ fontSize:"11px", fontWeight:600, color:"var(--text-muted)", margin:"0 0 3px 0" }}>{f.label}</p>
+                          <input value={f.val} onChange={function(e){ f.set(e.target.value); }} placeholder={f.ph}
+                            style={{ width:"100%", boxSizing:"border-box", padding:"10px 13px", borderRadius:"11px", border:"1px solid var(--border-subtle)", background:"var(--bg-card)", color:"var(--text-primary)", fontSize:"13px", outline:"none" }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Fraccionamiento */}
+                <div style={{ marginBottom:"16px" }}>
+                  <p style={{ fontSize:"11px", fontWeight:700, color:"var(--text-muted)", margin:"0 0 6px 0", textTransform:"uppercase", letterSpacing:"0.06em" }}>🏘️ Zona de entrega</p>
+                  {fraccionamientoSel ? (
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderRadius:"12px", border:"2px solid var(--color-yellow)", background:"var(--color-yellow-dim)" }}>
+                      <span style={{ fontSize:"13px", fontWeight:800, color:"var(--text-primary)" }}>{fraccionamientoSel.nombre}</span>
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                        <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${fraccionamientoSel.costo_envio}</span>
+                        <button onClick={function(){ setFraccionamientoSel(null); setCostoEnvioModal(COSTO_ENVIO); setFracSearch(""); }}
+                          style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", padding:0, lineHeight:0 }}>
+                          <X style={{ width:"14px", height:"14px" }} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <input value={fracSearch} onChange={function(e){ setFracSearch(e.target.value); }} placeholder="Buscar fraccionamiento..."
+                        style={{ width:"100%", boxSizing:"border-box", padding:"10px 13px", borderRadius:"11px", border:"1px solid var(--border-subtle)", background:"var(--bg-card)", color:"var(--text-primary)", fontSize:"13px", outline:"none", marginBottom:"4px" }} />
+                      {fracSearch.trim() !== '' && (
+                        <div style={{ maxHeight:"130px", overflowY:"auto", borderRadius:"11px", border:"1px solid var(--border-subtle)", background:"var(--bg-card)" }}>
+                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).map(function(f){
+                            return (
+                              <div key={f.id} onClick={function(){ setFraccionamientoSel(f); setCostoEnvioModal(f.costo_envio); setFracSearch(''); }}
+                                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 13px", cursor:"pointer", borderBottom:"1px solid var(--border-subtle)" }}>
+                                <span style={{ fontSize:"13px", fontWeight:700, color:"var(--text-primary)" }}>{f.nombre}</span>
+                                <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${f.costo_envio}</span>
+                              </div>
+                            );
+                          })}
+                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).length === 0 && (
+                            <p style={{ fontSize:"12px", color:"var(--text-muted)", padding:"10px 13px", margin:0 }}>Sin resultados</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {errorPedido !== '' && <p style={{ fontSize:"11px", color:"var(--color-red,#ef4444)", marginBottom:"10px" }}>{errorPedido}</p>}
+                <button onClick={function(){ setPaso('pago'); setErrorPedido(''); }}
+                  disabled={!dirSeleccionada && !formaNueva}
+                  style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"15px", borderRadius:"16px", border:"none", cursor: (!dirSeleccionada && !formaNueva) ? "not-allowed" : "pointer", opacity: (!dirSeleccionada && !formaNueva) ? 0.5 : 1 }}>
+                  Continuar →
+                </button>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "10px",
-                }}
-              >
-                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                  Envío
-                </span>
-                <span
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  ${costoEnvioActual.toFixed(2)}{negociosCount > 1 ? ' (+$' + ((negociosCount-1)*15).toFixed(0) + ' multi)' : ''}
-                </span>
+            )}
+
+            {/* ── PASO 2: Forma de pago ────────────────────────────────────── */}
+            {paso === 'pago' && (
+              <div>
+                <button onClick={function(){ setPaso('direccion'); }} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", fontSize:"12px", fontWeight:700, padding:"0 0 12px 0", display:"flex", alignItems:"center", gap:"4px" }}>
+                  ← Volver
+                </button>
+                <h2 style={{ fontSize:"18px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 4px 0" }}>¿Cómo pagas?</h2>
+                <p style={{ fontSize:"12px", color:"var(--text-muted)", margin:"0 0 16px 0" }}>Elige tu forma de pago preferida</p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px", marginBottom:"20px" }}>
+                  {FORMAS_PAGO_VN.map(function(fp) {
+                    const sel = formaPago === fp.id;
+                    return (
+                      <div key={fp.id} onClick={function(){ setFormaPago(fp.id); }}
+                        style={{ display:"flex", alignItems:"center", gap:"12px", padding:"14px 16px", borderRadius:"14px", border: sel ? "2px solid var(--color-yellow)" : "1px solid var(--border-subtle)", background: sel ? "var(--color-yellow-dim)" : "var(--bg-card)", cursor:"pointer" }}>
+                        <span style={{ fontSize:"20px" }}>{fp.emoji}</span>
+                        <span style={{ fontSize:"14px", fontWeight:800, color:"var(--text-primary)", flex:1 }}>{fp.label}</span>
+                        {sel && <Check style={{ width:"16px", height:"16px", color:"var(--color-yellow)" }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={function(){ setPaso('resumen'); }}
+                  style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"15px", borderRadius:"16px", border:"none", cursor:"pointer" }}>
+                  Continuar →
+                </button>
               </div>
-              <div
-                style={{
-                  borderTop: "1px solid var(--border-subtle)",
-                  paddingTop: "10px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: 800,
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  Total
-                </span>
-                <span
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: 900,
-                    color: "var(--color-yellow)",
-                  }}
-                >
-                  ${totalConEnvio.toFixed(2)}
-                </span>
-              </div>
-            </div>
-            {errorPedido !== "" && (
-              <div
-                style={{
-                  marginBottom: "12px",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  background: "var(--color-yellow-dim)",
-                  border: "1px solid rgba(250,204,21,0.3)",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--color-yellow)",
-                    margin: 0,
-                  }}
-                >
-                  {errorPedido}
+            )}
+
+            {/* ── PASO 3: Resumen ───────────────────────────────────────────── */}
+            {paso === 'resumen' && (
+              <div>
+                <button onClick={function(){ setPaso('pago'); }} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", fontSize:"12px", fontWeight:700, padding:"0 0 12px 0", display:"flex", alignItems:"center", gap:"4px" }}>
+                  ← Volver
+                </button>
+                <h2 style={{ fontSize:"18px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 4px 0" }}>Confirma tu pedido</h2>
+                <p style={{ fontSize:"12px", color:"var(--text-muted)", margin:"0 0 14px 0" }}>{negociosCount > 1 ? negociosCount + ' negocios' : m.name}</p>
+
+                {/* Items */}
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px", marginBottom:"14px" }}>
+                  {(function(){
+                    const grupos: Record<string, typeof carritoParaMostrar> = {};
+                    carritoParaMostrar.forEach(function(i){ if (!grupos[i.negocio]) grupos[i.negocio]=[]; grupos[i.negocio].push(i); });
+                    return Object.entries(grupos).map(function([neg, items]) {
+                      return (
+                        <div key={neg}>
+                          {negociosCount > 1 && <p style={{ fontSize:"10px", fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", color:"var(--color-yellow)", margin:"0 0 5px 0" }}>🍽️ {neg}</p>}
+                          {items.map(function(item) {
+                            return (
+                              <div key={item.id} style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"6px" }}>
+                                <span style={{ fontSize:"20px" }}>{item.emoji ?? '🍽️'}</span>
+                                <div style={{ flex:1 }}>
+                                  <p style={{ fontSize:"13px", fontWeight:700, color:"var(--text-primary)", margin:"0 0 1px 0" }}>{item.nombre}</p>
+                                  <p style={{ fontSize:"11px", color:"var(--text-muted)", margin:0 }}>x{item.cantidad} · ${item.precio.toFixed(2)}</p>
+                                </div>
+                                <span style={{ fontSize:"13px", fontWeight:800, color:"var(--color-yellow)" }}>${(item.precio*item.cantidad).toFixed(2)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Delivery + payment info */}
+                <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius:"14px", padding:"12px 14px", marginBottom:"12px", border:"1px solid var(--border-subtle)", display:"flex", flexDirection:"column", gap:"6px" }}>
+                  {(dirSeleccionada || (formaNueva && calleDir)) && (
+                    <div style={{ display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                      <MapPin style={{ width:"13px", height:"13px", color:"var(--text-muted)", marginTop:"1px", flexShrink:0 }} />
+                      <span style={{ fontSize:"12px", color:"var(--text-primary)" }}>
+                        {dirSeleccionada ? dirSeleccionada.calle + ' ' + dirSeleccionada.numero_casa : calleDir + ' ' + numeroDir}
+                        {fraccionamientoSel ? ' · ' + fraccionamientoSel.nombre : ''}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+                    <span style={{ fontSize:"13px" }}>{FORMAS_PAGO_VN.find(function(f){ return f.id === formaPago; })?.emoji ?? '💵'}</span>
+                    <span style={{ fontSize:"12px", color:"var(--text-primary)" }}>{FORMAS_PAGO_VN.find(function(f){ return f.id === formaPago; })?.label ?? formaPago}</span>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius:"14px", padding:"14px", marginBottom:"14px", border:"1px solid var(--border-subtle)" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"8px" }}>
+                    <span style={{ fontSize:"13px", color:"var(--text-muted)" }}>Subtotal</span>
+                    <span style={{ fontSize:"13px", fontWeight:700, color:"var(--text-primary)" }}>${subtotalGlobal.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"10px" }}>
+                    <span style={{ fontSize:"13px", color:"var(--text-muted)" }}>Envío{fraccionamientoSel ? ' · ' + fraccionamientoSel.nombre : ''}</span>
+                    <span style={{ fontSize:"13px", fontWeight:700, color:"var(--text-primary)" }}>
+                      ${(fraccionamientoSel ? fraccionamientoSel.costo_envio : costoEnvioModal).toFixed(2)}
+                      {negociosCount > 1 ? ' (+$' + ((negociosCount-1)*15).toFixed(0) + ' multi)' : ''}
+                    </span>
+                  </div>
+                  <div style={{ borderTop:"1px solid var(--border-subtle)", paddingTop:"10px", display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:"15px", fontWeight:800, color:"var(--text-primary)" }}>Total</span>
+                    <span style={{ fontSize:"18px", fontWeight:900, color:"var(--color-yellow)" }}>
+                      ${(subtotalGlobal + (fraccionamientoSel ? fraccionamientoSel.costo_envio : costoEnvioModal) + Math.max(0, negociosCount-1)*15).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {errorPedido !== '' && (
+                  <div style={{ marginBottom:"12px", padding:"10px 14px", borderRadius:"12px", background:"var(--color-yellow-dim)", border:"1px solid rgba(250,204,21,0.3)" }}>
+                    <p style={{ fontSize:"11px", color:"var(--color-yellow)", margin:0 }}>{errorPedido}</p>
+                  </div>
+                )}
+                <button onClick={confirmarPedido} disabled={enviando}
+                  style={{ width:"100%", background: enviando ? "rgba(37,211,102,0.5)" : "#25D366", color:"white", fontWeight:900, fontSize:"14px", textTransform:"uppercase", letterSpacing:"0.08em", padding:"16px", borderRadius:"16px", border:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:"10px", boxShadow: enviando ? "none" : "0 8px 24px rgba(37,211,102,0.35)", cursor: enviando ? "not-allowed" : "pointer" }}>
+                  {enviando ? <span className="spinner" /> : <MessageCircle style={{ width:"18px", height:"18px" }} />}
+                  {enviando ? 'Registrando...' : 'Confirmar por WhatsApp'}
+                </button>
+                <p style={{ textAlign:"center", fontSize:"11px", color:"var(--text-muted)", marginTop:"12px" }}>
+                  ¿Problemas? <a href={"tel:+" + PHONE_SOPORTE} style={{ color:"var(--color-green)", fontWeight:700, textDecoration:"none" }}>222-333-9999</a>
                 </p>
               </div>
             )}
-            <button
-              onClick={confirmarPedido}
-              disabled={enviando}
-              style={{
-                width: "100%",
-                background: enviando ? "rgba(37,211,102,0.5)" : "#25D366",
-                color: "white",
-                fontWeight: 900,
-                fontSize: "14px",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                padding: "16px",
-                borderRadius: "16px",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "10px",
-                boxShadow: enviando
-                  ? "none"
-                  : "0 8px 24px rgba(37,211,102,0.35)",
-                cursor: enviando ? "not-allowed" : "pointer",
-              }}
-            >
-              {enviando ? (
-                <span className="spinner" />
-              ) : (
-                <MessageCircle style={{ width: "18px", height: "18px" }} />
-              )}
-              {enviando ? "Registrando..." : "Confirmar por WhatsApp"}
-            </button>
-            <p
-              style={{
-                textAlign: "center",
-                fontSize: "11px",
-                color: "var(--text-muted)",
-                marginTop: "12px",
-              }}
-            >
-              ¿Problemas? Soporte:{" "}
-              <a
-                href={"tel:+" + PHONE_SOPORTE}
-                style={{
-                  color: "var(--color-green)",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
-              >
-                222-333-9999
-              </a>
-            </p>
           </div>
         </div>
       )}

@@ -82,7 +82,7 @@ export default function Servicios(props: ServiciosProps) {
             </button>
             <div>
               <p style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:0 }}>Proveedores de confianza</p>
-              <h1 style={{ fontSize:'18px', fontWeight:900, color:'var(--text-primary)', margin:0 }}>🛠️ Servicios</h1>
+              <h1 style={{ fontSize:'18px', fontWeight:900, color:'var(--text-primary)', margin:0 }}>📞 Directorio Telefónico</h1>
             </div>
           </div>
           <ThemeToggle theme={props.theme} onToggle={props.onThemeToggle} />

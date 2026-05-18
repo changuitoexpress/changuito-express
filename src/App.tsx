@@ -19,7 +19,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export type Theme = 'light' | 'dark';
 export interface AppSession { user: { id: string; email?: string; nombre?: string }; } // Agregado: nombre?: string
 export interface Toast { id: number; text: string; kind: 'error' | 'success' | 'info'; }
-type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'admin' | 'shopping' | 'negocio'; // Agregado: 'negocio'
+type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'admin' | 'shopping' | 'negocio' | 'repas';
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -240,6 +240,7 @@ onIrBazar={function(){ setPantalla('bazar'); }}
 onIrServicios={function(){ setPantalla('servicios'); }}
 onIrAdmin={function(){ setPantalla('admin'); }}
 onIrShopping={function(){ setPantalla('shopping'); }}
+onIrRepas={function(){ setPantalla('repas'); }}
 // Agregado: Props del negocio y carrito
 carritoGlobal={carritoGlobal}
 onUpdateCarritoGlobal={setCarritoGlobal}
