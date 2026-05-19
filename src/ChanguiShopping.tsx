@@ -20,10 +20,13 @@ interface Producto {
 }
 
 interface Props {
-  session:       AppSession;
-  theme:         Theme;
-  onThemeToggle: () => void;
-  onVolver:      () => void;
+  session:        AppSession;
+  theme:          Theme;
+  onThemeToggle:  () => void;
+  onVolver:       () => void;
+  onIrDashboard?: () => void;
+  onIrBazar?:     () => void;
+  onIrServicios?: () => void;
 }
 
 const CATEGORIAS = [
@@ -114,7 +117,7 @@ export default function ChanguiShopping(props: Props) {
         </div>
       </div>
 
-      <div style={{ padding:'16px', paddingBottom:'40px' }}>
+      <div style={{ padding:'16px', paddingBottom:'100px' }}>
 
         {/* Banner */}
         <div style={{ borderRadius:'18px', background:'linear-gradient(135deg,#7f1d1d,#dc2626)', padding:'18px 20px', marginBottom:'20px', position:'relative', overflow:'hidden' }}>
@@ -164,6 +167,27 @@ export default function ChanguiShopping(props: Props) {
             <p style={{ color:'var(--text-muted)' }}>Sin productos en esta categoría</p>
           </div>
         )}
+      </div>
+
+      {/* Bottom Nav */}
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:'480px', zIndex:90, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderTop:'1px solid var(--border-subtle)', padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0px))', display:'flex', justifyContent:'space-around' }}>
+        {([
+          { key:'inicio',    label:'Inicio',    emoji:'🍽️', onClick: function(){ props.onIrDashboard && props.onIrDashboard(); } },
+          { key:'bazar',     label:'Bazar',     emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
+          { key:'shopping',  label:'Shopping',  emoji:'🛍️', onClick: function(){} },
+          { key:'servicios', label:'Directorio', icon:'smartphone', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
+        ] as const).map(function(it){
+          const activo = it.key === 'shopping';
+          return (
+            <button key={it.key} onClick={it.onClick}
+              style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'6px 2px', background:'transparent', border:'none', cursor:'pointer', color: activo ? 'var(--color-red)' : 'var(--text-muted)' }}>
+              {('icon' in it && it.icon === 'smartphone')
+                ? <span style={{ fontSize:'18px', lineHeight:1 }}>📱</span>
+                : <span style={{ fontSize:'18px', lineHeight:1 }}>{(it as any).emoji}</span>}
+              <span style={{ fontSize:'9px', fontWeight:800, letterSpacing:'0.04em' }}>{it.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Modal detalle producto */}

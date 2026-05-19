@@ -36,6 +36,7 @@ import {
   Building2,
   Car,
   ShoppingBasket,
+  Smartphone,
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
@@ -462,7 +463,7 @@ function Banner() {
     },
     {
       bg: "linear-gradient(135deg,#22c55e,#15803d)",
-      t: "📍 Zona Lomas 1-2-3 y La Vista",
+      t: "📍 LOMAS 1 ● 2 ● 3● LA VISTA",
       s: "Cobertura exclusiva residencial",
     },
     {
@@ -908,11 +909,33 @@ function ModalCheckout(props: {
           padding: "24px 20px 40px",
           maxHeight: "90vh",
           overflowY: "auto",
+          position: "relative",
         }}
         onClick={function (e) {
           e.stopPropagation();
         }}
       >
+        {/* X cerrar */}
+        <button
+          onClick={props.onClose}
+          style={{
+            position: "absolute",
+            top: "14px",
+            right: "14px",
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            background: "var(--bg-base)",
+            border: "1px solid var(--border-subtle)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+          }}
+        >
+          <X style={{ width: "16px", height: "16px", color: "var(--text-primary)" }} />
+        </button>
         {/* Handle + título */}
         <div
           style={{
@@ -1151,7 +1174,7 @@ function ModalCheckout(props: {
                 </div>
                 {/* Fraccionamiento selector */}
                 <div style={{ marginBottom:"10px" }}>
-                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>🏘️ Zona de entrega</p>
+                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>🏘️ Fraccionamiento / Clúster / Plaza</p>
                   {fraccionamientoSel ? (
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderRadius:"12px", border:"2px solid var(--color-yellow)", background:"var(--color-yellow-dim)" }}>
                       <span style={{ fontSize:"13px", fontWeight:800, color:textPrim }}>{fraccionamientoSel.nombre}</span>
@@ -1658,7 +1681,10 @@ export default function Dashboard(props: DashboardProps) {
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const esAdmin = props.session.user.email === "uliseseven.7@gmail.com";
+  const esAdmin = props.session.user.email === "uliseseven.7@gmail.com" || props.session.user.rol === 'admin';
+  const rol = props.session.user.rol ?? 'cliente';
+  const puedeNegocio = esAdmin || rol === 'negocio';
+  const puedeRepartidor = esAdmin || rol === 'repartidor';
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -2542,7 +2568,7 @@ export default function Dashboard(props: DashboardProps) {
                   textAlign: "left",
                 }}
               >
-                <Briefcase
+                <Smartphone
                   style={{
                     width: "18px",
                     height: "18px",
@@ -2590,98 +2616,57 @@ export default function Dashboard(props: DashboardProps) {
                 }}
               />
 
-              {/* BOTÓN NUEVO: PANEL DE NEGOCIO */}
+              {/* PANEL NEGOCIO — solo rol negocio/admin */}
+              {puedeNegocio && (
               <button
                 onClick={function () {
                   setMenuAbierto(false);
                   props.onIrNegocio && props.onIrNegocio();
                 }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
               >
-                <Store
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+                <Store style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
                 <span>Panel de Negocio</span>
               </button>
+              )}
 
+              {/* BIENES RAÍCES — reactivado, abre bazar */}
               <button
-                disabled
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "not-allowed",
-                  color: "var(--text-muted)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
+                onClick={function () {
+                  setMenuAbierto(false);
+                  props.onIrBazar && props.onIrBazar();
                 }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
               >
-                <Building2 style={{ width: "18px", height: "18px" }} />
-                <span style={{ flex: 1 }}>Bienes Raíces</span>
-                <span
-                  style={{
-                    fontSize: "9px",
-                    fontWeight: 900,
-                    padding: "2px 7px",
-                    borderRadius: "8px",
-                    background: "var(--bg-base)",
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  Pronto
-                </span>
+                <Building2 style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <span>Bienes Raíces</span>
               </button>
 
+              {/* VENTA DE AUTOS — reactivado, abre bazar */}
+              <button
+                onClick={function () {
+                  setMenuAbierto(false);
+                  props.onIrBazar && props.onIrBazar();
+                }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
+              >
+                <Car style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <span>Venta de Autos</span>
+              </button>
+
+              {/* PANEL REPARTIDOR — solo rol repartidor/admin */}
+              {puedeRepartidor && (
               <button
                 onClick={function () {
                   setMenuAbierto(false);
                   props.onIrRepas && props.onIrRepas();
                 }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "rgba(34,197,94,0.12)",
-                  border: "1px solid rgba(34,197,94,0.35)",
-                  cursor: "pointer",
-                  color: "var(--color-green)",
-                  fontSize: "14px",
-                  fontWeight: 900,
-                  textAlign: "left",
-                }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.35)", cursor: "pointer", color: "var(--color-green)", fontSize: "14px", fontWeight: 900, textAlign: "left" }}
               >
                 <span style={{ fontSize: "18px" }}>🛵</span>
                 <span>Panel Repartidor</span>
               </button>
+              )}
 
               {esAdmin && (
                 <>
@@ -2758,65 +2743,52 @@ export default function Dashboard(props: DashboardProps) {
         {renderContenido()}
       </div>
 
-      {/* Barra carrito flotante */}
+      {/* FAB carrito flotante */}
       {totalItems > 0 && (
-        <div
+        <button
+          onClick={function () {
+            setModalCheckout(true);
+          }}
           style={{
             position: "fixed",
-            bottom: "16px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "calc(100% - 32px)",
-            maxWidth: "448px",
-            zIndex: 100,
+            bottom: "90px",
+            right: "20px",
+            width: "60px",
+            height: "60px",
+            borderRadius: "50%",
+            background: "var(--color-yellow)",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 32px rgba(250,204,21,0.5)",
+            zIndex: 999,
           }}
         >
-          <button
-            onClick={function () {
-              setModalCheckout(true);
-            }}
+          <ShoppingBag style={{ width: "24px", height: "24px", color: "#020617" }} />
+          <span
             style={{
-              width: "100%",
-              background: "var(--color-yellow)",
-              borderRadius: "18px",
-              padding: "16px 20px",
-              border: "none",
-              cursor: "pointer",
+              position: "absolute",
+              top: "-4px",
+              right: "-4px",
+              minWidth: "22px",
+              height: "22px",
+              padding: "0 6px",
+              borderRadius: "11px",
+              background: "#ef4444",
+              color: "white",
+              fontSize: "11px",
+              fontWeight: 900,
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              boxShadow: "0 8px 32px rgba(250,204,21,0.45)",
+              justifyContent: "center",
+              border: "2px solid var(--bg-base)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "8px",
-                  background: "rgba(2,6,23,0.15)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <ShoppingBag
-                  style={{ width: "15px", height: "15px", color: "#020617" }}
-                />
-              </div>
-              <span
-                style={{ fontSize: "13px", fontWeight: 900, color: "#020617" }}
-              >
-                Ver carrito · {totalItems} {totalItems === 1 ? "item" : "items"}
-              </span>
-            </div>
-            <span
-              style={{ fontSize: "15px", fontWeight: 900, color: "#020617" }}
-            >
-              ${totalPrecio.toFixed(2)}
-            </span>
-          </button>
-        </div>
+            {totalItems}
+          </span>
+        </button>
       )}
 
       {modalMandadito && (
@@ -2932,9 +2904,13 @@ export default function Dashboard(props: DashboardProps) {
                 color: activo ? "var(--color-yellow)" : "var(--text-muted)",
               }}
             >
-              <span style={{ fontSize: "18px", lineHeight: 1 }}>
-                {it.emoji}
-              </span>
+              {it.key === "servicios" ? (
+                <Smartphone style={{ width: "18px", height: "18px" }} />
+              ) : (
+                <span style={{ fontSize: "18px", lineHeight: 1 }}>
+                  {it.emoji}
+                </span>
+              )}
               <span
                 style={{
                   fontSize: "9px",

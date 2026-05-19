@@ -1,6 +1,6 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Search, X, Star, Phone, MessageCircle, WifiOff, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Search, X, Star, Phone, MessageCircle, WifiOff, RefreshCw, Smartphone } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
 

@@ -104,42 +104,7 @@ img { display: block; max-width: 100%; }
   isolation: isolate;
 }
 
-[data-theme="dark"] #root::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background:
-    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 0% 0%,
-      color-mix(in srgb, var(--neon-tl) 55%, transparent), transparent 70%),
-    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 100% 0%,
-      color-mix(in srgb, var(--neon-tr) 50%, transparent), transparent 70%),
-    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 0% 100%,
-      color-mix(in srgb, var(--neon-bl) 50%, transparent), transparent 70%),
-    radial-gradient(ellipse var(--neon-size) var(--neon-size) at 100% 100%,
-      color-mix(in srgb, var(--neon-br) 55%, transparent), transparent 70%);
-  animation: neon-breathe 4s ease-in-out infinite;
-}
-
-@keyframes neon-breathe {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.7; }
-}
-
-[data-theme="dark"] #root::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(var(--bg-base), var(--bg-base)) padding-box,
-    linear-gradient(to bottom right, var(--neon-tl), transparent 35%, transparent 65%, var(--neon-br)) border-box,
-    linear-gradient(to bottom left,  var(--neon-tr), transparent 35%, transparent 65%, var(--neon-bl)) border-box;
-  animation: neon-breathe 4s ease-in-out infinite;
-}
+/* Neon strobing eliminado — fondo oscuro sólido sin animación */
 
 /* ═══════════════════════════════════════
    UTILIDADES

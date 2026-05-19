@@ -1,7 +1,7 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
+import { Sun, Moon, Mail, Lock, LogIn, UserPlus, ShoppingCart, User } from 'lucide-react';
 import Dashboard from './Dashboard';
 import BazarVecinal from './BazarVecinal';
 import Servicios from './Servicios';
@@ -17,7 +17,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Theme = 'light' | 'dark';
-export interface AppSession { user: { id: string; email?: string; nombre?: string }; } // Agregado: nombre?: string
+export interface AppSession { user: { id: string; email?: string; nombre?: string; rol?: string }; }
 export interface Toast { id: number; text: string; kind: 'error' | 'success' | 'info'; }
 type Pantalla = 'dashboard' | 'bazar' | 'servicios' | 'admin' | 'shopping' | 'negocio' | 'repas';
 
@@ -95,6 +95,7 @@ function AuthScreen(props: { theme: Theme; onThemeToggle: () => void; onToast: (
 const [mode, setMode] = useState<'login'|'register'>('login');
 const [email, setEmail] = useState('');
 const [password, setPassword] = useState('');
+const [nombre, setNombre] = useState('');
 const [loading, setLoading] = useState(false);
 const [focused, setFocused] = useState('');
 const isDark = props.theme === 'dark';
@@ -103,12 +104,16 @@ const isLogin = mode === 'login';
 async function handleSubmit(e: React.FormEvent) {
 e.preventDefault();
 if (!email || !password) { props.onToast('Completá todos los campos.', 'error'); return; }
+if (mode === 'register' && nombre.trim().length < 2) { props.onToast('Ingresá tu nombre completo.', 'error'); return; }
 if (password.length < 6) { props.onToast('Mínimo 6 caracteres.', 'error'); return; }
 setLoading(true);
 try {
 if (mode === 'register') {
-const { error } = await supabase.auth.signUp({ email, password });
+const { data, error } = await supabase.auth.signUp({ email, password });
 if (error) throw error;
+if (data.user) {
+try { await supabase.from('perfiles').upsert({ id: data.user.id, nombre: nombre.trim(), email, rol: 'cliente' }, { onConflict: 'id' }); } catch(e) {}
+}
 props.onToast('Revisá tu email para confirmar.', 'success');
 } else {
 const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -154,6 +159,15 @@ return (
 })}
 </div>
 <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
+{!isLogin && (
+<div style={{ position:'relative' }}>
+<User style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', width:'15px', height:'15px', color:focused==='nombre'?'#facc15':'var(--text-muted)', pointerEvents:'none' }} />
+<input type="text" placeholder="Nombre completo" autoComplete="name" value={nombre}
+onChange={function(e) { setNombre(e.target.value); }}
+onFocus={function() { setFocused('nombre'); }} onBlur={function() { setFocused(''); }}
+style={{ width:'100%', boxSizing:'border-box', background:inputBg, border:ib('nombre'), borderRadius:'14px', padding:'14px 14px 14px 40px', color:'var(--text-primary)', fontSize:'14px', outline:'none' }} />
+</div>
+)}
 <div style={{ position:'relative' }}>
 <Mail style={{ position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', width:'15px', height:'15px', color:focused==='email'?'#facc15':'var(--text-muted)', pointerEvents:'none' }} />
 <input type="email" placeholder="tu@email.com" autoComplete="email" value={email}
@@ -185,21 +199,47 @@ const [booting, setBooting] = useState<boolean>(true);
 const [pantalla, setPantalla] = useState<Pantalla>('dashboard');
 const { theme, toggle } = useTheme();
 const { toasts, push } = useToast();
-const [carritoGlobal, setCarritoGlobal] = useState<any[]>([]); // Agregado: Estado para el carrito global
+const [carritoGlobal, setCarritoGlobal] = useState<any[]>(function() {
+try {
+const saved = localStorage.getItem('changuito-cart');
+if (saved) return JSON.parse(saved);
+} catch(e) {}
+return [];
+});
+
+// Persistir carrito en localStorage
+useEffect(function() {
+try { localStorage.setItem('changuito-cart', JSON.stringify(carritoGlobal)); } catch(e) {}
+}, [carritoGlobal]);
+
+async function cargarPerfil(userId: string, email: string | undefined) {
+try {
+const { data } = await supabase.from('perfiles').select('nombre,rol').eq('id', userId).maybeSingle();
+const nombre = data?.nombre ?? (email ? email.split('@')[0] : 'usuario');
+const rol = data?.rol ?? (email === 'uliseseven.7@gmail.com' ? 'admin' : 'cliente');
+return { nombre, rol };
+} catch(e) { return { nombre: email ? email.split('@')[0] : 'usuario', rol: 'cliente' }; }
+}
 
 useEffect(function() {
 let mounted = true;
 async function init() {
 try {
 const { data: { session: s } } = await supabase.auth.getSession();
-if (mounted && s) setSession({ user: { id: s.user.id, email: s.user.email } });
+if (mounted && s) {
+const p = await cargarPerfil(s.user.id, s.user.email);
+if (mounted) setSession({ user: { id: s.user.id, email: s.user.email, nombre: p.nombre, rol: p.rol } });
+}
 } catch { } finally { if (mounted) setBooting(false); }
 }
 init();
 const { data: { subscription } } = supabase.auth.onAuthStateChange(function(_ev, s) {
 if (!mounted) return;
-if (s) setSession({ user: { id: s.user.id, email: s.user.email } });
-else setSession(null);
+if (s) {
+cargarPerfil(s.user.id, s.user.email).then(function(p) {
+if (mounted) setSession({ user: { id: s.user.id, email: s.user.email, nombre: p.nombre, rol: p.rol } });
+});
+} else setSession(null);
 });
 return function() { mounted = false; subscription.unsubscribe(); };
 }, []);
@@ -281,6 +321,9 @@ session={session}
 theme={theme}
 onThemeToggle={toggle}
 onVolver={function(){ setPantalla('dashboard'); }}
+onIrDashboard={function(){ setPantalla('dashboard'); }}
+onIrBazar={function(){ setPantalla('bazar'); }}
+onIrServicios={function(){ setPantalla('servicios'); }}
 />
 )}
 
