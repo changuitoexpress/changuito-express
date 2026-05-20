@@ -1646,10 +1646,26 @@ export default function Dashboard(props: DashboardProps) {
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
+  const [modalLimite, setModalLimite] = useState(false);
   const esAdmin = props.session.user.email === "uliseseven.7@gmail.com" || props.session.user.rol === 'admin';
   const rol = props.session.user.rol ?? 'cliente';
-  const puedeNegocio = esAdmin || rol === 'negocio';
+  const puedeNegocio = esAdmin || rol === 'negocio' || esMerchantAdmin;
   const puedeRepartidor = esAdmin || rol === 'repartidor';
+
+  useEffect(function() {
+    async function checkMerchantAdmin() {
+      try {
+        const { data } = await supabase
+          .from('merchant_admins')
+          .select('merchant_id')
+          .eq('user_id', props.session.user.id)
+          .maybeSingle();
+        if (data) setEsMerchantAdmin(true);
+      } catch { /* ignore */ }
+    }
+    checkMerchantAdmin();
+  }, []);
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -1738,6 +1754,11 @@ export default function Dashboard(props: DashboardProps) {
   }
 
   function agregarMandadito(merchant: Merchant, texto: string) {
+    const negociosActuales = new Set(props.carritoGlobal.map(function(i) { return i.negocio_id; }));
+    if (!negociosActuales.has(merchant.id) && negociosActuales.size >= 4) {
+      setModalLimite(true);
+      return;
+    }
     const item: CartItem = {
       id: merchant.id + "-" + Date.now(),
       nombre: texto,
@@ -2891,6 +2912,31 @@ export default function Dashboard(props: DashboardProps) {
       </div>
 
       <style>{`::-webkit-scrollbar{display:none;}*{-webkit-tap-highlight-color:transparent;box-sizing:border-box;}button{font-family:inherit;}`}</style>
+
+      {/* Modal límite 4 negocios */}
+      {modalLimite && (
+        <div
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:600, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}
+          onClick={function(){ setModalLimite(false); }}
+        >
+          <div
+            style={{ background:"var(--bg-card)", borderRadius:"24px", padding:"28px 24px", maxWidth:"340px", width:"100%", textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,0.5)" }}
+            onClick={function(e){ e.stopPropagation(); }}
+          >
+            <div style={{ fontSize:"48px", marginBottom:"12px" }}>🛒</div>
+            <h2 style={{ fontSize:"17px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 10px 0", lineHeight:1.25 }}>Límite alcanzado</h2>
+            <p style={{ fontSize:"13px", color:"var(--text-muted)", margin:"0 0 20px 0", lineHeight:1.55 }}>
+              Máximo <strong style={{ color:"var(--text-primary)" }}>4 negocios</strong> por pedido para garantizar la frescura y velocidad de tus repartidores.
+            </p>
+            <button
+              onClick={function(){ setModalLimite(false); }}
+              style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"14px", borderRadius:"14px", border:"none", cursor:"pointer" }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -248,6 +248,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   const [fraccionamientoSel, setFraccionamientoSel] = useState<Fraccionamiento | null>(null);
   const [fracSearch, setFracSearch] = useState('');
   const [costoEnvioModal, setCostoEnvioModal] = useState(COSTO_ENVIO);
+  const [modalLimite, setModalLimite] = useState(false);
 
   // Sincronizar carritoLocal con carritoGlobal al montar
   useEffect(function () {
@@ -368,6 +369,13 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   }
 
   function agregar(product: Product) {
+    if (props.carritoGlobal) {
+      const negociosActuales = new Set(props.carritoGlobal.map(function(i) { return i.negocio_id; }));
+      if (!negociosActuales.has(m.id) && negociosActuales.size >= 4) {
+        setModalLimite(true);
+        return;
+      }
+    }
     setCarritoLocal(function(prev) {
       const existe = prev.find(function(i) { return i.id === product.id; });
       let nuevo: CartItem[];
@@ -1202,8 +1210,15 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:200, display:"flex", alignItems:"flex-end" }}
           onClick={function(){ setModalOpen(false); }}>
           <div className="theme-transition"
-            style={{ width:"100%", maxWidth:"480px", margin:"0 auto", background:isDark?"#1e1e28":"#ffffff", borderRadius:"28px 28px 0 0", padding:"24px 20px 40px", maxHeight:"90vh", overflowY:"auto" }}
+            style={{ width:"100%", maxWidth:"480px", margin:"0 auto", background:isDark?"#1e1e28":"#ffffff", borderRadius:"28px 28px 0 0", padding:"24px 20px 40px", maxHeight:"90vh", overflowY:"auto", position:"relative" }}
             onClick={function(e){ e.stopPropagation(); }}>
+            {/* X cerrar */}
+            <button
+              onClick={function(){ setModalOpen(false); }}
+              style={{ position:"absolute", top:"14px", right:"14px", width:"32px", height:"32px", borderRadius:"50%", background:"var(--bg-base)", border:"1px solid var(--border-subtle)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:10 }}
+            >
+              <X style={{ width:"14px", height:"14px", color:"var(--text-primary)" }} />
+            </button>
             {/* Handle */}
             <div style={{ width:"40px", height:"4px", borderRadius:"2px", background:"var(--border-medium)", margin:"0 auto 20px" }} />
 
@@ -1250,6 +1265,21 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                             <p style={{ fontSize:"11px", color:"var(--text-muted)", margin:0 }}>{d.calle} {d.numero_casa}{d.referencias ? ' · ' + d.referencias : ''}</p>
                           </div>
                           {sel && <Check style={{ width:"16px", height:"16px", color:"var(--color-yellow)", flexShrink:0, marginTop:"1px" }} />}
+                          <button
+                            onClick={async function(e) {
+                              e.stopPropagation();
+                              await supabase.from('direcciones_cliente').delete().eq('id', d.id);
+                              setDirecciones(function(prev) {
+                                const upd = prev.filter(function(x) { return x.id !== d.id; });
+                                if (upd.length === 0) setFormaNueva(true);
+                                if (dirSeleccionada?.id === d.id) setDirSel(upd[0] ?? null);
+                                return upd;
+                              });
+                            }}
+                            style={{ background:"none", border:"none", cursor:"pointer", color:"var(--color-red,#ef4444)", padding:"2px", lineHeight:0, flexShrink:0, marginTop:"1px" }}
+                          >
+                            <Trash2 style={{ width:"14px", height:"14px" }} />
+                          </button>
                         </div>
                       );
                     })}
@@ -1452,6 +1482,31 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal límite 4 negocios */}
+      {modalLimite && (
+        <div
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:400, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}
+          onClick={function(){ setModalLimite(false); }}
+        >
+          <div
+            style={{ background:"var(--bg-card)", borderRadius:"24px", padding:"28px 24px", maxWidth:"340px", width:"100%", textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,0.5)" }}
+            onClick={function(e){ e.stopPropagation(); }}
+          >
+            <div style={{ fontSize:"48px", marginBottom:"12px" }}>🛒</div>
+            <h2 style={{ fontSize:"17px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 10px 0", lineHeight:1.25 }}>Límite alcanzado</h2>
+            <p style={{ fontSize:"13px", color:"var(--text-muted)", margin:"0 0 20px 0", lineHeight:1.55 }}>
+              Máximo <strong style={{ color:"var(--text-primary)" }}>4 negocios</strong> por pedido para garantizar la frescura y velocidad de tus repartidores.
+            </p>
+            <button
+              onClick={function(){ setModalLimite(false); }}
+              style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"14px", borderRadius:"14px", border:"none", cursor:"pointer" }}
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
