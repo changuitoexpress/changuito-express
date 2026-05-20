@@ -172,18 +172,17 @@ export default function ChanguiShopping(props: Props) {
       {/* Bottom Nav */}
       <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)', width:'100%', maxWidth:'480px', zIndex:90, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderTop:'1px solid var(--border-subtle)', padding:'8px 8px calc(8px + env(safe-area-inset-bottom, 0px))', display:'flex', justifyContent:'space-around' }}>
         {([
-          { key:'inicio',    label:'Inicio',    emoji:'🍽️', onClick: function(){ props.onIrDashboard && props.onIrDashboard(); } },
-          { key:'bazar',     label:'Bazar',     emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
-          { key:'shopping',  label:'Shopping',  emoji:'🛍️', onClick: function(){} },
-          { key:'servicios', label:'Directorio', icon:'smartphone', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
+          { key:'inicio',    label:'Inicio',     emoji:'🍽️', onClick: function(){ props.onIrDashboard && props.onIrDashboard(); } },
+          { key:'tiendita',  label:'Tiendita',   emoji:'🛒', onClick: function(){ props.onIrDashboard && props.onIrDashboard(); } },
+          { key:'shopping',  label:'Shopping',   emoji:'🛍️', onClick: function(){} },
+          { key:'bazar',     label:'Bazar',      emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
+          { key:'directorio',label:'Directorio', emoji:'📱', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
         ] as const).map(function(it){
           const activo = it.key === 'shopping';
           return (
             <button key={it.key} onClick={it.onClick}
               style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'6px 2px', background:'transparent', border:'none', cursor:'pointer', color: activo ? 'var(--color-red)' : 'var(--text-muted)' }}>
-              {('icon' in it && it.icon === 'smartphone')
-                ? <span style={{ fontSize:'18px', lineHeight:1 }}>📱</span>
-                : <span style={{ fontSize:'18px', lineHeight:1 }}>{(it as any).emoji}</span>}
+              <span style={{ fontSize:'18px', lineHeight:1 }}>{it.emoji}</span>
               <span style={{ fontSize:'9px', fontWeight:800, letterSpacing:'0.04em' }}>{it.label}</span>
             </button>
           );

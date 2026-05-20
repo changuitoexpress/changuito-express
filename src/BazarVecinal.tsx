@@ -55,9 +55,16 @@ export default function BazarVecinal(props: BazarProps) {
   const [search, setSearch]             = useState('');
   const [modalPublicar, setModalPublicar] = useState(false);
 
-  const isDark   = props.theme === 'dark';
-  const miId     = props.session.user.id;
-  const miEmail  = props.session.user.email ?? '';
+  const isDark      = props.theme === 'dark';
+  const miId        = props.session.user.id;
+  const miEmail     = props.session.user.email ?? '';
+  const rolUsuario  = props.session.user.rol ?? 'cliente';
+  const puedePublicar = (function() {
+    if (rolUsuario === 'admin') return true;
+    if (catActiva === 'inmuebles') return rolUsuario === 'admin_inmuebles';
+    if (catActiva === 'autos')     return rolUsuario === 'admin_autos';
+    return ['admin_bazar', 'admin_inmuebles', 'admin_autos'].includes(rolUsuario);
+  })();
 
   const fetchItems = useCallback(async function() {
     setLoading(true); setError('');
@@ -96,9 +103,11 @@ export default function BazarVecinal(props: BazarProps) {
             </div>
           </div>
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-            <button onClick={function(){ setModalPublicar(true); }} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'12px', background:'var(--color-green)', border:'none', color:'white', fontSize:'12px', fontWeight:800, cursor:'pointer' }}>
-              <Plus style={{ width:'14px', height:'14px' }} /> Publicar
-            </button>
+            {puedePublicar && (
+              <button onClick={function(){ setModalPublicar(true); }} style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', borderRadius:'12px', background:'var(--color-green)', border:'none', color:'white', fontSize:'12px', fontWeight:800, cursor:'pointer' }}>
+                <Plus style={{ width:'14px', height:'14px' }} /> Publicar
+              </button>
+            )}
             <ThemeToggle theme={props.theme} onToggle={props.onThemeToggle} />
           </div>
         </div>
