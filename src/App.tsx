@@ -203,21 +203,34 @@ export function ThemeToggle(props: { theme: Theme; onToggle: () => void }) {
 function usePWAInstall() {
   const [prompt, setPrompt] = useState<any>(null);
   const [dismissed, setDismissed] = useState(function () {
-    try { return localStorage.getItem("pwa-dismissed") === "1"; } catch { return false; }
+    try {
+      return localStorage.getItem("pwa-dismissed") === "1";
+    } catch {
+      return false;
+    }
   });
   useEffect(function () {
-    function handler(e: any) { e.preventDefault(); setPrompt(e); }
+    function handler(e: any) {
+      e.preventDefault();
+      setPrompt(e);
+    }
     window.addEventListener("beforeinstallprompt", handler as any);
-    return function () { window.removeEventListener("beforeinstallprompt", handler as any); };
+    return function () {
+      window.removeEventListener("beforeinstallprompt", handler as any);
+    };
   }, []);
   function instalar() {
     if (!prompt) return;
     prompt.prompt();
-    prompt.userChoice.then(function () { setPrompt(null); });
+    prompt.userChoice.then(function () {
+      setPrompt(null);
+    });
   }
   function descartar() {
     setDismissed(true);
-    try { localStorage.setItem("pwa-dismissed", "1"); } catch {}
+    try {
+      localStorage.setItem("pwa-dismissed", "1");
+    } catch {}
     setPrompt(null);
   }
   return { mostrar: !!prompt && !dismissed, instalar, descartar };
@@ -225,17 +238,89 @@ function usePWAInstall() {
 
 function PWABanner(props: { onInstalar: () => void; onDescartar: () => void }) {
   return (
-    <div style={{ position:"fixed", bottom:"80px", left:"50%", transform:"translateX(-50%)", width:"calc(100% - 32px)", maxWidth:"448px", zIndex:950, background:"#16161e", border:"1px solid rgba(250,204,21,0.4)", borderRadius:"20px", padding:"14px 16px", boxShadow:"0 8px 32px rgba(0,0,0,0.55)", display:"flex", alignItems:"center", gap:"12px" }}>
-      <div style={{ width:"42px", height:"42px", borderRadius:"13px", background:"#facc15", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <ShoppingCart style={{ width:"22px", height:"22px", color:"#020617" }} strokeWidth={2.5} />
+    <div
+      style={{
+        position: "fixed",
+        bottom: "80px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "calc(100% - 32px)",
+        maxWidth: "448px",
+        zIndex: 950,
+        background: "#16161e",
+        border: "1px solid rgba(250,204,21,0.4)",
+        borderRadius: "20px",
+        padding: "14px 16px",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+      }}
+    >
+      <div
+        style={{
+          width: "42px",
+          height: "42px",
+          borderRadius: "13px",
+          background: "#facc15",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <ShoppingCart
+          style={{ width: "22px", height: "22px", color: "#020617" }}
+          strokeWidth={2.5}
+        />
       </div>
-      <div style={{ flex:1 }}>
-        <p style={{ fontSize:"13px", fontWeight:900, color:"#f0f0f8", margin:"0 0 2px 0" }}>Instalar Changuito Express</p>
-        <p style={{ fontSize:"11px", color:"#55556a", margin:0 }}>Acceso rápido desde tu pantalla de inicio</p>
+      <div style={{ flex: 1 }}>
+        <p
+          style={{
+            fontSize: "13px",
+            fontWeight: 900,
+            color: "#f0f0f8",
+            margin: "0 0 2px 0",
+          }}
+        >
+          Instalar Changuito Express
+        </p>
+        <p style={{ fontSize: "11px", color: "#55556a", margin: 0 }}>
+          Acceso rápido desde tu pantalla de inicio
+        </p>
       </div>
-      <button onClick={props.onInstalar} style={{ padding:"8px 14px", borderRadius:"12px", background:"#facc15", color:"#020617", fontWeight:900, fontSize:"11px", border:"none", cursor:"pointer", whiteSpace:"nowrap" }}>Instalar</button>
-      <button onClick={props.onDescartar} style={{ width:"28px", height:"28px", borderRadius:"50%", background:"rgba(255,255,255,0.06)", border:"none", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
-        <X style={{ width:"14px", height:"14px", color:"#55556a" }} />
+      <button
+        onClick={props.onInstalar}
+        style={{
+          padding: "8px 14px",
+          borderRadius: "12px",
+          background: "#facc15",
+          color: "#020617",
+          fontWeight: 900,
+          fontSize: "11px",
+          border: "none",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+        }}
+      >
+        Instalar
+      </button>
+      <button
+        onClick={props.onDescartar}
+        style={{
+          width: "28px",
+          height: "28px",
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.06)",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        <X style={{ width: "14px", height: "14px", color: "#55556a" }} />
       </button>
     </div>
   );
@@ -392,7 +477,7 @@ function AuthScreen(props: {
               marginTop: "8px",
             }}
           >
-            Lomas • 1 • 2 • 3 • La Vista
+            • Lomas • 1 • 2 • 3 • La Vista •
           </p>
         </div>
         <div
@@ -790,7 +875,9 @@ export default function App() {
   return (
     <>
       <ToastRack toasts={toasts} />
-      {pwa.mostrar && <PWABanner onInstalar={pwa.instalar} onDescartar={pwa.descartar} />}
+      {pwa.mostrar && (
+        <PWABanner onInstalar={pwa.instalar} onDescartar={pwa.descartar} />
+      )}
 
       {pantalla === "dashboard" && (
         <Dashboard
@@ -826,10 +913,18 @@ export default function App() {
           session={session}
           theme={theme}
           onThemeToggle={toggle}
-          onVolver={function () { setPantalla("dashboard"); }}
-          onIrDashboard={function () { setPantalla("dashboard"); }}
-          onIrShopping={function () { setPantalla("shopping"); }}
-          onIrServicios={function () { setPantalla("servicios"); }}
+          onVolver={function () {
+            setPantalla("dashboard");
+          }}
+          onIrDashboard={function () {
+            setPantalla("dashboard");
+          }}
+          onIrShopping={function () {
+            setPantalla("shopping");
+          }}
+          onIrServicios={function () {
+            setPantalla("servicios");
+          }}
         />
       )}
 
@@ -838,10 +933,18 @@ export default function App() {
           session={session}
           theme={theme}
           onThemeToggle={toggle}
-          onVolver={function () { setPantalla("dashboard"); }}
-          onIrDashboard={function () { setPantalla("dashboard"); }}
-          onIrBazar={function () { setPantalla("bazar"); }}
-          onIrShopping={function () { setPantalla("shopping"); }}
+          onVolver={function () {
+            setPantalla("dashboard");
+          }}
+          onIrDashboard={function () {
+            setPantalla("dashboard");
+          }}
+          onIrBazar={function () {
+            setPantalla("bazar");
+          }}
+          onIrShopping={function () {
+            setPantalla("shopping");
+          }}
         />
       )}
 
