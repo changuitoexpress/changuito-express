@@ -454,7 +454,7 @@ function Banner() {
   const slides = [
     {
       bg: "linear-gradient(135deg,#facc15,#f59e0b)",
-      t: "⭐ Espacio Patrocinado",
+      t: "⭐ Changuito Expréss App 🐵",
       s: "Tu negocio aquí · 222-858-6650",
     },
     {
@@ -465,7 +465,7 @@ function Banner() {
     {
       bg: "linear-gradient(135deg,#22c55e,#15803d)",
       t: "📍 LOMAS 1 ● 2 ● 3 ● LA VISTA",
-      s: "Cobertura exclusiva residencial",
+      s: "Cobertura exclusiva limitada",
     },
     {
       bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)",
