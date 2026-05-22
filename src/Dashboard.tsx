@@ -132,32 +132,68 @@ const SECCIONES_REST = [
 ];
 
 const SECCIONES_MAND = [
-  { titulo: "Supermercados",       keys: ["chedraui", "comer", "walmart"],                                                   emoji: "🛒" },
-  { titulo: "Frutas y Verduras",   keys: ["canasta"],                                                                         emoji: "🥦" },
-  { titulo: "Carnicerías",         keys: ["lulu", "maravillas", "ryc", "wild fork"],                                         emoji: "🥩" },
-  { titulo: "Pollerías",           keys: ["gallo giro"],                                                                      emoji: "🐓" },
-  { titulo: "Pescadería",          keys: ["almeja"],                                                                           emoji: "🐠" },
-  { titulo: "Lácteos",             keys: ["pastora", "piccolina"],                                                            emoji: "🧀" },
-  { titulo: "Farmacias",           keys: ["farmacia","farmacias","farmadrogueria","benavides","similares","ahorro","pablo"],  emoji: "💊" },
-  { titulo: "Papelerías",          keys: ["papelomas", "depot", "ofix"],                                                     emoji: "📎" },
-  { titulo: "Lavandería",          keys: ["yumikos"],                                                                         emoji: "👕" },
-  { titulo: "Desayunos",           keys: ["toks", "viejo", "ocho", "tagers", "almorzero"],                                  emoji: "🍳" },
-  { titulo: "Taquerías",           keys: ["oriental", "pastor", "suprema"],                                                  emoji: "🌮" },
-  { titulo: "Pizzerías",           keys: ["caesar", "domino"],                                                                emoji: "🍕" },
-  { titulo: "Comida Asiática",     keys: ["sushiitto", "sushi seven", "rock n wok"],                                        emoji: "🍜" },
-  { titulo: "Hamburguesas",        keys: ["mcdonald", "carl", "burger", "mccarthy", "arby"],                                emoji: "🍔" },
-  { titulo: "Barbacoa",            keys: ["barbaquita"],                                                                      emoji: "🫕" },
-  { titulo: "Pollos y Flautas",    keys: ["pollo feliz", "flautlan"],                                                        emoji: "🍗" },
-  { titulo: "Cafeterías",          keys: ["starbucks", "italian coffee"],                                                    emoji: "☕" },
-  { titulo: "Saludable",           keys: ["greenbite"],                                                                       emoji: "🥗" },
-  { titulo: "Panaderías",          keys: ["hackl", "rosario", "almendra"],                                                   emoji: "🥖" },
-  { titulo: "Pastelerías",         keys: ["zarza", "europea", "therese"],                                                    emoji: "🎂" },
-  { titulo: "Heladerías",          keys: ["santa clara", "biancolatte"],                                                     emoji: "🍦" },
-  { titulo: "Bebidas",             keys: ["rapichela", "clama"],                                                             emoji: "🧃" },
-  { titulo: "Comida Libanesa",     keys: ["biblos"],                                                                         emoji: "🫔" },
-  { titulo: "Pescados y Mariscos", keys: ["taco cabo"],                                                                      emoji: "🐟" },
-  { titulo: "Mascotas",            keys: ["petco"],                                                                           emoji: "🐾" },
-  { titulo: "Conveniencia",        keys: ["oxxo", "seven", "circle"],                                                       emoji: "🏪" },
+  {
+    titulo: "Supermercados",
+    keys: ["chedraui", "comer", "walmart"],
+    emoji: "🛒",
+  },
+  { titulo: "Frutas y Verduras", keys: ["canasta"], emoji: "🥦" },
+  {
+    titulo: "Carnicerías",
+    keys: ["lulu", "maravillas", "ryc", "wild fork"],
+    emoji: "🥩",
+  },
+  { titulo: "Pollerías", keys: ["gallo giro"], emoji: "🐓" },
+  { titulo: "Pescadería", keys: ["almeja"], emoji: "🐠" },
+  { titulo: "Lácteos", keys: ["pastora", "piccolina"], emoji: "🧀" },
+  {
+    titulo: "Farmacias",
+    keys: [
+      "farmacia",
+      "farmacias",
+      "farmadrogueria",
+      "benavides",
+      "similares",
+      "ahorro",
+      "pablo",
+    ],
+    emoji: "💊",
+  },
+  { titulo: "Papelerías", keys: ["papelomas", "depot", "ofix"], emoji: "📎" },
+  { titulo: "Lavandería", keys: ["yumikos"], emoji: "👕" },
+  {
+    titulo: "Desayunos",
+    keys: ["toks", "viejo", "ocho", "tagers", "almorzero"],
+    emoji: "🍳",
+  },
+  { titulo: "Taquerías", keys: ["oriental", "pastor", "suprema"], emoji: "🌮" },
+  { titulo: "Pizzerías", keys: ["caesar", "domino"], emoji: "🍕" },
+  {
+    titulo: "Comida Asiática",
+    keys: ["sushiitto", "sushi seven", "rock n wok"],
+    emoji: "🍜",
+  },
+  {
+    titulo: "Hamburguesas",
+    keys: ["mcdonald", "carl", "burger", "mccarthy", "arby"],
+    emoji: "🍔",
+  },
+  { titulo: "Barbacoa", keys: ["barbaquita"], emoji: "🫕" },
+  {
+    titulo: "Pollos y Flautas",
+    keys: ["pollo feliz", "flautlan"],
+    emoji: "🍗",
+  },
+  { titulo: "Cafeterías", keys: ["starbucks", "italian coffee"], emoji: "☕" },
+  { titulo: "Saludable", keys: ["greenbite"], emoji: "🥗" },
+  { titulo: "Panaderías", keys: ["hackl", "rosario", "almendra"], emoji: "🥖" },
+  { titulo: "Pastelerías", keys: ["zarza", "europea", "therese"], emoji: "🎂" },
+  { titulo: "Heladerías", keys: ["santa clara", "biancolatte"], emoji: "🍦" },
+  { titulo: "Bebidas", keys: ["rapichela", "clama"], emoji: "🧃" },
+  { titulo: "Comida Libanesa", keys: ["biblos"], emoji: "🫔" },
+  { titulo: "Pescados y Mariscos", keys: ["taco cabo"], emoji: "🐟" },
+  { titulo: "Mascotas", keys: ["petco"], emoji: "🐾" },
+  { titulo: "Conveniencia", keys: ["oxxo", "seven", "circle"], emoji: "🏪" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -428,7 +464,7 @@ function Banner() {
     },
     {
       bg: "linear-gradient(135deg,#22c55e,#15803d)",
-      t: "📍 LOMAS 1 ● 2 ● 3● LA VISTA",
+      t: "📍 LOMAS 1 ● 2 ● 3 ● LA VISTA",
       s: "Cobertura exclusiva residencial",
     },
     {
@@ -899,7 +935,13 @@ function ModalCheckout(props: {
             zIndex: 10,
           }}
         >
-          <X style={{ width: "16px", height: "16px", color: "var(--text-primary)" }} />
+          <X
+            style={{
+              width: "16px",
+              height: "16px",
+              color: "var(--text-primary)",
+            }}
+          />
         </button>
         {/* Handle + título */}
         <div
@@ -1133,40 +1175,194 @@ function ModalCheckout(props: {
                 </p>
                 {/* Alias field */}
                 <div style={{ marginBottom: "10px" }}>
-                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>Alias / Nombre (Casa, Trabajo...)</p>
-                  <input value={alias} onChange={function(e){ setAlias(e.target.value); }} placeholder="Casa, Trabajo"
-                    style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none" }} />
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: textMuted,
+                      margin: "0 0 4px 0",
+                    }}
+                  >
+                    Alias / Nombre (Casa, Trabajo...)
+                  </p>
+                  <input
+                    value={alias}
+                    onChange={function (e) {
+                      setAlias(e.target.value);
+                    }}
+                    placeholder="Casa, Trabajo"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      border: `1px solid ${border}`,
+                      background: "var(--bg-card)",
+                      color: textPrim,
+                      fontSize: "13px",
+                      outline: "none",
+                    }}
+                  />
                 </div>
                 {/* Fraccionamiento selector */}
-                <div style={{ marginBottom:"10px" }}>
-                  <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>🏘️ Fraccionamiento / Clúster / Plaza</p>
+                <div style={{ marginBottom: "10px" }}>
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: textMuted,
+                      margin: "0 0 4px 0",
+                    }}
+                  >
+                    🏘️ Fraccionamiento / Clúster / Plaza
+                  </p>
                   {fraccionamientoSel ? (
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderRadius:"12px", border:"2px solid var(--color-yellow)", background:"var(--color-yellow-dim)" }}>
-                      <span style={{ fontSize:"13px", fontWeight:800, color:textPrim }}>{fraccionamientoSel.nombre}</span>
-                      <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                        <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${fraccionamientoSel.costo_envio}</span>
-                        <button onClick={function(){ setFraccionamientoSel(null); setCostoEnvio(50); setFracSearch(""); }} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", padding:0, lineHeight:0 }}>
-                          <X style={{ width:"14px", height:"14px" }} />
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 14px",
+                        borderRadius: "12px",
+                        border: "2px solid var(--color-yellow)",
+                        background: "var(--color-yellow-dim)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 800,
+                          color: textPrim,
+                        }}
+                      >
+                        {fraccionamientoSel.nombre}
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 800,
+                            color: "var(--color-yellow)",
+                          }}
+                        >
+                          ${fraccionamientoSel.costo_envio}
+                        </span>
+                        <button
+                          onClick={function () {
+                            setFraccionamientoSel(null);
+                            setCostoEnvio(50);
+                            setFracSearch("");
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            padding: 0,
+                            lineHeight: 0,
+                          }}
+                        >
+                          <X style={{ width: "14px", height: "14px" }} />
                         </button>
                       </div>
                     </div>
                   ) : (
                     <>
-                      <input value={fracSearch} onChange={function(e){ setFracSearch(e.target.value); }} placeholder="Buscar fraccionamiento..."
-                        style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none", marginBottom:"4px" }} />
+                      <input
+                        value={fracSearch}
+                        onChange={function (e) {
+                          setFracSearch(e.target.value);
+                        }}
+                        placeholder="Buscar fraccionamiento..."
+                        style={{
+                          width: "100%",
+                          boxSizing: "border-box",
+                          padding: "11px 14px",
+                          borderRadius: "12px",
+                          border: `1px solid ${border}`,
+                          background: "var(--bg-card)",
+                          color: textPrim,
+                          fontSize: "13px",
+                          outline: "none",
+                          marginBottom: "4px",
+                        }}
+                      />
                       {fracSearch.trim() !== "" && (
-                        <div style={{ maxHeight:"140px", overflowY:"auto", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)" }}>
-                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).map(function(f){
-                            return (
-                              <div key={f.id} onClick={function(){ setFraccionamientoSel(f); setCostoEnvio(f.costo_envio); setFracSearch(""); }}
-                                style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", cursor:"pointer", borderBottom:`1px solid ${border}` }}>
-                                <span style={{ fontSize:"13px", fontWeight:700, color:textPrim }}>{f.nombre}</span>
-                                <span style={{ fontSize:"12px", fontWeight:800, color:"var(--color-yellow)" }}>${f.costo_envio}</span>
-                              </div>
-                            );
-                          })}
-                          {fraccionamientos.filter(function(f){ return f.nombre.toLowerCase().includes(fracSearch.toLowerCase()); }).length === 0 && (
-                            <p style={{ fontSize:"12px", color:"var(--text-muted)", padding:"10px 14px", margin:0 }}>Sin resultados</p>
+                        <div
+                          style={{
+                            maxHeight: "140px",
+                            overflowY: "auto",
+                            borderRadius: "12px",
+                            border: `1px solid ${border}`,
+                            background: "var(--bg-card)",
+                          }}
+                        >
+                          {fraccionamientos
+                            .filter(function (f) {
+                              return f.nombre
+                                .toLowerCase()
+                                .includes(fracSearch.toLowerCase());
+                            })
+                            .map(function (f) {
+                              return (
+                                <div
+                                  key={f.id}
+                                  onClick={function () {
+                                    setFraccionamientoSel(f);
+                                    setCostoEnvio(f.costo_envio);
+                                    setFracSearch("");
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    padding: "10px 14px",
+                                    cursor: "pointer",
+                                    borderBottom: `1px solid ${border}`,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "13px",
+                                      fontWeight: 700,
+                                      color: textPrim,
+                                    }}
+                                  >
+                                    {f.nombre}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 800,
+                                      color: "var(--color-yellow)",
+                                    }}
+                                  >
+                                    ${f.costo_envio}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          {fraccionamientos.filter(function (f) {
+                            return f.nombre
+                              .toLowerCase()
+                              .includes(fracSearch.toLowerCase());
+                          }).length === 0 && (
+                            <p
+                              style={{
+                                fontSize: "12px",
+                                color: "var(--text-muted)",
+                                padding: "10px 14px",
+                                margin: 0,
+                              }}
+                            >
+                              Sin resultados
+                            </p>
                           )}
                         </div>
                       )}
@@ -1175,16 +1371,61 @@ function ModalCheckout(props: {
                 </div>
                 {/* Remaining address fields */}
                 {[
-                  { label: "Calle / Torre *",          val: calle,       set: setCalle,       ph: "Av. Principal"  },
-                  { label: "Número / Depto *",          val: numero,      set: setNumero,      ph: "#123, Depto #123" },
-                  { label: "Referencias",               val: referencias, set: setReferencias, ph: "Opcional"       },
-                  { label: "Instrucciones de entrega",  val: preferencias,set: setPreferencias,ph: "Opcional"       },
+                  {
+                    label: "Calle / Torre *",
+                    val: calle,
+                    set: setCalle,
+                    ph: "Av. Principal",
+                  },
+                  {
+                    label: "Número / Depto *",
+                    val: numero,
+                    set: setNumero,
+                    ph: "#123, Depto #123",
+                  },
+                  {
+                    label: "Referencias",
+                    val: referencias,
+                    set: setReferencias,
+                    ph: "Opcional",
+                  },
+                  {
+                    label: "Instrucciones de entrega",
+                    val: preferencias,
+                    set: setPreferencias,
+                    ph: "Opcional",
+                  },
                 ].map(function (f) {
                   return (
                     <div key={f.label} style={{ marginBottom: "10px" }}>
-                      <p style={{ fontSize:"11px", fontWeight:600, color:textMuted, margin:"0 0 4px 0" }}>{f.label}</p>
-                      <input value={f.val} onChange={function(e){ f.set(e.target.value); }} placeholder={f.ph}
-                        style={{ width:"100%", boxSizing:"border-box", padding:"11px 14px", borderRadius:"12px", border:`1px solid ${border}`, background:"var(--bg-card)", color:textPrim, fontSize:"13px", outline:"none" }} />
+                      <p
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          color: textMuted,
+                          margin: "0 0 4px 0",
+                        }}
+                      >
+                        {f.label}
+                      </p>
+                      <input
+                        value={f.val}
+                        onChange={function (e) {
+                          f.set(e.target.value);
+                        }}
+                        placeholder={f.ph}
+                        style={{
+                          width: "100%",
+                          boxSizing: "border-box",
+                          padding: "11px 14px",
+                          borderRadius: "12px",
+                          border: `1px solid ${border}`,
+                          background: "var(--bg-card)",
+                          color: textPrim,
+                          fontSize: "13px",
+                          outline: "none",
+                        }}
+                      />
                     </div>
                   );
                 })}
@@ -1648,21 +1889,25 @@ export default function Dashboard(props: DashboardProps) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
   const [modalLimite, setModalLimite] = useState(false);
-  const esAdmin = props.session.user.email === "uliseseven.7@gmail.com" || props.session.user.rol === 'admin';
-  const rol = props.session.user.rol ?? 'cliente';
-  const puedeNegocio = esAdmin || rol === 'negocio' || esMerchantAdmin;
-  const puedeRepartidor = esAdmin || rol === 'repartidor';
+  const esAdmin =
+    props.session.user.email === "uliseseven.7@gmail.com" ||
+    props.session.user.rol === "admin";
+  const rol = props.session.user.rol ?? "cliente";
+  const puedeNegocio = esAdmin || rol === "negocio" || esMerchantAdmin;
+  const puedeRepartidor = esAdmin || rol === "repartidor";
 
-  useEffect(function() {
+  useEffect(function () {
     async function checkMerchantAdmin() {
       try {
         const { data } = await supabase
-          .from('merchant_admins')
-          .select('merchant_id')
-          .eq('user_id', props.session.user.id)
+          .from("merchant_admins")
+          .select("merchant_id")
+          .eq("user_id", props.session.user.id)
           .maybeSingle();
         if (data) setEsMerchantAdmin(true);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     checkMerchantAdmin();
   }, []);
@@ -1754,7 +1999,11 @@ export default function Dashboard(props: DashboardProps) {
   }
 
   function agregarMandadito(merchant: Merchant, texto: string) {
-    const negociosActuales = new Set(props.carritoGlobal.map(function(i) { return i.negocio_id; }));
+    const negociosActuales = new Set(
+      props.carritoGlobal.map(function (i) {
+        return i.negocio_id;
+      }),
+    );
     if (!negociosActuales.has(merchant.id) && negociosActuales.size >= 4) {
       setModalLimite(true);
       return;
@@ -2604,16 +2853,36 @@ export default function Dashboard(props: DashboardProps) {
 
               {/* PANEL NEGOCIO — solo rol negocio/admin */}
               {puedeNegocio && (
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrNegocio && props.onIrNegocio();
-                }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
-              >
-                <Store style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
-                <span>Panel de Negocio</span>
-              </button>
+                <button
+                  onClick={function () {
+                    setMenuAbierto(false);
+                    props.onIrNegocio && props.onIrNegocio();
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "13px 12px",
+                    borderRadius: "12px",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-primary)",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    textAlign: "left",
+                  }}
+                >
+                  <Store
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      color: "var(--color-yellow)",
+                    }}
+                  />
+                  <span>Panel de Negocio</span>
+                </button>
               )}
 
               {/* BIENES RAÍCES — reactivado, abre bazar */}
@@ -2622,9 +2891,29 @@ export default function Dashboard(props: DashboardProps) {
                   setMenuAbierto(false);
                   props.onIrBazar && props.onIrBazar();
                 }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "13px 12px",
+                  borderRadius: "12px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  textAlign: "left",
+                }}
               >
-                <Building2 style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <Building2
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "var(--color-yellow)",
+                  }}
+                />
                 <span>Bienes Raíces</span>
               </button>
 
@@ -2634,24 +2923,58 @@ export default function Dashboard(props: DashboardProps) {
                   setMenuAbierto(false);
                   props.onIrBazar && props.onIrBazar();
                 }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "transparent", border: "none", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: 700, textAlign: "left" }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "13px 12px",
+                  borderRadius: "12px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  textAlign: "left",
+                }}
               >
-                <Car style={{ width: "18px", height: "18px", color: "var(--color-yellow)" }} />
+                <Car
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "var(--color-yellow)",
+                  }}
+                />
                 <span>Venta de Autos</span>
               </button>
 
               {/* PANEL REPARTIDOR — solo rol repartidor/admin */}
               {puedeRepartidor && (
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrRepas && props.onIrRepas();
-                }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "13px 12px", borderRadius: "12px", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.35)", cursor: "pointer", color: "var(--color-green)", fontSize: "14px", fontWeight: 900, textAlign: "left" }}
-              >
-                <span style={{ fontSize: "18px" }}>🛵</span>
-                <span>Panel Repartidor</span>
-              </button>
+                <button
+                  onClick={function () {
+                    setMenuAbierto(false);
+                    props.onIrRepas && props.onIrRepas();
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "13px 12px",
+                    borderRadius: "12px",
+                    background: "rgba(34,197,94,0.12)",
+                    border: "1px solid rgba(34,197,94,0.35)",
+                    cursor: "pointer",
+                    color: "var(--color-green)",
+                    fontSize: "14px",
+                    fontWeight: 900,
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: "18px" }}>🛵</span>
+                  <span>Panel Repartidor</span>
+                </button>
               )}
 
               {esAdmin && (
@@ -2752,7 +3075,9 @@ export default function Dashboard(props: DashboardProps) {
             zIndex: 999,
           }}
         >
-          <ShoppingBag style={{ width: "24px", height: "24px", color: "#020617" }} />
+          <ShoppingBag
+            style={{ width: "24px", height: "24px", color: "#020617" }}
+          />
           <span
             style={{
               position: "absolute",
@@ -2916,21 +3241,76 @@ export default function Dashboard(props: DashboardProps) {
       {/* Modal límite 4 negocios */}
       {modalLimite && (
         <div
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.72)", zIndex:600, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}
-          onClick={function(){ setModalLimite(false); }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.72)",
+            zIndex: 600,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+          }}
+          onClick={function () {
+            setModalLimite(false);
+          }}
         >
           <div
-            style={{ background:"var(--bg-card)", borderRadius:"24px", padding:"28px 24px", maxWidth:"340px", width:"100%", textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,0.5)" }}
-            onClick={function(e){ e.stopPropagation(); }}
+            style={{
+              background: "var(--bg-card)",
+              borderRadius: "24px",
+              padding: "28px 24px",
+              maxWidth: "340px",
+              width: "100%",
+              textAlign: "center",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+            }}
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
           >
-            <div style={{ fontSize:"48px", marginBottom:"12px" }}>🛒</div>
-            <h2 style={{ fontSize:"17px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 10px 0", lineHeight:1.25 }}>Límite alcanzado</h2>
-            <p style={{ fontSize:"13px", color:"var(--text-muted)", margin:"0 0 20px 0", lineHeight:1.55 }}>
-              Máximo <strong style={{ color:"var(--text-primary)" }}>4 negocios</strong> por pedido para garantizar la frescura y velocidad de tus repartidores.
+            <div style={{ fontSize: "48px", marginBottom: "12px" }}>🛒</div>
+            <h2
+              style={{
+                fontSize: "17px",
+                fontWeight: 900,
+                color: "var(--text-primary)",
+                margin: "0 0 10px 0",
+                lineHeight: 1.25,
+              }}
+            >
+              Límite alcanzado
+            </h2>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "var(--text-muted)",
+                margin: "0 0 20px 0",
+                lineHeight: 1.55,
+              }}
+            >
+              Máximo{" "}
+              <strong style={{ color: "var(--text-primary)" }}>
+                4 negocios
+              </strong>{" "}
+              por pedido para garantizar la frescura y velocidad de tus
+              repartidores.
             </p>
             <button
-              onClick={function(){ setModalLimite(false); }}
-              style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"14px", borderRadius:"14px", border:"none", cursor:"pointer" }}
+              onClick={function () {
+                setModalLimite(false);
+              }}
+              style={{
+                width: "100%",
+                background: "var(--color-yellow)",
+                color: "#020617",
+                fontWeight: 900,
+                fontSize: "14px",
+                padding: "14px",
+                borderRadius: "14px",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               Entendido
             </button>
