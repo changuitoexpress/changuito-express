@@ -905,6 +905,19 @@ export default function App() {
           onIrNegocio={function () {
             setPantalla("negocio");
           }}
+          onAddToCart={function (items: any[]) {
+            setCarritoGlobal(function (prev: any[]) {
+              const nuevo = [...prev];
+              items.forEach(function (item) {
+                const idx = nuevo.findIndex(function (i) {
+                  return i.id === item.id && i.negocio_id === item.negocio_id;
+                });
+                if (idx >= 0) nuevo[idx].cantidad = (nuevo[idx].cantidad || 1) + (item.cantidad || 1);
+                else nuevo.push(item);
+              });
+              return nuevo;
+            });
+          }}
         />
       )}
 

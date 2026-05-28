@@ -41,6 +41,7 @@ import {
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
 import VistaNegocio from "./VistaNegocio";
+import ChanguitoAI from "./ChanguitoAI";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface Merchant {
@@ -95,6 +96,7 @@ interface DashboardProps {
   onIrRepas?: () => void;
   carritoGlobal: CartItem[];
   onUpdateCarritoGlobal: (items: CartItem[]) => void;
+  onAddToCart?: (items: any[]) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -3237,6 +3239,16 @@ export default function Dashboard(props: DashboardProps) {
       </div>
 
       <style>{`::-webkit-scrollbar{display:none;}*{-webkit-tap-highlight-color:transparent;box-sizing:border-box;}button{font-family:inherit;}`}</style>
+
+      {/* ChanguiBot IA */}
+      {props.onAddToCart && (
+        <ChanguitoAI
+          session={props.session}
+          theme={props.theme}
+          carritoGlobal={props.carritoGlobal}
+          onAddToCart={props.onAddToCart}
+        />
+      )}
 
       {/* Modal límite 4 negocios */}
       {modalLimite && (
