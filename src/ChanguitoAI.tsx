@@ -176,9 +176,17 @@ export default function ChanguitoAI(props: Props) {
 
   // ── Llamar a Gemini via SDK ─────────────────────────────────────────────────
   async function llamarGemini(textoUsuario: string): Promise<string> {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const rawKey = (import.meta.env as any).VITE_GEMINI_API_KEY;
+    const cleanApiKey = rawKey
+      ? String(rawKey).trim().replace(/['"‘’“”\s]/g, '')
+      : '';
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    if (!cleanApiKey) {
+      console.error('API Key evaluation failed or string is empty');
+      throw new Error('No se pudo leer la API key.');
+    }
+
+    const genAI = new GoogleGenerativeAI(cleanApiKey);
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
       systemInstruction: SYSTEM_PROMPT.replace('{{PRODUCTOS_CONTEXT}}', construirContexto()),
