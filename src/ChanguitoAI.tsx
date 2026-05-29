@@ -176,9 +176,10 @@ export default function ChanguitoAI(props: Props) {
 
   // ── Llamar a Gemini via SDK ─────────────────────────────────────────────────
   async function llamarGemini(textoUsuario: string): Promise<string> {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = (import.meta.env as any).VITE_GEMINI_API_KEY || '';
     if (!apiKey) {
-      throw new Error('Agrega VITE_GEMINI_API_KEY en Replit Secrets');
+      setError('VITE_GEMINI_API_KEY no configurada en Replit Secrets');
+      throw new Error('Configura la API key en Replit Secrets');
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
