@@ -35,6 +35,8 @@ interface Props {
   theme:         Theme;
   carritoGlobal: any[];
   onAddToCart:   (items: ItemCarrito[]) => void;
+  abierto:       boolean;
+  onCerrar:      () => void;
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
@@ -67,7 +69,6 @@ function horaActual(): string {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ChanguitoAI(props: Props) {
-  const [abierto, setAbierto]       = useState(false);
   const [mensajes, setMensajes]     = useState<Mensaje[]>([]);
   const [input, setInput]           = useState('');
   const [cargando, setCargando]     = useState(false);
@@ -75,21 +76,10 @@ export default function ChanguitoAI(props: Props) {
   const [productos, setProductos]   = useState<any[]>([]);
   const [error, setError]           = useState('');
   const [historial, setHistorial]   = useState<HistorialItem[]>([]);
-  const [pulso, setPulso]           = useState(false);
   const chatEndRef                  = useRef<HTMLDivElement>(null);
   const inputRef                    = useRef<HTMLInputElement>(null);
   const recognitionRef              = useRef<any>(null);
   const isDark = props.theme === 'dark';
-
-  // ── Pulso periódico para llamar la atención ─────────────────────────────────
-  useEffect(function() {
-    if (abierto) return;
-    const t = setInterval(function() {
-      setPulso(true);
-      setTimeout(function() { setPulso(false); }, 1200);
-    }, 6000);
-    return function() { clearInterval(t); };
-  }, [abierto]);
 
   // ── Scroll al último mensaje ────────────────────────────────────────────────
   useEffect(function() {
@@ -98,7 +88,7 @@ export default function ChanguitoAI(props: Props) {
 
   // ── Saludo al abrir ─────────────────────────────────────────────────────────
   useEffect(function() {
-    if (abierto && mensajes.length === 0) {
+    if (props.abierto && mensajes.length === 0) {
       const saludo: Mensaje = {
         id: 'bienvenida', rol: 'bot', hora: horaActual(),
         texto: '¡Hola! 🐒 Soy ChanguiBot. ¿Qué se te antoja hoy? Puedo tomarte pedidos de comida, hacer mandaditos, pagos de servicios, depósitos y traslados. ¡Habla o escribe!',
@@ -107,7 +97,7 @@ export default function ChanguitoAI(props: Props) {
       hablar(saludo.texto);
       setTimeout(function() { inputRef.current?.focus(); }, 300);
     }
-  }, [abierto]);
+  }, [props.abierto]);
 
   // ── Cargar productos de Supabase ────────────────────────────────────────────
   const cargarProductos = useCallback(async function() {
@@ -284,39 +274,9 @@ export default function ChanguitoAI(props: Props) {
     hablar('Listo, agregué los productos a tu carrito.');
   }
 
-  // ── Botón flotante (cerrado) ────────────────────────────────────────────────
-  if (!abierto) {
-    return (
-      <button
-        onClick={function() { setAbierto(true); }}
-        title="ChanguiBot IA"
-        style={{
-          position: 'fixed',
-          top:      '115px',
-          right:    '16px',
-          zIndex:   90,
-          width:    '44px',
-          height:   '44px',
-          borderRadius: '50%',
-          border:   'none',
-          cursor:   'pointer',
-          background: 'linear-gradient(135deg,#facc15,#f59e0b)',
-          display:  'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '18px',
-          boxShadow: pulso
-            ? '0 0 0 8px rgba(250,204,21,0.25),0 0 0 16px rgba(250,204,21,0.1),0 6px 20px rgba(250,204,21,0.5)'
-            : '0 6px 20px rgba(250,204,21,0.4)',
-          transition: 'box-shadow 0.4s ease',
-        }}
-      >
-        🐒
-      </button>
-    );
-  }
+  // ── Panel chat ─────────────────────────────────────────────────────────────
+  if (!props.abierto) return null;
 
-  // ── Panel chat (abierto) ────────────────────────────────────────────────────
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0,
@@ -361,7 +321,7 @@ export default function ChanguitoAI(props: Props) {
             🛒 {props.carritoGlobal.length}
           </div>
           <button
-            onClick={function() { window.speechSynthesis?.cancel(); setAbierto(false); }}
+            onClick={function() { window.speechSynthesis?.cancel(); props.onCerrar(); }}
             style={{
               width: '32px', height: '32px', borderRadius: '10px',
               background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',

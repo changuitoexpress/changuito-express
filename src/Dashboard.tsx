@@ -1891,6 +1891,7 @@ export default function Dashboard(props: DashboardProps) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
   const [modalLimite, setModalLimite] = useState(false);
+  const [changuiAbierto, setChanguiAbierto] = useState(false);
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
@@ -2547,7 +2548,7 @@ export default function Dashboard(props: DashboardProps) {
                 ? "1px solid rgba(255,255,255,0.08)"
                 : "1px solid rgba(0,0,0,0.1)",
               borderRadius: "14px",
-              padding: "11px 36px 11px 38px",
+              padding: "11px 74px 11px 38px",
               color: "var(--text-primary)",
               fontSize: "13px",
               outline: "none",
@@ -2560,7 +2561,7 @@ export default function Dashboard(props: DashboardProps) {
               }}
               style={{
                 position: "absolute",
-                right: "12px",
+                right: "46px",
                 top: "50%",
                 transform: "translateY(-50%)",
                 background: "none",
@@ -2571,6 +2572,33 @@ export default function Dashboard(props: DashboardProps) {
               }}
             >
               <X style={{ width: "14px", height: "14px" }} />
+            </button>
+          )}
+          {/* ChanguiBot trigger — embedded in search bar right edge */}
+          {props.onAddToCart && (
+            <button
+              onClick={function () { setChanguiAbierto(true); }}
+              title="ChanguiBot IA"
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "32px",
+                height: "32px",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+                background: "linear-gradient(135deg,#facc15,#f59e0b)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "16px",
+                boxShadow: "0 3px 10px rgba(250,204,21,0.45)",
+                lineHeight: 1,
+              }}
+            >
+              🐒
             </button>
           )}
         </div>
@@ -3247,6 +3275,8 @@ export default function Dashboard(props: DashboardProps) {
           theme={props.theme}
           carritoGlobal={props.carritoGlobal}
           onAddToCart={props.onAddToCart}
+          abierto={changuiAbierto}
+          onCerrar={function () { setChanguiAbierto(false); }}
         />
       )}
 
