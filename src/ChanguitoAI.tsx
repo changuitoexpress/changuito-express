@@ -216,8 +216,30 @@ export default function ChanguitoAI(props: Props) {
 
   if (!abierto) {
     return (
-      <button onClick={function() { setAbierto(true); }}
-        style={{ position: 'fixed', top: '80px', right: '16px', zIndex: 250, width: '56px', height: '56px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#facc15,#f59e0b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: pulso ? '0 0 0 10px rgba(250,204,21,0.25),0 0 0 20px rgba(250,204,21,0.1),0 8px 24px rgba(250,204,21,0.5)' : '0 8px 24px rgba(250,204,21,0.4)', transition: 'box-shadow 0.4s ease' }}>
+      <button
+        onClick={function() { setAbierto(true); }}
+        title="ChanguiBot IA"
+        style={{
+          position: 'fixed',
+          top: '112px',
+          right: '16px',
+          zIndex: 90,
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg,#facc15,#f59e0b)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '20px',
+          boxShadow: pulso
+            ? '0 0 0 8px rgba(250,204,21,0.25),0 0 0 16px rgba(250,204,21,0.1),0 6px 20px rgba(250,204,21,0.5)'
+            : '0 6px 20px rgba(250,204,21,0.4)',
+          transition: 'box-shadow 0.4s ease',
+        }}
+      >
         🐒
       </button>
     );
