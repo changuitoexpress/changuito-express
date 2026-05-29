@@ -177,12 +177,12 @@ export default function ChanguitoAI(props: Props) {
   // ── Llamar a Gemini via SDK ─────────────────────────────────────────────────
   async function llamarGemini(textoUsuario: string): Promise<string> {
     const rawKey = (import.meta.env as any).VITE_GEMINI_API_KEY;
-    const cleanApiKey = rawKey
-      ? String(rawKey).trim().replace(/['"‘’“”\s]/g, '')
-      : '';
+    const cleanApiKey = rawKey ? String(rawKey).trim().replace(/['"‘“’]/g, '') : '';
+
+    console.log('ChanguitoAI Auth Debug - Key Length:', cleanApiKey.length);
 
     if (!cleanApiKey) {
-      console.error('API Key evaluation failed or string is empty');
+      console.error('ChanguitoAI: cleanApiKey está vacía.');
       throw new Error('No se pudo leer la API key.');
     }
 
