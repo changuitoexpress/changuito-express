@@ -1,7 +1,6 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Mic, MicOff, Send, ShoppingCart, AlertCircle, Volume2 } from 'lucide-react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from './App';
 import type { AppSession, Theme } from './App';
 
@@ -174,27 +173,39 @@ export default function ChanguitoAI(props: Props) {
     return ctx;
   }
 
-  // ── Llamar a Gemini via SDK ─────────────────────────────────────────────────
+  // ── Llamar a Gemini via fetch directo ──────────────────────────────────────────────
   async function llamarGemini(textoUsuario: string): Promise<string> {
-    const rawKey = (import.meta.env as any).VITE_GEMINI_API_KEY;
-    const cleanApiKey = rawKey ? String(rawKey).trim().replace(/['"‘“’]/g, '') : '';
-
-    console.log('ChanguitoAI Auth Debug - Key Length:', cleanApiKey.length);
-
-    if (!cleanApiKey) {
-      console.error('ChanguitoAI: cleanApiKey está vacía.');
-      throw new Error('No se pudo leer la API key.');
+    const apiKey = (import.meta.env as any).VITE_GEMINI_API_KEY || '';
+    if (!apiKey) {
+      console.error('VITE_GEMINI_API_KEY no configurada');
+      throw new Error('Configura VITE_GEMINI_API_KEY');
     }
 
-    const genAI = new GoogleGenerativeAI(cleanApiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT.replace('{{PRODUCTOS_CONTEXT}}', construirContexto()),
-    });
+    const systemPrompt = SYSTEM_PROMPT.replace('{{PRODUCTOS_CONTEXT}}', construirContexto());
+    const contents = [
+      ...historial,
+      { role: 'user', parts: [{ text: textoUsuario }] },
+    ];
 
-    const chat = model.startChat({ history: historial });
-    const result = await chat.sendMessage(textoUsuario);
-    const respuesta = result.response.text();
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('[' + res.status + '] ' + errText);
+    }
+
+    const data = await res.json();
+    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     setHistorial(function(prev) {
       return [
