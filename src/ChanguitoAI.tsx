@@ -175,7 +175,7 @@ export default function ChanguitoAI(props: Props) {
 
   // ── Llamar a Gemini via fetch directo ──────────────────────────────────────────────
   async function llamarGemini(textoUsuario: string): Promise<string> {
-    const apiKey = (import.meta.env as any).VITE_GEMINI_API_KEY || '';
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     if (!apiKey) {
       console.error('VITE_GEMINI_API_KEY no configurada');
       throw new Error('Configura VITE_GEMINI_API_KEY');
