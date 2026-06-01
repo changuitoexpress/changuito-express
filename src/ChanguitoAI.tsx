@@ -1,6 +1,6 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Mic, MicOff, Send, ShoppingCart, AlertCircle, Volume2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Send } from 'lucide-react';
 import { supabase } from './App';
 import type { AppSession, Theme } from './App';
 
@@ -17,16 +17,10 @@ interface ItemCarrito {
 }
 
 interface Mensaje {
-  id:     string;
-  rol:    'user' | 'bot' | 'sistema';
-  texto:  string;
-  items?: ItemCarrito[];
-  hora:   string;
-}
-
-interface HistorialItem {
-  role:  'user' | 'model';
-  parts: { text: string }[];
+  id:    string;
+  rol:   'user' | 'bot' | 'sistema';
+  texto: string;
+  hora:  string;
 }
 
 interface Props {
@@ -38,46 +32,194 @@ interface Props {
   onCerrar:      () => void;
 }
 
-// ─── System prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `Eres ChanguiBot 🐒, el asistente cajero de Changuito Express — delivery premium en Lomas de Angelópolis, Puebla, México. Eres amable, eficiente y conoces todos los servicios.
-
-SERVICIOS:
-1. 🍽️ PEDIDOS DE RESTAURANTES — 85+ negocios en la app
-2. 🛒 MANDADITOS — compras en supermercados y tiendas en Lomas
-3. 💡 PAGOS DE SERVICIOS — luz, agua, teléfono, internet (OXXO / 7-Eleven)
-4. 🏦 DEPÓSITOS BANCARIOS — llevamos tu efectivo al banco o cajero
-5. 📦 RECOLECCIÓN DE PAQUETES — recogemos en cualquier dirección de Lomas
-6. 🚗 TRASLADOS — movemos objetos o documentos entre fraccionamientos
-
-ZONAS DE COBERTURA: Lomas 1, Lomas 2, Lomas 3, La Vista, Sonata, Victoria, Toscana, Cluster. Si piden fuera de estas zonas, di amablemente que no tenemos cobertura aún.
-
-REGLAS:
-- Habla en español mexicano, amigable y profesional, máximo 3 oraciones
-- Si piden comida de un negocio en el sistema, incluye al FINAL de tu respuesta: CARRITO_JSON:[{"merchant_id":"id","merchant_name":"nombre","product_id":"id","product_name":"nombre","price":99,"quantity":1}]
-- Si piden algo fuera de la app pero en Lomas, ofrece mandadito
-- Si piden pago de servicios, traslado o depósito, confirma y pide dirección
-- NO uses markdown ni bloques de código
-
-NEGOCIOS DISPONIBLES:
-{{PRODUCTOS_CONTEXT}}`;
+interface ContextoIA {
+  negocios:  any[];
+  productos: any[];
+  ultimoTema: string;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function horaActual(): string {
   return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 }
 
+function quitarAcentos(texto: string): string {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function incluyeAlguna(texto: string, claves: string[]): boolean {
+  for (let i = 0; i < claves.length; i++) {
+    if (texto.indexOf(claves[i]) !== -1) return true;
+  }
+  return false;
+}
+
+// Coincidencia por palabra completa (evita falsos positivos con palabras cortas como "si", "va", "ok")
+function tienePalabraExacta(texto: string, claves: string[]): boolean {
+  const palabras = texto.split(/[^a-z0-9]+/);
+  for (let i = 0; i < palabras.length; i++) {
+    for (let j = 0; j < claves.length; j++) {
+      if (palabras[i] === claves[j]) return true;
+    }
+  }
+  return false;
+}
+
+// Busca hasta "limite" nombres de negocios cuyo nombre o categoría contenga alguna palabra clave
+function negociosPorTema(negocios: any[], claves: string[], limite: number): string[] {
+  const encontrados: string[] = [];
+  for (let i = 0; i < negocios.length; i++) {
+    const n = negocios[i];
+    const nombre = quitarAcentos(String(n?.name ?? '').toLowerCase());
+    const categoria = quitarAcentos(String(n?.category ?? n?.type ?? '').toLowerCase());
+    if (incluyeAlguna(nombre, claves) || incluyeAlguna(categoria, claves)) {
+      if (n?.name) encontrados.push(n.name);
+    }
+    if (encontrados.length >= limite) break;
+  }
+  return encontrados;
+}
+
+function listaNegocios(nombres: string[]): string {
+  if (nombres.length === 0) return '';
+  return ' Por ejemplo: ' + nombres.join(', ') + '.';
+}
+
+// ─── Base de conocimiento IA (LOCAL, sin API) ─────────────────────────────────
+function respuestaIA(input: string, contexto: ContextoIA): { texto: string; tema: string } {
+  const texto = quitarAcentos(input.toLowerCase().trim());
+
+  // Despedidas
+  if (incluyeAlguna(texto, ['adios', 'gracias', 'bye', 'nos vemos', 'hasta luego'])) {
+    return {
+      tema: 'despedida',
+      texto: '¡Con gusto! 🐒 Aquí estaré cuando me necesites. ¡Que disfrutes tu pedido en Changuito Express!',
+    };
+  }
+
+  // Saludos
+  if (incluyeAlguna(texto, ['hola', 'buenos', 'buenas', 'que onda', 'que tal', 'hey', 'qué onda'])) {
+    return {
+      tema: 'saludo',
+      texto: '¡Hola! 👋 Soy ChanguiBot, tu asistente de Changuito Express. Puedo ayudarte con comida, súper, farmacia, traslados, servicios y mandaditos. ¿Qué se te antoja hoy?',
+    };
+  }
+
+  // Ayuda / cómo funciona
+  if (incluyeAlguna(texto, ['ayuda', 'como funciona', 'que puedes', 'que haces', 'opciones', 'menu de opciones'])) {
+    return {
+      tema: 'ayuda',
+      texto: '📋 Aquí va lo que puedo hacer:\n\n🍕 COMIDA: pide de restaurantes\n🛒 SÚPER: compra en supermercados\n💊 FARMACIA: medicinas y productos\n🚗 TRASLADOS: mover cosas entre fraccionamientos\n🏠 SERVICIOS: pagos de luz, agua, depósitos\n📦 MANDADITOS: recados varios\n\n¿Qué necesitas?',
+    };
+  }
+
+  // Memelas / tortillas (caso específico)
+  if (incluyeAlguna(texto, ['memela', 'tortilla', 'tlacoyo'])) {
+    const negs = negociosPorTema(contexto.negocios, ['tortil', 'memela', 'maiz', 'antojito'], 3);
+    return {
+      tema: 'comida',
+      texto: '¡Perfecto! 😋 Tengo tortillería con memelas deliciosas de cecina, rajas, queso y más.' +
+             listaNegocios(negs) +
+             '\n\nAbre el menú en la app (toca 🍕 Comida) para agregar exactamente lo que quieres al carrito. ¿Te ayudo con algo más?',
+    };
+  }
+
+  // Tacos / hamburguesas / comida en general
+  if (incluyeAlguna(texto, ['comida', 'comer', 'restaurante', 'taco', 'hamburguesa', 'pizza', 'antojo', 'hambre', 'pedido'])) {
+    const negs = negociosPorTema(contexto.negocios, ['taco', 'burger', 'pizza', 'rest', 'comida', 'food'], 4);
+    return {
+      tema: 'comida',
+      texto: '¡Excelente! 🍕 Tenemos restaurantes increíbles para ti.' +
+             listaNegocios(negs) +
+             '\n\nToca el botón 🍕 Comida en la pantalla para ver todos los menús y agregar al carrito. ¿Qué se te antoja?',
+    };
+  }
+
+  // Súper / supermercado
+  if (incluyeAlguna(texto, ['super', 'supermercado', 'compra', 'mandado', 'soriana', 'chedraui', 'despensa'])) {
+    const negs = negociosPorTema(contexto.negocios, ['super', 'soriana', 'chedraui', 'city', 'market', 'merc'], 4);
+    return {
+      tema: 'super',
+      texto: '¡Claro! 🛒 Para tus compras de súper tenemos varias tiendas.' +
+             listaNegocios(negs) +
+             '\n\nToca el botón 🛒 Mi Súper para ver las tiendas y armar tu lista. ¿Algo más?',
+    };
+  }
+
+  // Farmacia
+  if (incluyeAlguna(texto, ['farmacia', 'medicina', 'medicamento', 'pastilla', 'receta'])) {
+    const negs = negociosPorTema(contexto.negocios, ['farmac', 'salud', 'botica'], 3);
+    return {
+      tema: 'farmacia',
+      texto: '💊 Te ayudo con la farmacia. Tenemos medicinas y productos de salud.' +
+             listaNegocios(negs) +
+             '\n\nToca el botón 💊 Farmacia para ver las opciones. Si necesitas algo con receta, indícalo al hacer el pedido.',
+    };
+  }
+
+  // Traslados
+  if (incluyeAlguna(texto, ['traslado', 'mover', 'llevar', 'recoger', 'paquete', 'enviar', 'mandar algo'])) {
+    return {
+      tema: 'traslados',
+      texto: '🚗 ¡Hacemos traslados entre fraccionamientos! Movemos objetos, documentos o paquetes dentro de Lomas y La Vista. Dime de dónde a dónde y qué necesitas mover, y lo organizamos.',
+    };
+  }
+
+  // Servicios / pagos / depósitos
+  if (incluyeAlguna(texto, ['servicio', 'pago', 'luz', 'agua', 'deposito', 'banco', 'recibo', 'telefono', 'internet'])) {
+    return {
+      tema: 'servicios',
+      texto: '🏠 Te ayudamos con pagos de servicios (luz, agua, teléfono, internet) y depósitos bancarios. Toca el botón 🏠 Servicios para empezar, o dime qué necesitas pagar y te guío.',
+    };
+  }
+
+  // Mandaditos
+  if (incluyeAlguna(texto, ['mandadito', 'recado', 'favor', 'encargo'])) {
+    return {
+      tema: 'mandaditos',
+      texto: '📦 ¡Los mandaditos son lo nuestro! Hacemos recados varios dentro de Lomas y La Vista. Cuéntame qué necesitas y lo resolvemos. Toca el botón 📦 Mandaditos para más opciones.',
+    };
+  }
+
+  // Cobertura / zonas
+  if (incluyeAlguna(texto, ['cobertura', 'zona', 'llegan', 'donde', 'lomas', 'vista', 'fraccionamiento'])) {
+    return {
+      tema: 'cobertura',
+      texto: '📍 Damos servicio en Lomas 1, Lomas 2, Lomas 3 y La Vista, además de Sonata, Victoria, Toscana y Cluster. ¿En cuál fraccionamiento estás?',
+    };
+  }
+
+  // Confirmación (palabra completa para evitar falsos positivos)
+  if (tienePalabraExacta(texto, ['listo', 'si', 'confirmar', 'confirmo', 'proceder', 'dale', 'ok', 'okay', 'perfecto', 'va', 'adelante'])) {
+    if (contexto.ultimoTema === 'comida' || contexto.ultimoTema === 'super' || contexto.ultimoTema === 'farmacia') {
+      return {
+        tema: contexto.ultimoTema,
+        texto: '¡Genial! 🙌 Abre el botón correspondiente en la pantalla para agregar los productos a tu carrito. Cada producto puede personalizarse ahí. ¿Te ayudo con algo más?',
+      };
+    }
+    return {
+      tema: 'confirmacion',
+      texto: '¡Perfecto! 🙌 ¿Con qué te ayudo? Puedo guiarte con comida, súper, farmacia, traslados, servicios o mandaditos.',
+    };
+  }
+
+  // Fallback
+  return {
+    tema: 'general',
+    texto: 'Entiendo. 🐒 Cuéntame un poco más para ayudarte mejor. Puedo apoyarte con comida, súper, farmacia, traslados, servicios o mandaditos. ¿Qué necesitas?',
+  };
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ChanguitoAI(props: Props) {
-  const [mensajes, setMensajes]     = useState<Mensaje[]>([]);
-  const [input, setInput]           = useState('');
-  const [cargando, setCargando]     = useState(false);
-  const [escuchando, setEscuchando] = useState(false);
-  const [productos, setProductos]   = useState<any[]>([]);
-  const [error, setError]           = useState('');
-  const [historial, setHistorial]   = useState<HistorialItem[]>([]);
-  const chatEndRef                  = useRef<HTMLDivElement>(null);
-  const inputRef                    = useRef<HTMLInputElement>(null);
-  const recognitionRef              = useRef<any>(null);
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  const [input, setInput]       = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [productos, setProductos] = useState<any[]>([]);
+  const [negocios, setNegocios]   = useState<any[]>([]);
+  const ultimoTemaRef = useRef<string>('');
+  const chatEndRef    = useRef<HTMLDivElement>(null);
+  const inputRef      = useRef<HTMLInputElement>(null);
   const isDark = props.theme === 'dark';
 
   // ── Scroll al último mensaje ────────────────────────────────────────────────
@@ -90,204 +232,55 @@ export default function ChanguitoAI(props: Props) {
     if (props.abierto && mensajes.length === 0) {
       const saludo: Mensaje = {
         id: 'bienvenida', rol: 'bot', hora: horaActual(),
-        texto: '¡Hola! 🐒 Soy ChanguiBot. ¿Qué se te antoja hoy? Puedo tomarte pedidos de comida, hacer mandaditos, pagos de servicios, depósitos y traslados. ¡Habla o escribe!',
+        texto: '¡Hola! 🐒 Soy ChanguiBot, tu asistente de Changuito Express. Puedo ayudarte con comida, súper, farmacia, traslados, servicios y mandaditos. ¿Qué se te antoja hoy?',
       };
       setMensajes([saludo]);
-      hablar(saludo.texto);
       setTimeout(function() { inputRef.current?.focus(); }, 300);
     }
   }, [props.abierto]);
 
-  // ── Cargar productos de Supabase ────────────────────────────────────────────
-  const cargarProductos = useCallback(async function() {
-    try {
-      const { data } = await supabase
-        .from('products')
-        .select('id, merchant_id, name, price, is_available, merchants(name)')
-        .eq('is_available', true)
-        .limit(600);
-      setProductos(data ?? []);
-    } catch(e) { console.error('Error cargando productos:', e); }
+  // ── Cargar datos de Supabase una sola vez ───────────────────────────────────
+  useEffect(function() {
+    let activo = true;
+    async function cargarDatos() {
+      try {
+        const resNeg = await supabase.from('merchants').select('*').limit(200);
+        if (activo && resNeg.data) setNegocios(resNeg.data);
+      } catch(e) { console.error('Error cargando negocios:', e); }
+      try {
+        const resProd = await supabase
+          .from('products')
+          .select('id, merchant_id, name, price, is_available')
+          .eq('is_available', true)
+          .limit(600);
+        if (activo && resProd.data) setProductos(resProd.data);
+      } catch(e) { console.error('Error cargando productos:', e); }
+    }
+    cargarDatos();
+    return function() { activo = false; };
   }, []);
 
-  useEffect(function() { cargarProductos(); }, [cargarProductos]);
-
-  // ── Text-to-speech ──────────────────────────────────────────────────────────
-  function hablar(texto: string) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const limpio = texto
-      .replace(/CARRITO_JSON:\[.*?\]/gs, '')
-      .replace(/[🐒🍽️🛒💡🏦📦🚗✅⚠️]/g, '');
-    const utt = new SpeechSynthesisUtterance(limpio);
-    utt.lang = 'es-MX'; utt.rate = 1.05; utt.pitch = 1.1;
-    const voces = window.speechSynthesis.getVoices();
-    const voz = voces.find(function(v) { return v.lang.startsWith('es'); });
-    if (voz) utt.voice = voz;
-    window.speechSynthesis.speak(utt);
-  }
-
-  // ── Speech recognition ──────────────────────────────────────────────────────
-  function toggleVoz() {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { setError('Usa Chrome o Safari actualizado para voz.'); return; }
-    if (escuchando) {
-      recognitionRef.current?.stop();
-      setEscuchando(false);
-      return;
-    }
-    const rec = new SR();
-    rec.lang = 'es-MX';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = function() { setEscuchando(true); setError(''); };
-    rec.onresult = function(e: any) {
-      const texto = e.results[0][0].transcript;
-      setInput(texto);
-      setEscuchando(false);
-      setTimeout(function() { enviarMensaje(texto); }, 200);
-    };
-    rec.onerror = function(e: any) {
-      setEscuchando(false);
-      setError(e.error === 'not-allowed'
-        ? 'Permite el micrófono en tu navegador.'
-        : 'Error de micrófono: ' + e.error);
-    };
-    rec.onend = function() { setEscuchando(false); };
-    recognitionRef.current = rec;
-    rec.start();
-  }
-
-  // ── Construir contexto de productos para Gemini ─────────────────────────────
-  function construirContexto(): string {
-    const mapa: Record<string, { name: string; prods: string[] }> = {};
-    productos.forEach(function(p) {
-      const mn = (p.merchants as any)?.name ?? 'Desconocido';
-      if (!mapa[p.merchant_id]) mapa[p.merchant_id] = { name: mn, prods: [] };
-      mapa[p.merchant_id].prods.push(p.id + '|' + p.name + '|$' + p.price);
-    });
-    let ctx = '';
-    Object.entries(mapa).slice(0, 35).forEach(function([mid, info]) {
-      ctx += '[' + mid + '] ' + info.name + ': ' + info.prods.slice(0, 8).join(' / ') + '\n';
-    });
-    return ctx;
-  }
-
-  // ── Llamar a Gemini via fetch directo ──────────────────────────────────────────────
-  async function llamarGemini(textoUsuario: string): Promise<string> {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    if (!apiKey) {
-      console.error('VITE_GEMINI_API_KEY no configurada');
-      throw new Error('Configura VITE_GEMINI_API_KEY');
-    }
-
-    const systemPrompt = SYSTEM_PROMPT.replace('{{PRODUCTOS_CONTEXT}}', construirContexto());
-    const contents = [
-      ...historial,
-      { role: 'user', parts: [{ text: textoUsuario }] },
-    ];
-
-    const res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents,
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error('[' + res.status + '] ' + errText);
-    }
-
-    const data = await res.json();
-    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
-    setHistorial(function(prev) {
-      return [
-        ...prev,
-        { role: 'user' as const,  parts: [{ text: textoUsuario }] },
-        { role: 'model' as const, parts: [{ text: respuesta }] },
-      ];
-    });
-
-    return respuesta;
-  }
-
-  // ── Extraer items del JSON embebido en la respuesta ─────────────────────────
-  function extraerItems(respuesta: string): ItemCarrito[] {
-    const match = respuesta.match(/CARRITO_JSON:(\[.*?\])/s);
-    if (!match) return [];
-    try {
-      const items = JSON.parse(match[1]);
-      return items.map(function(item: any) {
-        const prodReal = productos.find(function(p) { return p.id === item.product_id; });
-        return {
-          id:            item.product_id,
-          merchant_id:   item.merchant_id,
-          merchant_name: item.merchant_name,
-          nombre:        item.product_name,
-          precio:        prodReal?.price ?? item.price,
-          cantidad:      item.quantity ?? 1,
-          negocio_id:    item.merchant_id,
-          tipo:          'producto',
-        };
-      }).filter(function(i: ItemCarrito) { return i.id && i.negocio_id; });
-    } catch(e) { return []; }
-  }
-
   // ── Enviar mensaje ──────────────────────────────────────────────────────────
-  async function enviarMensaje(textoForzado?: string) {
+  function enviarMensaje(textoForzado?: string) {
     const texto = (textoForzado ?? input).trim();
     if (!texto || cargando) return;
     setInput('');
-    setError('');
     setMensajes(function(prev) {
       return [...prev, { id: 'u-' + Date.now(), rol: 'user', texto, hora: horaActual() }];
     });
     setCargando(true);
-    try {
-      const respuesta = await llamarGemini(texto);
-      const items = extraerItems(respuesta);
-      const textoLimpio = respuesta.replace(/CARRITO_JSON:\[.*?\]/gs, '').trim();
-      setMensajes(function(prev) {
-        return [...prev, {
-          id:    'b-' + Date.now(),
-          rol:   'bot',
-          texto: textoLimpio,
-          items: items.length > 0 ? items : undefined,
-          hora:  horaActual(),
-        }];
+    setTimeout(function() {
+      const resultado = respuestaIA(texto, {
+        negocios: negocios,
+        productos: productos,
+        ultimoTema: ultimoTemaRef.current,
       });
-      hablar(textoLimpio);
-    } catch(e: any) {
-      const msg = e.message ?? 'Error inesperado';
-      setError(msg);
+      ultimoTemaRef.current = resultado.tema;
       setMensajes(function(prev) {
-        return [...prev, { id: 'err-' + Date.now(), rol: 'sistema', texto: '⚠️ ' + msg, hora: horaActual() }];
+        return [...prev, { id: 'b-' + Date.now(), rol: 'bot', texto: resultado.texto, hora: horaActual() }];
       });
-    } finally {
       setCargando(false);
-    }
-  }
-
-  // ── Agregar al carrito ──────────────────────────────────────────────────────
-  function agregarAlCarrito(items: ItemCarrito[]) {
-    props.onAddToCart(items);
-    setMensajes(function(prev) {
-      return [...prev, {
-        id:    'ok-' + Date.now(),
-        rol:   'sistema',
-        hora:  horaActual(),
-        texto: '✅ ' + items.length + ' producto' + (items.length > 1 ? 's' : '') +
-               ' agregado' + (items.length > 1 ? 's' : '') + ' al carrito.',
-      }];
-    });
-    hablar('Listo, agregué los productos a tu carrito.');
+    }, 500);
   }
 
   // ── Panel chat ─────────────────────────────────────────────────────────────
@@ -301,7 +294,7 @@ export default function ChanguitoAI(props: Props) {
       height: '78vh',
       background: isDark ? '#0d0d1a' : '#ffffff',
       borderRadius: '24px 24px 0 0',
-      border: '1px solid rgba(250,204,21,0.25)',
+      border: '1px solid rgba(245,158,11,0.25)',
       boxShadow: '0 -12px 48px rgba(0,0,0,0.5)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
@@ -309,35 +302,35 @@ export default function ChanguitoAI(props: Props) {
       {/* Header */}
       <div style={{
         padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px',
-        background: 'linear-gradient(135deg,rgba(250,204,21,0.12),transparent)',
-        borderBottom: '1px solid rgba(250,204,21,0.15)', flexShrink: 0,
+        background: 'linear-gradient(135deg,rgba(245,158,11,0.12),transparent)',
+        borderBottom: '1px solid rgba(245,158,11,0.15)', flexShrink: 0,
       }}>
         <div style={{
           width: '42px', height: '42px', borderRadius: '50%',
           background: 'linear-gradient(135deg,#facc15,#f59e0b)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '22px', boxShadow: '0 4px 12px rgba(250,204,21,0.4)', flexShrink: 0,
+          fontSize: '22px', boxShadow: '0 4px 12px rgba(245,158,11,0.4)', flexShrink: 0,
         }}>🐒</div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: '15px', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>ChanguiBot</p>
           <p style={{
             fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
             letterSpacing: '0.1em', margin: 0,
-            color: cargando ? 'var(--color-yellow)' : escuchando ? '#22c55e' : 'var(--text-muted)',
+            color: cargando ? '#f59e0b' : '#22c55e',
           }}>
-            {cargando ? '✨ Pensando...' : escuchando ? '🎤 Escuchando...' : '● Tu asistente personal'}
+            {cargando ? '✨ Pensando...' : '● Tu asistente personal'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <div style={{
             padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 800,
-            background: 'rgba(250,204,21,0.12)', color: 'var(--color-yellow)',
-            border: '1px solid rgba(250,204,21,0.25)',
+            background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+            border: '1px solid rgba(245,158,11,0.25)',
           }}>
             🛒 {props.carritoGlobal.length}
           </div>
           <button
-            onClick={function() { window.speechSynthesis?.cancel(); props.onCerrar(); }}
+            onClick={function() { props.onCerrar(); }}
             style={{
               width: '32px', height: '32px', borderRadius: '10px',
               background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
@@ -392,34 +385,9 @@ export default function ChanguitoAI(props: Props) {
                 <p style={{
                   fontSize: '13px',
                   color: esUser ? '#020617' : 'var(--text-primary)',
-                  margin: '0 0 6px 0', lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                  margin: '0 0 4px 0', lineHeight: 1.5, whiteSpace: 'pre-wrap',
                 }}>{m.texto}</p>
-                {m.items && m.items.length > 0 && (
-                  <button
-                    onClick={function() { agregarAlCarrito(m.items!); }}
-                    style={{
-                      width: '100%', padding: '9px 14px', borderRadius: '12px',
-                      border: 'none', cursor: 'pointer', background: '#22c55e',
-                      color: 'white', fontSize: '12px', fontWeight: 900,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      gap: '6px', boxShadow: '0 4px 12px rgba(34,197,94,0.35)',
-                    }}
-                  >
-                    <ShoppingCart style={{ width: '13px', height: '13px' }} />
-                    Agregar {m.items.length} producto{m.items.length > 1 ? 's' : ''} al carrito
-                  </button>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                  <p style={{ fontSize: '9px', color: esUser ? 'rgba(2,6,23,0.5)' : 'var(--text-muted)', margin: 0 }}>{m.hora}</p>
-                  {!esUser && (
-                    <button
-                      onClick={function() { hablar(m.texto); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 0 }}
-                    >
-                      <Volume2 style={{ width: '11px', height: '11px', color: 'var(--text-muted)' }} />
-                    </button>
-                  )}
-                </div>
+                <p style={{ fontSize: '9px', color: esUser ? 'rgba(2,6,23,0.5)' : 'var(--text-muted)', margin: 0 }}>{m.hora}</p>
               </div>
             </div>
           );
@@ -455,67 +423,23 @@ export default function ChanguitoAI(props: Props) {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div style={{
-          margin: '0 16px 8px', padding: '8px 12px', borderRadius: '10px',
-          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-          display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0,
-        }}>
-          <AlertCircle style={{ width: '13px', height: '13px', color: '#ef4444', flexShrink: 0 }} />
-          <p style={{ fontSize: '11px', color: '#ef4444', margin: 0 }}>{error}</p>
-        </div>
-      )}
-
       {/* Input area */}
       <div style={{ padding: '10px 16px 24px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
-        {escuchando && (
-          <div style={{
-            textAlign: 'center', padding: '8px', marginBottom: '8px',
-            borderRadius: '12px', background: 'rgba(34,197,94,0.1)',
-            border: '1px solid rgba(34,197,94,0.2)',
-          }}>
-            <p style={{ fontSize: '12px', color: '#22c55e', fontWeight: 700, margin: 0 }}>
-              🎤 Escuchando... habla ahora
-            </p>
-          </div>
-        )}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* Mic button */}
-          <button
-            onClick={toggleVoz}
-            style={{
-              width: '44px', height: '44px', borderRadius: '14px', border: 'none',
-              cursor: 'pointer', flexShrink: 0,
-              background: escuchando ? '#22c55e' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: escuchando ? '0 0 0 4px rgba(34,197,94,0.3)' : 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            {escuchando
-              ? <MicOff style={{ width: '18px', height: '18px', color: 'white' }} />
-              : <Mic style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
-            }
-          </button>
-
-          {/* Text input */}
           <input
             ref={inputRef}
             value={input}
             onChange={function(e) { setInput(e.target.value); }}
             onKeyPress={function(e) { if (e.key === 'Enter') enviarMensaje(); }}
-            placeholder="Escribe o toca el mic 🎤"
-            disabled={cargando || escuchando}
+            placeholder="Escribe tu mensaje..."
+            disabled={cargando}
             style={{
-              flex: 1, padding: '12px 14px', borderRadius: '14px',
-              border: '1px solid rgba(250,204,21,0.25)',
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+              flex: 1, padding: '12px 14px', borderRadius: '16px',
+              border: '1px solid #e5e7eb',
+              background: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
               color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
             }}
           />
-
-          {/* Send button */}
           <button
             onClick={function() { enviarMensaje(); }}
             disabled={cargando || !input.trim()}
@@ -524,10 +448,10 @@ export default function ChanguitoAI(props: Props) {
               border: 'none', flexShrink: 0,
               cursor: cargando || !input.trim() ? 'not-allowed' : 'pointer',
               background: cargando || !input.trim()
-                ? 'rgba(250,204,21,0.25)'
+                ? 'rgba(245,158,11,0.25)'
                 : 'linear-gradient(135deg,#facc15,#f59e0b)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: cargando || !input.trim() ? 'none' : '0 4px 12px rgba(250,204,21,0.4)',
+              boxShadow: cargando || !input.trim() ? 'none' : '0 4px 12px rgba(245,158,11,0.4)',
             }}
           >
             <Send style={{ width: '16px', height: '16px', color: '#020617' }} />
@@ -537,7 +461,7 @@ export default function ChanguitoAI(props: Props) {
           fontSize: '9px', color: 'var(--text-muted)', textAlign: 'center',
           margin: '8px 0 0 0', letterSpacing: '0.08em', textTransform: 'uppercase',
         }}>
-          ✨ POWERED BY GEMINI AI · CHANGUITO EXPRESS
+          🐒 CHANGUIBOT · CHANGUITO EXPRESS
         </p>
       </div>
 
