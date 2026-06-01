@@ -3079,6 +3079,107 @@ export default function Dashboard(props: DashboardProps) {
       )}
 
       <div style={{ paddingTop: "8px", paddingBottom: "90px" }}>
+        {/* Accesos directos iniciales */}
+        <div style={{ padding: "12px 16px 4px" }}>
+          <p
+            style={{
+              fontSize: "13px",
+              fontWeight: 800,
+              color: "var(--text-primary)",
+              margin: "0 0 10px 2px",
+            }}
+          >
+            ¿Qué necesitas hoy?
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3,1fr)",
+              gap: "10px",
+            }}
+          >
+            {[
+              {
+                icono: "🍕",
+                texto: "Comida",
+                accion: function () {
+                  setTabActiva("restaurantes");
+                  setSearch("");
+                },
+              },
+              {
+                icono: "🛒",
+                texto: "Mi Súper",
+                accion: function () {
+                  setTabActiva("mandaditos");
+                  setSeccionAbierta("Supermercados");
+                  setSearch("");
+                },
+              },
+              {
+                icono: "💊",
+                texto: "Farmacia",
+                accion: function () {
+                  setTabActiva("mandaditos");
+                  setSeccionAbierta("Farmacias");
+                  setSearch("");
+                },
+              },
+              {
+                icono: "📦",
+                texto: "Mandaditos",
+                accion: function () {
+                  setTabActiva("mandaditos");
+                  setSearch("");
+                },
+              },
+              {
+                icono: "🏠",
+                texto: "Servicios",
+                accion: function () {
+                  if (props.onIrServicios) props.onIrServicios();
+                },
+              },
+              {
+                icono: "🚗",
+                texto: "Traslados",
+                accion: function () {
+                  setChanguiAbierto(true);
+                },
+              },
+            ].map(function (b) {
+              return (
+                <button
+                  key={b.texto}
+                  onClick={b.accion}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "14px 8px",
+                    borderRadius: "18px",
+                    border: "1px solid var(--border-subtle)",
+                    background: "var(--bg-card)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ fontSize: "26px", lineHeight: 1 }}>{b.icono}</span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {b.texto}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         {renderContenido()}
       </div>
 

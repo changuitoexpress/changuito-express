@@ -1,0 +1,1 @@
+- [Build shell env](build-shell-env.md) — agent shell has no npm/node on PATH; run vite build via explicit nodejs-20 bin path.
