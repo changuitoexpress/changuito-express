@@ -1,1 +1,2 @@
 - [Build shell env](build-shell-env.md) — agent shell has no npm/node on PATH; run vite build via explicit nodejs-20 bin path.
+- [ChanguitoAI integration](changuitoai-integration.md) — keep controlled abierto/onCerrar props; cart items must match CartItem shape (negocio/negocio_id/phone_number) or checkout crashes.
