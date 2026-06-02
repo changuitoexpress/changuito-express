@@ -676,7 +676,7 @@ function ModalMandadito(props: {
   );
 }
 
-// ─── Modal Checkout (Dirección + Pago + Confirmar) ────────────────────────────
+// ─── Modal Checkout (Carrito + Dirección + Pago + Confirmar) ──────────────────
 function ModalCheckout(props: {
   carrito: CartItem[];
   clienteId: string;
@@ -684,9 +684,11 @@ function ModalCheckout(props: {
   clienteNombre?: string;
   onClose: () => void;
   onPedidoOk: () => void;
+  onRemoveItem: (id: string) => void;
+  onUpdateCantidad: (id: string, delta: number) => void;
 }) {
-  const [paso, setPaso] = useState<"direccion" | "pago" | "resumen">(
-    "direccion",
+  const [paso, setPaso] = useState<"carrito" | "direccion" | "pago" | "resumen">(
+    "carrito",
   );
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [dirSeleccionada, setDirSel] = useState<Direccion | null>(null);
@@ -957,19 +959,19 @@ function ModalCheckout(props: {
         />
 
         {/* Pasos */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-          {(["direccion", "pago", "resumen"] as const).map(function (p, i) {
+        <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
+          {(["carrito", "direccion", "pago", "resumen"] as const).map(function (p, i) {
             const activo = paso === p;
-            const done =
-              (paso === "pago" && i === 0) || (paso === "resumen" && i <= 1);
-            const labels = ["📍 Dirección", "💳 Pago", "✅ Confirmar"];
+            const pasoIdx = ["carrito", "direccion", "pago", "resumen"].indexOf(paso);
+            const done = i < pasoIdx;
+            const labels = ["🛒 Carrito", "📍 Dirección", "💳 Pago", "✅ Confirmar"];
             return (
               <div
                 key={p}
                 style={{
                   flex: 1,
                   textAlign: "center",
-                  padding: "8px 4px",
+                  padding: "7px 2px",
                   borderRadius: "12px",
                   background: activo
                     ? "var(--color-yellow-dim)"
@@ -981,7 +983,7 @@ function ModalCheckout(props: {
               >
                 <p
                   style={{
-                    fontSize: "10px",
+                    fontSize: "9px",
                     fontWeight: 700,
                     color: activo
                       ? "var(--color-yellow)"
@@ -997,6 +999,127 @@ function ModalCheckout(props: {
             );
           })}
         </div>
+
+        {/* ── PASO 0: CARRITO ── */}
+        {paso === "carrito" && (
+          <div>
+            <h3
+              style={{
+                fontSize: "17px",
+                fontWeight: 900,
+                color: textPrim,
+                margin: "0 0 14px 0",
+              }}
+            >
+              Tu carrito
+            </h3>
+
+            {props.carrito.length === 0 ? (
+              <p style={{ fontSize: "13px", color: textMuted, textAlign: "center", padding: "30px 0" }}>
+                Tu carrito está vacío
+              </p>
+            ) : (
+              <div style={{ marginBottom: "14px" }}>
+                {props.carrito.map(function (item) {
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "10px 0",
+                        borderBottom: `1px solid ${border}`,
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: "13px", fontWeight: 700, color: textPrim, margin: "0 0 2px 0" }}>
+                          {item.emoji ?? "🍽️"} {item.nombre}
+                        </p>
+                        <p style={{ fontSize: "11px", color: textMuted, margin: 0 }}>
+                          {item.negocio}
+                        </p>
+                      </div>
+                      {item.tipo === "producto" && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <button
+                            onClick={function () { props.onUpdateCantidad(item.id, -1); }}
+                            style={{
+                              width: "26px", height: "26px", borderRadius: "8px",
+                              border: `1px solid ${border}`, background: bgBase,
+                              color: textPrim, fontSize: "16px", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >−</button>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: textPrim, minWidth: "16px", textAlign: "center" }}>
+                            {item.cantidad}
+                          </span>
+                          <button
+                            onClick={function () { props.onUpdateCantidad(item.id, 1); }}
+                            style={{
+                              width: "26px", height: "26px", borderRadius: "8px",
+                              border: `1px solid ${border}`, background: bgBase,
+                              color: textPrim, fontSize: "16px", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >+</button>
+                        </div>
+                      )}
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-yellow)", minWidth: "50px", textAlign: "right" }}>
+                        ${item.tipo === "producto" ? (item.precio * item.cantidad).toFixed(2) : "—"}
+                      </span>
+                      <button
+                        onClick={function () { props.onRemoveItem(item.id); }}
+                        style={{
+                          width: "26px", height: "26px", borderRadius: "8px",
+                          border: "none", background: "rgba(239,68,68,0.1)",
+                          color: "#ef4444", fontSize: "14px", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {props.carrito.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "10px 0",
+                  marginBottom: "14px",
+                  borderTop: `1px solid ${border}`,
+                }}
+              >
+                <span style={{ fontSize: "14px", fontWeight: 700, color: textPrim }}>Subtotal</span>
+                <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-yellow)" }}>
+                  ${subtotal.toFixed(2)}
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={function () { setPaso("direccion"); }}
+              disabled={props.carrito.length === 0}
+              style={{
+                width: "100%",
+                background: props.carrito.length === 0 ? "rgba(245,158,11,0.3)" : "var(--color-yellow)",
+                color: "#020617",
+                fontWeight: 900,
+                fontSize: "14px",
+                padding: "15px",
+                borderRadius: "16px",
+                border: "none",
+                cursor: props.carrito.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              Continuar al pago →
+            </button>
+          </div>
+        )}
 
         {/* ── PASO 1: DIRECCIÓN ── */}
         {paso === "direccion" && (
@@ -1465,26 +1588,44 @@ function ModalCheckout(props: {
               </p>
             )}
 
-            <button
-              onClick={function () {
-                setError("");
-                setPaso("pago");
-              }}
-              disabled={!formaNueva && !dirSeleccionada}
-              style={{
-                width: "100%",
-                background: "var(--color-yellow)",
-                color: "#020617",
-                fontWeight: 900,
-                fontSize: "14px",
-                padding: "15px",
-                borderRadius: "16px",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Continuar →
-            </button>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={function () { setPaso("carrito"); }}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  borderRadius: "14px",
+                  border: `1px solid ${border}`,
+                  background: "transparent",
+                  color: textMuted,
+                  fontWeight: 700,
+                  fontSize: "13px",
+                  cursor: "pointer",
+                }}
+              >
+                ← Carrito
+              </button>
+              <button
+                onClick={function () {
+                  setError("");
+                  setPaso("pago");
+                }}
+                disabled={!formaNueva && !dirSeleccionada}
+                style={{
+                  flex: 2,
+                  background: "var(--color-yellow)",
+                  color: "#020617",
+                  fontWeight: 900,
+                  fontSize: "14px",
+                  padding: "15px",
+                  borderRadius: "16px",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Continuar →
+              </button>
+            </div>
           </div>
         )}
 
@@ -3259,6 +3400,20 @@ export default function Dashboard(props: DashboardProps) {
             props.onUpdateCarritoGlobal([]);
             setModalCheckout(false);
           }}
+          onRemoveItem={function (id) {
+            props.onUpdateCarritoGlobal(
+              props.carritoGlobal.filter(function (i) { return i.id !== id; })
+            );
+          }}
+          onUpdateCantidad={function (id, delta) {
+            props.onUpdateCarritoGlobal(
+              props.carritoGlobal
+                .map(function (i) {
+                  if (i.id !== id) return i;
+                  return { ...i, cantidad: Math.max(1, i.cantidad + delta) };
+                })
+            );
+          }}
         />
       )}
 
@@ -3376,6 +3531,11 @@ export default function Dashboard(props: DashboardProps) {
           theme={props.theme}
           carritoGlobal={props.carritoGlobal}
           onAddToCart={props.onAddToCart}
+          onRemoveFromCart={function (id) {
+            props.onUpdateCarritoGlobal(
+              props.carritoGlobal.filter(function (i) { return i.id !== id; })
+            );
+          }}
           abierto={changuiAbierto}
           onCerrar={function () { setChanguiAbierto(false); }}
         />

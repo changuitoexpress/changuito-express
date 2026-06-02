@@ -27,12 +27,13 @@ interface Mensaje {
 }
 
 interface Props {
-  session:       AppSession;
-  theme:         Theme;
-  carritoGlobal: any[];
-  onAddToCart:   (items: ItemCarrito[]) => void;
-  abierto:       boolean;
-  onCerrar:      () => void;
+  session:             AppSession;
+  theme:               Theme;
+  carritoGlobal:       any[];
+  onAddToCart:         (items: ItemCarrito[]) => void;
+  onRemoveFromCart?:   (id: string) => void;
+  abierto:             boolean;
+  onCerrar:            () => void;
 }
 
 interface EstadoConversacion {
@@ -42,8 +43,9 @@ interface EstadoConversacion {
 }
 
 interface RespuestaIA {
-  texto:  string;
-  items?: ItemCarrito[];
+  texto:      string;
+  items?:     ItemCarrito[];
+  removedId?: string;
 }
 
 // ─── Constantes de lenguaje ───────────────────────────────────────────────────
@@ -231,6 +233,44 @@ function generarRespuesta(input: string, estado: EstadoConversacion, productos: 
       };
     }
     return { texto: 'Perfecto, cuéntame qué necesitas y lo agrego a tu carrito. 🛒' };
+  }
+
+  // 4.5) Intent de QUITAR producto del carrito
+  if (incluyeAlguna(texto, ['quita ', 'quitar', 'borra', 'borrar', 'elimina', 'eliminar', 'no lo pedi', 'no quiero el', 'saca el', 'sacar el', 'no lo pedí', 'no pedí', 'no pedi', 'no habia pedido', 'no habia'])) {
+    if (estado.carritoTemporal.length === 0) {
+      return { texto: 'Tu carrito del chat está vacío, no hay nada que quitar. 😊 ¿Qué quieres pedir?' };
+    }
+    const tokensQ = tokensSignificativos(texto);
+    let quitado: ItemCarrito | null = null;
+    let quitadoIdx = -1;
+    for (let i = 0; i < estado.carritoTemporal.length && !quitado; i++) {
+      const nombreItem = quitarAcentos(estado.carritoTemporal[i].nombre.toLowerCase());
+      for (let j = 0; j < tokensQ.length; j++) {
+        if (tokensQ[j].length >= 3 && nombreItem.indexOf(tokensQ[j]) !== -1) {
+          quitado = estado.carritoTemporal[i];
+          quitadoIdx = i;
+          break;
+        }
+      }
+    }
+    if (quitado !== null) {
+      const idQuitado = quitado.id;
+      estado.carritoTemporal.splice(quitadoIdx, 1);
+      if (estado.carritoTemporal.length === 0) {
+        return {
+          removedId: idQuitado,
+          texto: '✅ Quité ' + quitado.nombre + ' de tu carrito. ¡Ahora está vacío!\n¿Qué más se te antoja?',
+        };
+      }
+      const totalQ = totalCarrito(estado.carritoTemporal);
+      return {
+        removedId: idQuitado,
+        texto: '✅ Quité ' + quitado.nombre + '.\n\n' + resumenLineas(estado.carritoTemporal) +
+               '\n\n💰 Total actualizado: ' + dinero(totalQ) + '\n¿Algo más?',
+      };
+    }
+    const listaCarrito = estado.carritoTemporal.map(function(it) { return '• ' + it.nombre; }).join('\n');
+    return { texto: 'No encontré ese producto en lo que pediste por el chat. Tienes:\n\n' + listaCarrito + '\n\n¿Cuál quieres quitar?' };
   }
 
   // 5) Seguimiento: ya presentamos opciones y el usuario elige sabor/cantidad
@@ -429,6 +469,7 @@ export default function ChanguitoAI(props: Props) {
     setTimeout(function() {
       const r = generarRespuesta(texto, estadoRef.current, productos, negocios);
       if (r.items && r.items.length > 0) props.onAddToCart(r.items);
+      if (r.removedId && props.onRemoveFromCart) props.onRemoveFromCart(r.removedId);
       setMensajes(function(prev) {
         return [...prev, { id: 'b-' + Date.now(), rol: 'bot', texto: r.texto, hora: horaActual() }];
       });
