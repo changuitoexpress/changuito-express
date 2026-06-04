@@ -186,6 +186,7 @@ const SECCIONES_MAND = [
     keys: ["pollo feliz", "flautlan"],
     emoji: "🍗",
   },
+  { titulo: "Crepas", keys: ["crepa"], emoji: "🥞" },
   { titulo: "Cafeterías", keys: ["starbucks", "italian coffee"], emoji: "☕" },
   { titulo: "Saludable", keys: ["greenbite"], emoji: "🥗" },
   { titulo: "Panaderías", keys: ["hackl", "rosario", "almendra"], emoji: "🥖" },
