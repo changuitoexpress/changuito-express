@@ -3251,7 +3251,7 @@ export default function Dashboard(props: DashboardProps) {
               },
               {
                 icono: "🛒",
-                texto: "Mi Súper",
+                texto: "Supermercados",
                 accion: function () {
                   setTabActiva("mandaditos");
                   setSeccionAbierta("Supermercados");
@@ -3260,7 +3260,7 @@ export default function Dashboard(props: DashboardProps) {
               },
               {
                 icono: "💊",
-                texto: "Farmacia",
+                texto: "Farmacias",
                 accion: function () {
                   setTabActiva("mandaditos");
                   setSeccionAbierta("Farmacias");
@@ -3283,8 +3283,8 @@ export default function Dashboard(props: DashboardProps) {
                 },
               },
               {
-                icono: "🚗",
-                texto: "Traslados",
+                icono: "🐒",
+                texto: "ChanguiBot IA",
                 accion: function () {
                   setChanguiAbierto(true);
                 },
