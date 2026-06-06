@@ -10,16 +10,18 @@ import type { AppSession, Theme } from './App';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
-  id:             string;
-  cliente_email:  string | null;
-  negocio_nombre: string | null;
-  detalle:        string | null;
-  total:          number | null;
-  estatus:        string;
-  forma_pago:     string | null;
-  direccion:      string | null;
-  canal:          string | null;
-  created_at:     string;
+  id:               string;
+  cliente_email:    string | null;
+  negocio_nombre:   string | null;
+  detalle:          string | null;
+  total:            number | null;
+  estatus:          string;
+  forma_pago:       string | null;
+  direccion:        string | null;
+  canal:            string | null;
+  created_at:       string;
+  repartidor_id:    string | null;
+  repartidor_nombre?: string | null;
 }
 
 interface Metricas {
@@ -71,7 +73,10 @@ export default function AdminGodMode(props: AdminProps) {
   const [filtroEstatus, setFiltro]  = useState('todos');
   const [pedidoAbierto, setPedAbi]  = useState<string | null>(null);
   const [tab, setTab]               = useState<'pedidos'|'negocios'|'clientes'>('pedidos');
-  const [merchants, setMerchants]   = useState<any[]>([]);
+  const [merchants, setMerchants]         = useState<any[]>([]);
+  const [repartidores, setRepartidores]   = useState<any[]>([]);
+  const [selRep, setSelRep]               = useState<Record<string, string>>({});
+  const [asignando, setAsignando]         = useState<string | null>(null);
   const isDark = props.theme === 'dark';
 
   // Verificar que sea admin
@@ -138,11 +143,39 @@ export default function AdminGodMode(props: AdminProps) {
     setMerchants(data ?? []);
   }, []);
 
-  useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); }, [fetchMetricas, fetchPedidos, fetchMerchants]);
+  const fetchRepartidores = useCallback(async function() {
+    const { data } = await supabase
+      .from('perfiles')
+      .select('id, nombre')
+      .eq('rol', 'repartidor');
+    setRepartidores(data ?? []);
+  }, []);
+
+  useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores]);
 
   async function cambiarEstatus(pedidoId: string, nuevoEstatus: string) {
     await supabase.from('pedidos').update({ estatus: nuevoEstatus }).eq('id', pedidoId);
     fetchPedidos(); fetchMetricas();
+  }
+
+  async function asignarRepartidor(pedidoId: string) {
+    const repartidorId = selRep[pedidoId];
+    if (!repartidorId) return;
+    setAsignando(pedidoId);
+    const { error: err } = await supabase
+      .from('pedidos')
+      .update({ repartidor_id: repartidorId, estatus: 'en_camino' })
+      .eq('id', pedidoId);
+    if (err) { alert('Error: ' + err.message); }
+    else {
+      setSelRep(function(prev) {
+        const next = { ...prev };
+        delete next[pedidoId];
+        return next;
+      });
+      fetchPedidos(); fetchMetricas();
+    }
+    setAsignando(null);
   }
 
   async function toggleMerchant(id: string, actual: boolean) {
@@ -313,6 +346,63 @@ export default function AdminGodMode(props: AdminProps) {
                             })}
                           </div>
                         </div>
+                        {/* Asignar repartidor */}
+                        <div style={{ paddingTop:'4px' }}>
+                          <p style={{ fontSize:'10px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', margin:'0 0 8px 0' }}>
+                            🛵 Asignar repartidor
+                          </p>
+                          {pedido.repartidor_id && (
+                            <p style={{ fontSize:'11px', color:'var(--color-green)', fontWeight:700, margin:'0 0 8px 0' }}>
+                              ✓ Ya asignado · ID {pedido.repartidor_id.slice(0, 8)}…
+                            </p>
+                          )}
+                          {repartidores.length === 0 ? (
+                            <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>
+                              No hay repartidores registrados (rol=repartidor en perfiles)
+                            </p>
+                          ) : (
+                            <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+                              <select
+                                value={selRep[pedido.id] ?? ''}
+                                onChange={function(e) {
+                                  const v = e.target.value;
+                                  setSelRep(function(prev) { return { ...prev, [pedido.id]: v }; });
+                                }}
+                                style={{
+                                  flex:1, padding:'9px 12px', borderRadius:'12px',
+                                  border:'1px solid var(--border-medium)',
+                                  background:'var(--bg-base)', color:'var(--text-primary)',
+                                  fontSize:'12px', fontWeight:600, cursor:'pointer',
+                                }}
+                              >
+                                <option value=''>— Seleccionar —</option>
+                                {repartidores.map(function(r) {
+                                  return (
+                                    <option key={r.id} value={r.id}>
+                                      {r.nombre ?? r.id.slice(0, 8)}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <button
+                                onClick={function() { asignarRepartidor(pedido.id); }}
+                                disabled={!selRep[pedido.id] || asignando === pedido.id}
+                                style={{
+                                  padding:'9px 16px', borderRadius:'12px', border:'none', cursor: !selRep[pedido.id] || asignando === pedido.id ? 'not-allowed' : 'pointer',
+                                  background: !selRep[pedido.id] ? 'var(--border-subtle)' : 'var(--color-yellow)',
+                                  color: !selRep[pedido.id] ? 'var(--text-muted)' : '#020617',
+                                  fontSize:'12px', fontWeight:900, whiteSpace:'nowrap',
+                                  display:'flex', alignItems:'center', gap:'5px',
+                                }}
+                              >
+                                {asignando === pedido.id
+                                  ? <span className="spinner" style={{ width:'12px', height:'12px', borderWidth:'2px' }} />
+                                  : '🛵 Asignar'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Contactar cliente */}
                         {pedido.cliente_email && (
                           <a href={'mailto:' + pedido.cliente_email}
