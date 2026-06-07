@@ -42,6 +42,7 @@ import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
 import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguitoAI";
+import Monedero from "./Monedero";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface Merchant {
@@ -824,6 +825,28 @@ function ModalCheckout(props: {
           direccion: dir ? dir.calle + " " + dir.numero_casa : "",
         });
       }
+
+      // Actualizar monedero: +1 pedido
+      try {
+        const userId = props.session?.user?.id;
+        if (userId) {
+          const { data: mon } = await supabase
+            .from('monedero_cliente')
+            .select('id, pedidos_realizados')
+            .eq('user_id', userId)
+            .single();
+          if (mon) {
+            await supabase
+              .from('monedero_cliente')
+              .update({ pedidos_realizados: (mon.pedidos_realizados ?? 0) + 1, updated_at: new Date().toISOString() })
+              .eq('id', mon.id);
+          } else {
+            await supabase
+              .from('monedero_cliente')
+              .insert([{ user_id: userId, pedidos_realizados: 1 }]);
+          }
+        }
+      } catch (_) { /* silencioso */ }
 
       // Mensaje WhatsApp estructurado
       const linea = "━━━━━━━━━━━━━━━━━━━━━━";
@@ -3329,6 +3352,7 @@ export default function Dashboard(props: DashboardProps) {
             })}
           </div>
         </div>
+        <Monedero session={props.session} theme={props.theme} />
         {renderContenido()}
       </div>
 
