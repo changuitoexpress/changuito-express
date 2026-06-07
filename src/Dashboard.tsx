@@ -131,6 +131,7 @@ const SECCIONES_REST = [
   { titulo: "Alitas y Boneless", cats: ["alitas y boneless"], emoji: "🍗" },
   { titulo: "Elotes y Antojitos", cats: ["elotes y antojitos"], emoji: "🌽" },
   { titulo: "Cafeterías", cats: ["cafeteria"], emoji: "☕" },
+  { titulo: "Cheesesteak", cats: ["cheesesteak"], names: ["philly steak"], emoji: "🥩" },
 ];
 
 const SECCIONES_MAND = [
@@ -2125,10 +2126,16 @@ export default function Dashboard(props: DashboardProps) {
     );
   }
 
-  function porCats(cats: string[]): Merchant[] {
+  function porCats(cats: string[], names?: string[]): Merchant[] {
     return merchants.filter(function (m) {
-      return cats.some(function (c) {
+      const byCategory = cats.some(function (c) {
         return m.category?.toLowerCase().trim() === c.toLowerCase();
+      });
+      if (byCategory) return true;
+      if (!names || names.length === 0) return false;
+      const n = m.name?.toLowerCase().trim() ?? '';
+      return names.some(function (nm) {
+        return n.includes(nm.toLowerCase());
       });
     });
   }
@@ -2234,7 +2241,7 @@ export default function Dashboard(props: DashboardProps) {
         <div style={{ paddingBottom: "40px" }}>
           <Banner />
           {SECCIONES_REST.map(function (sec) {
-            const lista = porCats(sec.cats);
+            const lista = porCats(sec.cats, (sec as any).names);
             if (!loading && lista.length === 0) return null;
             return (
               <SeccionH
