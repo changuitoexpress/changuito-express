@@ -3,8 +3,9 @@
   "short_name": "Changuito",
   "description": "Delivery y bazar vecinal — Lomas 1, 2, 3 y La Vista",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
+  "background_color": "#ffffff",
   "theme_color": "#F59E0B",
   "orientation": "portrait",
   "icons": [
