@@ -2048,6 +2048,7 @@ export default function Dashboard(props: DashboardProps) {
   const [error, setError] = useState<string>("");
   const [tabActiva, setTabActiva] = useState<MainTab>("restaurantes");
   const [search, setSearch] = useState<string>("");
+  const [productosBusqueda, setProductosBusqueda] = useState<any[]>([]);
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(
     null,
   );
@@ -2133,6 +2134,23 @@ export default function Dashboard(props: DashboardProps) {
     [fetchMerchants],
   );
 
+  useEffect(function () {
+    const term = search.trim();
+    if (!term) { setProductosBusqueda([]); return; }
+    const timer = setTimeout(async function () {
+      try {
+        const { data } = await supabase
+          .from('products')
+          .select('id, name, price, merchant_id, merchants:merchant_id(id, name, phone_number)')
+          .ilike('name', '%' + term + '%')
+          .eq('is_available', true)
+          .limit(30);
+        setProductosBusqueda(data ?? []);
+      } catch (_) { setProductosBusqueda([]); }
+    }, 350);
+    return function () { clearTimeout(timer); };
+  }, [search]);
+
   if (selectedMerchant !== null) {
     return (
       <VistaNegocio
@@ -2197,6 +2215,48 @@ export default function Dashboard(props: DashboardProps) {
     props.onUpdateCarritoGlobal([...props.carritoGlobal, item]);
   }
 
+  function agregarProductoBusqueda(producto: any) {
+    const mer = producto.merchants as any;
+    const existente = props.carritoGlobal.find(function (i) {
+      return i.id === producto.id;
+    });
+    if (existente) {
+      props.onUpdateCarritoGlobal(props.carritoGlobal.map(function (i) {
+        if (i.id !== producto.id) return i;
+        return { ...i, cantidad: i.cantidad + 1 };
+      }));
+    } else {
+      const item: CartItem = {
+        id: producto.id,
+        nombre: producto.name,
+        precio: producto.price ?? 0,
+        cantidad: 1,
+        negocio: mer?.name ?? '',
+        negocio_id: mer?.id ?? producto.merchant_id ?? '',
+        phone_number: mer?.phone_number ?? PHONE_OPERATIVO,
+        tipo: 'producto',
+      };
+      props.onUpdateCarritoGlobal([...props.carritoGlobal, item]);
+    }
+  }
+
+  function irASeccion(tab: MainTab, seccion?: string) {
+    setTabActiva(tab);
+    setSearch('');
+    if (seccion) {
+      setSeccionAbierta(seccion);
+      setTimeout(function () {
+        const btns = document.querySelectorAll<HTMLButtonElement>('button');
+        for (let i = 0; i < btns.length; i++) {
+          if (btns[i].textContent && btns[i].textContent!.includes(seccion)) {
+            btns[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            break;
+          }
+        }
+      }, 250);
+    }
+  }
+
   function tabStyle(t: MainTab): React.CSSProperties {
     const active = tabActiva === t;
     return {
@@ -2217,44 +2277,85 @@ export default function Dashboard(props: DashboardProps) {
   function renderContenido() {
     if (search.trim() !== "") {
       const q = search.toLowerCase();
-      const res = merchants.filter(function (m) {
+      const resNegocios = merchants.filter(function (m) {
         return (
           m.name.toLowerCase().includes(q) ||
           (m.category ?? "").toLowerCase().includes(q)
         );
       });
+      const totalRes = resNegocios.length + productosBusqueda.length;
       return (
         <div style={{ padding: "0 16px 40px" }}>
-          <p
-            style={{
-              fontSize: "12px",
-              color: "var(--text-muted)",
-              margin: "0 0 14px 0",
-            }}
-          >
-            {res.length} resultados para "{search}"
+          <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: "0 0 14px 0" }}>
+            {totalRes} resultados para "{search}"
           </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-            }}
-          >
-            {res.map(function (m) {
-              return (
-                <TarjetaNegocio
-                  key={m.id}
-                  merchant={m}
-                  onClick={function () {
-                    m.category?.toLowerCase() === "mandaditos"
-                      ? setModalMandadito(m)
-                      : setSelectedMerchant(m);
-                  }}
-                />
-              );
-            })}
-          </div>
+
+          {/* Productos encontrados */}
+          {productosBusqueda.length > 0 && (
+            <div style={{ marginBottom: "20px" }}>
+              <p style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px 0" }}>
+                🛍️ Productos
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {productosBusqueda.map(function (p) {
+                  const yaEnCarrito = props.carritoGlobal.find(function (i) { return i.id === p.id; });
+                  const mer = p.merchants as any;
+                  return (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "14px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.name}
+                        </p>
+                        <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>
+                          {mer?.name ?? ""}
+                        </p>
+                      </div>
+                      <p style={{ fontSize: "15px", fontWeight: 900, color: "var(--color-yellow)", margin: "0 8px 0 0", flexShrink: 0 }}>
+                        ${(p.price ?? 0).toFixed(0)}
+                      </p>
+                      <button
+                        onClick={function () { agregarProductoBusqueda(p); }}
+                        style={{ padding: "7px 14px", borderRadius: "10px", border: "none", background: yaEnCarrito ? "var(--color-green)" : "var(--color-yellow)", color: "#020617", fontSize: "12px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                      >
+                        {yaEnCarrito ? "✓ " + yaEnCarrito.cantidad : "+ Agregar"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Negocios encontrados */}
+          {resNegocios.length > 0 && (
+            <div>
+              <p style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px 0" }}>
+                🏪 Negocios
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {resNegocios.map(function (m) {
+                  return (
+                    <TarjetaNegocio
+                      key={m.id}
+                      merchant={m}
+                      onClick={function () {
+                        m.category?.toLowerCase() === "mandaditos"
+                          ? setModalMandadito(m)
+                          : setSelectedMerchant(m);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {totalRes === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0" }}>
+              <p style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</p>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>Sin resultados para "{search}"</p>
+            </div>
+          )}
         </div>
       );
     }
@@ -3251,74 +3352,33 @@ export default function Dashboard(props: DashboardProps) {
       )}
 
       <div style={{ paddingTop: "8px", paddingBottom: "90px" }}>
-        {/* Accesos directos iniciales */}
-        <div style={{ padding: "12px 16px 4px" }}>
-          <p
-            style={{
-              fontSize: "13px",
-              fontWeight: 800,
-              color: "var(--text-primary)",
-              margin: "0 0 10px 2px",
-            }}
-          >
+        {/* Accesos directos — scroll horizontal */}
+        <div style={{ padding: "12px 0 4px" }}>
+          <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
             ¿Qué necesitas hoy?
           </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3,1fr)",
-              gap: "10px",
-            }}
-          >
+          <div style={{
+            display: "flex",
+            overflowX: "auto",
+            gap: "10px",
+            padding: "2px 16px 8px",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch" as any,
+            msOverflowStyle: "none" as any,
+            scrollbarWidth: "none" as any,
+          }}>
             {[
-              {
-                icono: "🍕",
-                texto: "Comida",
-                accion: function () {
-                  setTabActiva("restaurantes");
-                  setSearch("");
-                },
-              },
-              {
-                icono: "🛒",
-                texto: "Supermercados",
-                accion: function () {
-                  setTabActiva("mandaditos");
-                  setSeccionAbierta("Supermercados");
-                  setSearch("");
-                },
-              },
-              {
-                icono: "💊",
-                texto: "Farmacias",
-                accion: function () {
-                  setTabActiva("mandaditos");
-                  setSeccionAbierta("Farmacias");
-                  setSearch("");
-                },
-              },
-              {
-                icono: "📦",
-                texto: "Mandaditos",
-                accion: function () {
-                  setTabActiva("mandaditos");
-                  setSearch("");
-                },
-              },
-              {
-                icono: "🏠",
-                texto: "Servicios",
-                accion: function () {
-                  if (props.onIrServicios) props.onIrServicios();
-                },
-              },
-              {
-                icono: "🐒",
-                texto: "ChanguiBot IA",
-                accion: function () {
-                  setChanguiAbierto(true);
-                },
-              },
+              { icono: "🍕", texto: "Comida",          accion: function () { irASeccion("restaurantes"); } },
+              { icono: "🛒", texto: "Supermercados",   accion: function () { irASeccion("mandaditos", "Supermercados"); } },
+              { icono: "🍎", texto: "Frutas",           accion: function () { irASeccion("mandaditos", "Frutas y Verduras"); } },
+              { icono: "🥩", texto: "Carnicerías",      accion: function () { irASeccion("mandaditos", "Carnicerías"); } },
+              { icono: "🍗", texto: "Pollerías",        accion: function () { irASeccion("mandaditos", "Pollerías"); } },
+              { icono: "🐠", texto: "Pescaderías",      accion: function () { irASeccion("mandaditos", "Pescadería"); } },
+              { icono: "🧀", texto: "Lácteos",          accion: function () { irASeccion("mandaditos", "Lácteos"); } },
+              { icono: "💊", texto: "Farmacias",        accion: function () { irASeccion("mandaditos", "Farmacias"); } },
+              { icono: "📚", texto: "Papelerías",       accion: function () { irASeccion("mandaditos", "Papelerías"); } },
+              { icono: "🏠", texto: "Servicios",        accion: function () { if (props.onIrServicios) props.onIrServicios(); } },
+              { icono: "🐒", texto: "ChanguiBot",       accion: function () { setChanguiAbierto(true); } },
             ].map(function (b) {
               return (
                 <button
@@ -3330,21 +3390,18 @@ export default function Dashboard(props: DashboardProps) {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "6px",
-                    padding: "14px 8px",
-                    borderRadius: "18px",
+                    minWidth: "72px",
+                    padding: "12px 8px",
+                    borderRadius: "16px",
                     border: "1px solid var(--border-subtle)",
                     background: "var(--bg-card)",
                     cursor: "pointer",
+                    flexShrink: 0,
+                    scrollSnapAlign: "start",
                   }}
                 >
-                  <span style={{ fontSize: "26px", lineHeight: 1 }}>{b.icono}</span>
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.icono}</span>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>
                     {b.texto}
                   </span>
                 </button>

@@ -745,6 +745,17 @@ export default function App() {
     [carritoGlobal],
   );
 
+  // Prevenir que botón Atrás del celular cierre la app (PWA)
+  useEffect(function () {
+    history.pushState({ changuito: true }, '');
+    function handlePop() {
+      history.pushState({ changuito: true }, '');
+      if (pantalla !== 'dashboard') setPantalla('dashboard');
+    }
+    window.addEventListener('popstate', handlePop);
+    return function () { window.removeEventListener('popstate', handlePop); };
+  }, [pantalla]);
+
   async function cargarPerfil(userId: string, email: string | undefined) {
     try {
       const { data } = await supabase
