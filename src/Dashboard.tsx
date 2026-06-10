@@ -386,6 +386,14 @@ function TarjetaNegocio(props: { merchant: Merchant; onClick: () => void }) {
 }
 
 // ─── Sección Horizontal ───────────────────────────────────────────────────────
+function tituloAId(titulo: string): string {
+  return "seccion-" + titulo
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
 function SeccionH(props: {
   titulo: string;
   emoji: string;
@@ -395,7 +403,7 @@ function SeccionH(props: {
 }) {
   if (!props.loading && props.merchants.length === 0) return null;
   return (
-    <div style={{ marginBottom: "24px" }}>
+    <div id={tituloAId(props.titulo)} style={{ marginBottom: "24px" }}>
       <div
         style={{
           display: "flex",
@@ -2246,13 +2254,8 @@ export default function Dashboard(props: DashboardProps) {
     if (seccion) {
       setSeccionAbierta(seccion);
       setTimeout(function () {
-        const btns = document.querySelectorAll<HTMLButtonElement>('button');
-        for (let i = 0; i < btns.length; i++) {
-          if (btns[i].textContent && btns[i].textContent!.includes(seccion)) {
-            btns[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            break;
-          }
-        }
+        const el = document.getElementById(tituloAId(seccion));
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 250);
     }
   }
@@ -2362,7 +2365,7 @@ export default function Dashboard(props: DashboardProps) {
 
     if (tabActiva === "restaurantes") {
       return (
-        <div style={{ paddingBottom: "40px" }}>
+        <div id="seccion-restaurantes" style={{ paddingBottom: "40px" }}>
           <Banner />
           {SECCIONES_REST.map(function (sec) {
             const lista = porCats(sec.cats, (sec as any).names);
@@ -2384,7 +2387,7 @@ export default function Dashboard(props: DashboardProps) {
 
     if (tabActiva === "mandaditos") {
       return (
-        <div style={{ paddingBottom: "40px" }}>
+        <div id="seccion-mandaditos" style={{ paddingBottom: "40px" }}>
           <div
             style={{
               margin: "0 16px 16px",
@@ -2419,6 +2422,7 @@ export default function Dashboard(props: DashboardProps) {
             return (
               <div
                 key={sec.titulo}
+                id={tituloAId(sec.titulo)}
                 style={{ marginBottom: "8px", padding: "0 16px" }}
               >
                 <button
