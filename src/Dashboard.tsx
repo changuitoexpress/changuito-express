@@ -2399,146 +2399,142 @@ export default function Dashboard(props: DashboardProps) {
       );
     }
 
+    const estiloBotonCat: React.CSSProperties = {
+      minWidth: "90px",
+      padding: "12px 8px",
+      background: isDark ? "#1E1E1E" : "var(--bg-card)",
+      border: isDark ? "1px solid rgba(212,175,55,0.35)" : "1px solid var(--border-subtle)",
+      borderRadius: "14px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "6px",
+      cursor: "pointer",
+      fontSize: "11px",
+      fontWeight: 700,
+      color: isDark ? "#D4AF37" : "var(--text-primary)",
+      flexShrink: 0,
+    };
+    const estiloScrollRow: React.CSSProperties = {
+      display: "flex",
+      overflowX: "auto",
+      gap: "12px",
+      paddingBottom: "12px",
+      scrollbarWidth: "none" as any,
+      msOverflowStyle: "none" as any,
+      WebkitOverflowScrolling: "touch" as any,
+    };
+    const estiloBotonChanguiBot: React.CSSProperties = {
+      ...estiloBotonCat,
+      background: isDark ? "rgba(212,175,55,0.18)" : "rgba(250,204,21,0.22)",
+      border: isDark ? "1.5px solid rgba(212,175,55,0.65)" : "1.5px solid rgba(250,204,21,0.55)",
+      color: isDark ? "#E5C158" : "#92400e",
+    };
+    function irAMandadito(sec: string | null) {
+      if (tabActiva !== "mandaditos") {
+        setTabActiva("mandaditos");
+        setSearch("");
+      }
+      if (sec) { setSeccionAbierta(sec); }
+      setTimeout(function () {
+        const id = sec ? tituloAId(sec) : "seccion-mandaditos-top";
+        const el = document.getElementById(id);
+        if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+      }, 160);
+    }
+    function irARestaurante(secId: string) {
+      if (tabActiva !== "restaurantes") {
+        setTabActiva("restaurantes");
+        setSearch("");
+        setTimeout(function () {
+          const el = document.getElementById(secId);
+          if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+        }, 160);
+      } else {
+        const el = document.getElementById(secId);
+        if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+      }
+    }
+    const tituloBloqueStyle: React.CSSProperties = {
+      fontSize: "14px", fontWeight: 700,
+      color: isDark ? "#D4AF37" : "var(--text-primary)",
+      margin: "0 0 12px 0",
+    };
+    const bloqueBotones = (
+      <div>
+        <div style={{ padding: "16px 16px 0 16px" }}>
+          <h3 style={tituloBloqueStyle}>Mandaditos</h3>
+          <div style={estiloScrollRow}>
+            {[
+              { emoji: "🛒", label: "ChanguiSuper", sec: "Supermercados" },
+              { emoji: "🍎", label: "Frutas",        sec: "Frutas y Verduras" },
+              { emoji: "🥩", label: "Carnes",        sec: "Carnicerías" },
+              { emoji: "🍗", label: "Pollo",         sec: "Pollerías" },
+              { emoji: "🐟", label: "Pescado",       sec: "Pescadería" },
+              { emoji: "🥛", label: "Lácteos",       sec: "Lácteos" },
+              { emoji: "📚", label: "Papelería",     sec: "Papelerías" },
+              { emoji: "🧺", label: "Lavandería",    sec: "Lavandería" },
+              { emoji: "🐕", label: "Mascotas",      sec: null },
+            ].map(function (btn) {
+              return (
+                <button key={btn.label} onClick={function () { irAMandadito(btn.sec); }} style={estiloBotonCat}>
+                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                  {btn.label}
+                </button>
+              );
+            })}
+            <button onClick={function () { setChanguiAbierto(true); }} style={estiloBotonChanguiBot}>
+              <span style={{ fontSize: "20px" }}>🐒</span>
+              ChanguiBot
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: "12px 16px 0 16px" }}>
+          <h3 style={tituloBloqueStyle}>Restaurantes</h3>
+          <div style={estiloScrollRow}>
+            {[
+              { emoji: "🍳", label: "Desayunos y Comidas", secId: "seccion-desayunos-y-comidas" },
+              { emoji: "🫓", label: "Cemitas",             secId: "seccion-cemitas" },
+              { emoji: "🥖", label: "Tortas",              secId: "seccion-tortas" },
+              { emoji: "🌮", label: "Taquerías",           secId: "seccion-taquerias" },
+              { emoji: "🍕", label: "Pizzerías",           secId: "seccion-pizzerias" },
+              { emoji: "🍔", label: "Hamburguesas",        secId: "seccion-hamburguesas" },
+              { emoji: "🍜", label: "Comida Asiática",     secId: "seccion-asiatica" },
+              { emoji: "🍗", label: "Pollos Preparados",   secId: "seccion-pollos-preparados" },
+              { emoji: "🐟", label: "Pescados y Mariscos", secId: "seccion-pescados-y-mariscos" },
+              { emoji: "🍲", label: "Pozolerías",          secId: "seccion-pozoleria" },
+              { emoji: "🫙", label: "Cochinita Pibil",     secId: "seccion-cochinita-pibil" },
+              { emoji: "🥩", label: "Carnitas",            secId: "seccion-carnitas" },
+              { emoji: "🫕", label: "Barbacoa",            secId: "seccion-barbacoa" },
+              { emoji: "🌶️", label: "Birria",              secId: "seccion-birria" },
+              { emoji: "🍗", label: "Alitas y Boneless",   secId: "seccion-alitas-y-boneless" },
+              { emoji: "🌽", label: "Elotes y Antojitos",  secId: "seccion-elotes" },
+              { emoji: "🥞", label: "Crepas",              secId: "seccion-crepas" },
+              { emoji: "🥙", label: "Cheesesteak",         secId: "seccion-cheese" },
+              { emoji: "☕", label: "Cafeterías",          secId: "seccion-cafeterias" },
+            ].map(function (btn, i) {
+              return (
+                <button key={btn.label + i} onClick={function () { irARestaurante(btn.secId); }} style={estiloBotonCat}>
+                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                  {btn.label}
+                </button>
+              );
+            })}
+            <button onClick={function () { setChanguiAbierto(true); }} style={estiloBotonChanguiBot}>
+              <span style={{ fontSize: "20px" }}>🐒</span>
+              ChanguiBot
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
     if (tabActiva === "restaurantes") {
-      const estiloBotonCat: React.CSSProperties = {
-        minWidth: "90px",
-        padding: "12px 8px",
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: "14px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "6px",
-        cursor: "pointer",
-        fontSize: "11px",
-        fontWeight: 700,
-        color: "var(--text-primary)",
-        flexShrink: 0,
-      };
-      const estiloScrollRow: React.CSSProperties = {
-        display: "flex",
-        overflowX: "auto",
-        gap: "12px",
-        paddingBottom: "12px",
-        scrollbarWidth: "none" as any,
-        msOverflowStyle: "none" as any,
-        WebkitOverflowScrolling: "touch" as any,
-      };
-      const estiloBotonChanguiBot: React.CSSProperties = {
-        ...estiloBotonCat,
-        background: isDark ? "rgba(250,204,21,0.15)" : "rgba(250,204,21,0.22)",
-        border: "1.5px solid rgba(250,204,21,0.55)",
-        color: isDark ? "#facc15" : "#92400e",
-      };
       return (
         <div style={{ paddingBottom: "40px" }}>
           <Banner />
           <Monedero session={props.session} theme={props.theme} />
-
-          {/* ── GRUPO 1: BOTONES MANDADITOS ── */}
-          <div style={{ padding: "16px 16px 0 16px" }}>
-            <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
-              Mandaditos
-            </h3>
-            <div style={estiloScrollRow}>
-              {[
-                { emoji: "🛒", label: "ChanguiSuper", sec: "Supermercados" },
-                { emoji: "🍎", label: "Frutas",        sec: "Frutas y Verduras" },
-                { emoji: "🥩", label: "Carnes",        sec: "Carnicerías" },
-                { emoji: "🍗", label: "Pollo",         sec: "Pollerías" },
-                { emoji: "🐟", label: "Pescado",       sec: "Pescadería" },
-                { emoji: "🥛", label: "Lácteos",       sec: "Lácteos" },
-                { emoji: "📚", label: "Papelería",     sec: "Papelerías" },
-                { emoji: "🧺", label: "Lavandería",    sec: "Lavandería" },
-                { emoji: "🐕", label: "Mascotas",      sec: null },
-              ].map(function (btn) {
-                return (
-                  <button
-                    key={btn.label}
-                    onClick={function () {
-                      setTabActiva("mandaditos");
-                      setSearch("");
-                      if (btn.sec) { setSeccionAbierta(btn.sec); }
-                      setTimeout(function () {
-                        const id = btn.sec ? tituloAId(btn.sec) : "seccion-mandaditos-top";
-                        const el = document.getElementById(id);
-                        if (el) {
-                          const y = el.getBoundingClientRect().top + window.scrollY - 120;
-                          window.scrollTo({ top: y, behavior: "smooth" });
-                        }
-                      }, 160);
-                    }}
-                    style={estiloBotonCat}
-                  >
-                    <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
-                    {btn.label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={function () { setChanguiAbierto(true); }}
-                style={estiloBotonChanguiBot}
-              >
-                <span style={{ fontSize: "20px" }}>🐒</span>
-                ChanguiBot
-              </button>
-            </div>
-          </div>
-
-          {/* ── GRUPO 2: BOTONES RESTAURANTES ── */}
-          <div style={{ padding: "16px 16px 0 16px", marginTop: "8px" }}>
-            <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
-              Restaurantes
-            </h3>
-            <div style={estiloScrollRow}>
-              {[
-                { emoji: "🍳", label: "Desayunos y Comidas", secId: "seccion-desayunos-y-comidas" },
-                { emoji: "🫓", label: "Cemitas",             secId: "seccion-cemitas" },
-                { emoji: "🥖", label: "Tortas",              secId: "seccion-tortas" },
-                { emoji: "🌮", label: "Taquerías",           secId: "seccion-taquerias" },
-                { emoji: "🍕", label: "Pizzerías",           secId: "seccion-pizzerias" },
-                { emoji: "🍔", label: "Hamburguesas",        secId: "seccion-hamburguesas" },
-                { emoji: "🍜", label: "Comida Asiática",     secId: "seccion-asiatica" },
-                { emoji: "🍗", label: "Pollos Preparados",   secId: "seccion-pollos-preparados" },
-                { emoji: "🐟", label: "Pescados y Mariscos", secId: "seccion-pescados-y-mariscos" },
-                { emoji: "🍲", label: "Pozolerías",          secId: "seccion-pozoleria" },
-                { emoji: "🫙", label: "Cochinita Pibil",     secId: "seccion-cochinita-pibil" },
-                { emoji: "🥩", label: "Carnitas",            secId: "seccion-carnitas" },
-                { emoji: "🫕", label: "Barbacoa",            secId: "seccion-barbacoa" },
-                { emoji: "🌶️", label: "Birria",              secId: "seccion-birria" },
-                { emoji: "🍗", label: "Alitas y Boneless",   secId: "seccion-alitas-y-boneless" },
-                { emoji: "🌽", label: "Elotes y Antojitos",  secId: "seccion-elotes" },
-                { emoji: "🥞", label: "Crepas",              secId: "seccion-crepas" },
-                { emoji: "🥙", label: "Cheesesteak",         secId: "seccion-cheese" },
-                { emoji: "☕", label: "Cafeterías",          secId: "seccion-cafeterias" },
-              ].map(function (btn, i) {
-                return (
-                  <button
-                    key={btn.label + i}
-                    onClick={function () {
-                      const el = document.getElementById(btn.secId);
-                      if (el) {
-                        const y = el.getBoundingClientRect().top + window.scrollY - 120;
-                        window.scrollTo({ top: y, behavior: "smooth" });
-                      }
-                    }}
-                    style={estiloBotonCat}
-                  >
-                    <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
-                    {btn.label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={function () { setChanguiAbierto(true); }}
-                style={estiloBotonChanguiBot}
-              >
-                <span style={{ fontSize: "20px" }}>🐒</span>
-                ChanguiBot
-              </button>
-            </div>
-          </div>
+          {bloqueBotones}
 
           {/* ── SECCIONES RESTAURANTES ── */}
           <div id="seccion-restaurantes" style={{ marginTop: "16px" }}>
@@ -2630,6 +2626,8 @@ export default function Dashboard(props: DashboardProps) {
               Toca el negocio, escribe tu pedido y se guarda en el carrito. Puedes pedir de varios negocios a la vez.
             </p>
           </div>
+
+          {bloqueBotones}
 
           {/* Acordeón de secciones */}
           {SECCIONES_MAND.map(function (sec) {
@@ -2770,6 +2768,7 @@ export default function Dashboard(props: DashboardProps) {
               Entrega express · Todo lo que necesitas
             </p>
           </div>
+          {bloqueBotones}
           {lista.map(function (m) {
             return (
               <div
