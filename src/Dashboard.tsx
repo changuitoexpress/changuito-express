@@ -55,6 +55,8 @@ export interface Merchant {
   is_open: boolean;
   phone_number: string | null;
   commission: number | null;
+  horario_apertura: string | null;
+  horario_cierre: string | null;
 }
 
 export interface CartItem {
@@ -201,6 +203,37 @@ const SECCIONES_MAND = [
   { titulo: "Conveniencia", keys: ["oxxo", "seven", "circle"], emoji: "🏪" },
 ];
 
+// ─── Horario helpers ──────────────────────────────────────────────────────────
+function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
+  const ahora = new Date();
+  const horaActual = ahora.getHours() * 60 + ahora.getMinutes();
+  const partsAp = horarioApertura.split(':').map(Number);
+  const partsCi = horarioCierre.split(':').map(Number);
+  const apertura = partsAp[0] * 60 + partsAp[1];
+  const cierre = partsCi[0] * 60 + partsCi[1];
+  return horaActual >= apertura && horaActual < cierre;
+}
+
+// ─── Botones acceso rápido ─────────────────────────────────────────────────────
+const botonesMandaditos = [
+  { id: 'super',      emoji: '🛒', label: 'ChanguiSuper',     sectionId: 'seccion-supermercados' },
+  { id: 'frutas',     emoji: '🍎', label: 'Frutas y Verduras', sectionId: 'seccion-frutas-y-verduras' },
+  { id: 'carnes',     emoji: '🥩', label: 'Carnicerías',       sectionId: 'seccion-carniceriass' },
+  { id: 'pollo',      emoji: '🍗', label: 'Pollerías',         sectionId: 'seccion-pollerias' },
+  { id: 'pescado',    emoji: '🐟', label: 'Pescaderías',       sectionId: 'seccion-pescaderia' },
+  { id: 'lacteos',    emoji: '🥛', label: 'Lácteos',           sectionId: 'seccion-lacteos' },
+  { id: 'papeleria',  emoji: '📚', label: 'Papelería',         sectionId: 'seccion-papelerias' },
+  { id: 'lavanderia', emoji: '🧺', label: 'Lavanderías',       sectionId: 'seccion-lavanderia' },
+  { id: 'mascotas',   emoji: '🐕', label: 'Mascotas',          sectionId: 'seccion-mascotas' },
+];
+
+const botonesRestaurantes = [
+  { id: 'comida',      emoji: '🍕', label: 'Comida',            sectionId: 'seccion-restaurantes' },
+  { id: 'asiatica',    emoji: '🍜', label: 'Asiática',          sectionId: 'seccion-comida-asiatica' },
+  { id: 'elotes',      emoji: '🌽', label: 'Elotes y Antojitos', sectionId: 'seccion-elotes-y-antojitos' },
+  { id: 'cheesesteak', emoji: '🥙', label: 'Cheesesteak',       sectionId: 'seccion-cheesesteak' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getEmoji(cat: string): string {
   const m: Record<string, string> = {
@@ -287,7 +320,9 @@ function Skeleton() {
 // ─── Tarjeta Negocio ──────────────────────────────────────────────────────────
 function TarjetaNegocio(props: { merchant: Merchant; onClick: () => void }) {
   const m = props.merchant;
-  const isClosed = !m.is_open;
+  const isClosed = m.horario_apertura && m.horario_cierre
+    ? !esAbierto(m.horario_apertura, m.horario_cierre)
+    : !m.is_open;
   return (
     <div
       onClick={props.onClick}
@@ -2122,7 +2157,7 @@ export default function Dashboard(props: DashboardProps) {
       const { data, error: err } = await supabase
         .from("merchants")
         .select(
-          "id,name,category,rating,delivery_time,image_url,is_open,phone_number,commission",
+          "id,name,category,rating,delivery_time,image_url,is_open,phone_number,commission,horario_apertura,horario_cierre",
         )
         .order("is_open", { ascending: false })
         .order("name", { ascending: true });
@@ -2255,7 +2290,7 @@ export default function Dashboard(props: DashboardProps) {
       setSeccionAbierta(seccion);
       setTimeout(function () {
         const el = document.getElementById(tituloAId(seccion));
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 250);
     }
   }
@@ -2364,151 +2399,157 @@ export default function Dashboard(props: DashboardProps) {
     }
 
     if (tabActiva === "restaurantes") {
+      const estiloStrip: React.CSSProperties = {
+        display: "flex",
+        overflowX: "auto",
+        gap: "10px",
+        padding: "2px 16px 8px",
+        scrollSnapType: "x mandatory",
+        WebkitOverflowScrolling: "touch" as any,
+        msOverflowStyle: "none" as any,
+        scrollbarWidth: "none" as any,
+      };
+      const estiloBotonStrip: React.CSSProperties = {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "6px",
+        minWidth: "72px",
+        padding: "12px 8px",
+        borderRadius: "16px",
+        border: "1px solid var(--border-subtle)",
+        background: "var(--bg-card)",
+        cursor: "pointer",
+        flexShrink: 0,
+        scrollSnapAlign: "start",
+      };
       return (
-        <div id="seccion-restaurantes" style={{ paddingBottom: "40px" }}>
+        <div style={{ paddingBottom: "40px" }}>
           <Banner />
-          {SECCIONES_REST.map(function (sec) {
-            const lista = porCats(sec.cats, (sec as any).names);
-            if (!loading && lista.length === 0) return null;
-            return (
-              <SeccionH
-                key={sec.titulo}
-                titulo={sec.titulo}
-                emoji={sec.emoji}
-                merchants={lista}
-                loading={loading}
-                onSelect={setSelectedMerchant}
-              />
-            );
-          })}
-        </div>
-      );
-    }
 
-    if (tabActiva === "mandaditos") {
-      return (
-        <div id="seccion-mandaditos" style={{ paddingBottom: "40px" }}>
-          <div
-            style={{
-              margin: "0 16px 16px",
-              padding: "12px 16px",
-              borderRadius: "14px",
-              background: isDark
-                ? "rgba(255,255,255,0.04)"
-                : "rgba(0,0,0,0.03)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--text-muted)",
-                lineHeight: 1.5,
-                margin: 0,
-              }}
-            >
-              ✍️{" "}
-              <strong style={{ color: "var(--text-primary)" }}>
-                Cómo funciona:
-              </strong>{" "}
-              Toca el negocio, escribe tu pedido y se guarda en el carrito.
-              Puedes pedir de varios negocios a la vez.
+          {/* ── BOTONES MANDADITOS ── */}
+          <div style={{ padding: "16px 0 4px" }}>
+            <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
+              🛒 Mandaditos y Súper
             </p>
+            <div style={estiloStrip}>
+              {botonesMandaditos.map(function (b) {
+                return (
+                  <button
+                    key={b.id}
+                    onClick={function () {
+                      const el = document.getElementById(b.sectionId);
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                    style={estiloBotonStrip}
+                  >
+                    <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.emoji}</span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>{b.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {SECCIONES_MAND.map(function (sec) {
-            const lista = porKeys(sec.keys);
-            if (!loading && lista.length === 0) return null;
-            const abierta = seccionAbierta === sec.titulo;
-            return (
-              <div
-                key={sec.titulo}
-                id={tituloAId(sec.titulo)}
-                style={{ marginBottom: "8px", padding: "0 16px" }}
-              >
-                <button
-                  onClick={function () {
-                    setSeccionAbierta(abierta ? null : sec.titulo);
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 16px",
-                    borderRadius: "16px",
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border-subtle)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
+
+          {/* ── SECCIONES MANDADITOS ── */}
+          <div id="seccion-mandaditos" style={{ paddingBottom: "8px" }}>
+            <div style={{ margin: "0 16px 16px", padding: "12px 16px", borderRadius: "14px", background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: "1px solid var(--border-subtle)" }}>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, margin: 0 }}>
+                ✍️{" "}
+                <strong style={{ color: "var(--text-primary)" }}>Cómo funciona:</strong>{" "}
+                Toca el negocio, escribe tu pedido y se guarda en el carrito. Puedes pedir de varios negocios a la vez.
+              </p>
+            </div>
+            {SECCIONES_MAND.map(function (sec) {
+              const lista = porKeys(sec.keys);
+              if (!loading && lista.length === 0) return null;
+              const abierta = seccionAbierta === sec.titulo;
+              return (
+                <div key={sec.titulo} id={tituloAId(sec.titulo)} style={{ marginBottom: "8px", padding: "0 16px" }}>
+                  <button
+                    onClick={function () { setSeccionAbierta(abierta ? null : sec.titulo); }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: "16px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", cursor: "pointer" }}
                   >
-                    <span style={{ fontSize: "20px" }}>{sec.emoji}</span>
-                    <span
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {sec.titulo}
-                    </span>
-                    <span
-                      style={{ fontSize: "11px", color: "var(--text-muted)" }}
-                    >
-                      ({lista.length})
-                    </span>
-                  </div>
-                  {abierta ? (
-                    <ChevronUp
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        color: "var(--text-muted)",
-                      }}
-                    />
-                  ) : (
-                    <ChevronDown
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        color: "var(--text-muted)",
-                      }}
-                    />
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "20px" }}>{sec.emoji}</span>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>{sec.titulo}</span>
+                      <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>({lista.length})</span>
+                    </div>
+                    {abierta
+                      ? <ChevronUp style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
+                      : <ChevronDown style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />}
+                  </button>
+                  {abierta && (
+                    <div style={{ paddingTop: "8px", overflowX: "auto", display: "flex", gap: "12px", scrollbarWidth: "none", paddingBottom: "8px" }}>
+                      {lista.map(function (m) {
+                        return (
+                          <TarjetaNegocio key={m.id} merchant={m} onClick={function () { setModalMandadito(m); }} />
+                        );
+                      })}
+                    </div>
                   )}
-                </button>
-                {abierta && (
-                  <div
-                    style={{
-                      paddingTop: "8px",
-                      overflowX: "auto",
-                      display: "flex",
-                      gap: "12px",
-                      scrollbarWidth: "none",
-                      paddingBottom: "8px",
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── BOTONES RESTAURANTES ── */}
+          <div style={{ padding: "16px 0 4px", marginTop: "8px" }}>
+            <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
+              🍽️ Restaurantes
+            </p>
+            <div style={estiloStrip}>
+              {botonesRestaurantes.map(function (b) {
+                return (
+                  <button
+                    key={b.id}
+                    onClick={function () {
+                      const el = document.getElementById(b.sectionId);
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                     }}
+                    style={estiloBotonStrip}
                   >
-                    {lista.map(function (m) {
-                      return (
-                        <TarjetaNegocio
-                          key={m.id}
-                          merchant={m}
-                          onClick={function () {
-                            setModalMandadito(m);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                    <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.emoji}</span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>{b.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── SECCIONES RESTAURANTES ── */}
+          <div id="seccion-restaurantes">
+            {SECCIONES_REST.map(function (sec) {
+              const lista = porCats(sec.cats, (sec as any).names);
+              if (!loading && lista.length === 0) return null;
+              return (
+                <SeccionH
+                  key={sec.titulo}
+                  titulo={sec.titulo}
+                  emoji={sec.emoji}
+                  merchants={lista}
+                  loading={loading}
+                  onSelect={setSelectedMerchant}
+                />
+              );
+            })}
+          </div>
+
+          {/* ── CHANGUIBOT ── */}
+          <div style={{ padding: "8px 16px 24px" }}>
+            <button
+              onClick={function () { setChanguiAbierto(true); }}
+              style={{ width: "100%", padding: "16px", borderRadius: "18px", background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)", border: "2px solid rgba(250,204,21,0.35)", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}
+            >
+              <span style={{ fontSize: "28px" }}>🐒</span>
+              <div style={{ textAlign: "left", flex: 1 }}>
+                <p style={{ fontSize: "14px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 2px 0" }}>ChanguiBot IA</p>
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué quieres comer hoy?</p>
               </div>
-            );
-          })}
+              <ChevronRight style={{ width: "18px", height: "18px", color: "var(--text-muted)" }} />
+            </button>
+          </div>
         </div>
       );
     }
@@ -3019,9 +3060,19 @@ export default function Dashboard(props: DashboardProps) {
                   <button
                     key={it.key}
                     onClick={function () {
-                      setTabActiva(it.key as MainTab);
-                      setSearch("");
-                      setMenuAbierto(false);
+                      if (it.key === "mandaditos") {
+                        setTabActiva("restaurantes");
+                        setSearch("");
+                        setMenuAbierto(false);
+                        setTimeout(function () {
+                          const el = document.getElementById("seccion-mandaditos");
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }, 350);
+                      } else {
+                        setTabActiva(it.key as MainTab);
+                        setSearch("");
+                        setMenuAbierto(false);
+                      }
                     }}
                     style={{
                       width: "100%",
@@ -3356,63 +3407,6 @@ export default function Dashboard(props: DashboardProps) {
       )}
 
       <div style={{ paddingTop: "8px", paddingBottom: "90px" }}>
-        {/* Accesos directos — scroll horizontal */}
-        <div style={{ padding: "12px 0 4px" }}>
-          <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
-            ¿Qué necesitas hoy?
-          </p>
-          <div style={{
-            display: "flex",
-            overflowX: "auto",
-            gap: "10px",
-            padding: "2px 16px 8px",
-            scrollSnapType: "x mandatory",
-            WebkitOverflowScrolling: "touch" as any,
-            msOverflowStyle: "none" as any,
-            scrollbarWidth: "none" as any,
-          }}>
-            {[
-              { icono: "🍕", texto: "Comida",          accion: function () { irASeccion("restaurantes"); } },
-              { icono: "🛒", texto: "Supermercados",   accion: function () { irASeccion("mandaditos", "Supermercados"); } },
-              { icono: "🍎", texto: "Frutas",           accion: function () { irASeccion("mandaditos", "Frutas y Verduras"); } },
-              { icono: "🥩", texto: "Carnicerías",      accion: function () { irASeccion("mandaditos", "Carnicerías"); } },
-              { icono: "🍗", texto: "Pollerías",        accion: function () { irASeccion("mandaditos", "Pollerías"); } },
-              { icono: "🐠", texto: "Pescaderías",      accion: function () { irASeccion("mandaditos", "Pescadería"); } },
-              { icono: "🧀", texto: "Lácteos",          accion: function () { irASeccion("mandaditos", "Lácteos"); } },
-              { icono: "💊", texto: "Farmacias",        accion: function () { irASeccion("mandaditos", "Farmacias"); } },
-              { icono: "📚", texto: "Papelerías",       accion: function () { irASeccion("mandaditos", "Papelerías"); } },
-              { icono: "🏠", texto: "Servicios",        accion: function () { if (props.onIrServicios) props.onIrServicios(); } },
-              { icono: "🐒", texto: "ChanguiBot",       accion: function () { setChanguiAbierto(true); } },
-            ].map(function (b) {
-              return (
-                <button
-                  key={b.texto}
-                  onClick={b.accion}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    minWidth: "72px",
-                    padding: "12px 8px",
-                    borderRadius: "16px",
-                    border: "1px solid var(--border-subtle)",
-                    background: "var(--bg-card)",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    scrollSnapAlign: "start",
-                  }}
-                >
-                  <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.icono}</span>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>
-                    {b.texto}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
         <Monedero session={props.session} theme={props.theme} />
         {renderContenido()}
       </div>
