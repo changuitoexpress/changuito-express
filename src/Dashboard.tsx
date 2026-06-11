@@ -2425,26 +2425,41 @@ export default function Dashboard(props: DashboardProps) {
         msOverflowStyle: "none" as any,
         WebkitOverflowScrolling: "touch" as any,
       };
+      const botonChanguiBot = (
+        <div style={{ padding: "8px 16px" }}>
+          <button
+            onClick={function () { setChanguiAbierto(true); }}
+            style={{ width: "100%", padding: "14px 16px", borderRadius: "16px", background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)", border: "2px solid rgba(250,204,21,0.35)", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}
+          >
+            <span style={{ fontSize: "24px" }}>🐒</span>
+            <div style={{ textAlign: "left", flex: 1 }}>
+              <p style={{ fontSize: "13px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 1px 0" }}>ChanguiBot IA</p>
+              <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué quieres comer hoy?</p>
+            </div>
+            <ChevronRight style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
+          </button>
+        </div>
+      );
       return (
         <div style={{ paddingBottom: "40px" }}>
           <Banner />
 
           {/* ── GRUPO 1: BOTONES MANDADITOS ── */}
           <div style={{ padding: "16px", marginBottom: "0" }}>
-            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--text-primary)", margin: "0 0 12px 0" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
               Mandaditos
             </h3>
             <div style={estiloScrollRow}>
               {[
                 { emoji: "🛒", label: "ChanguiSuper", id: "super" },
-                { emoji: "🍎", label: "Frutas",       id: "frutas" },
-                { emoji: "🥩", label: "Carnes",       id: "carnes" },
-                { emoji: "🍗", label: "Pollo",        id: "pollo" },
-                { emoji: "🐟", label: "Pescado",      id: "pescado" },
-                { emoji: "🥛", label: "Lácteos",      id: "lacteos" },
-                { emoji: "📚", label: "Papelería",    id: "papeleria" },
-                { emoji: "🧺", label: "Lavandería",   id: "lavanderia" },
-                { emoji: "🐕", label: "Mascotas",     id: "mascotas" },
+                { emoji: "🍎", label: "Frutas",        id: "frutas" },
+                { emoji: "🥩", label: "Carnes",        id: "carnes" },
+                { emoji: "🍗", label: "Pollo",         id: "pollo" },
+                { emoji: "🐟", label: "Pescado",       id: "pescado" },
+                { emoji: "🥛", label: "Lácteos",       id: "lacteos" },
+                { emoji: "📚", label: "Papelería",     id: "papeleria" },
+                { emoji: "🧺", label: "Lavandería",    id: "lavanderia" },
+                { emoji: "🐕", label: "Mascotas",      id: "mascotas" },
               ].map(function (btn) {
                 return (
                   <button
@@ -2463,23 +2478,41 @@ export default function Dashboard(props: DashboardProps) {
             </div>
           </div>
 
+          {botonChanguiBot}
+
           {/* ── GRUPO 2: BOTONES RESTAURANTES ── */}
-          <div style={{ padding: "0 16px 16px 16px" }}>
-            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--text-primary)", margin: "0 0 12px 0" }}>
+          <div style={{ padding: "16px 16px 0 16px", marginTop: "12px" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
               Restaurantes
             </h3>
             <div style={estiloScrollRow}>
               {[
-                { emoji: "🍕", label: "Comida",      id: "comida" },
-                { emoji: "🍜", label: "Asiática",    id: "asiatica" },
-                { emoji: "🌽", label: "Elotes",      id: "elotes" },
-                { emoji: "🥙", label: "Cheesesteak", id: "cheese" },
-              ].map(function (btn) {
+                { emoji: "🍳", label: "Desayunos y Comidas", id: "rest" },
+                { emoji: "🫓", label: "Cemitas",             id: "rest" },
+                { emoji: "🥖", label: "Tortas",              id: "rest" },
+                { emoji: "🌮", label: "Taquerías",           id: "rest" },
+                { emoji: "🍕", label: "Pizzerías",           id: "rest" },
+                { emoji: "🍔", label: "Hamburguesas",        id: "rest" },
+                { emoji: "🍜", label: "Comida Asiática",     id: "asiatica" },
+                { emoji: "🍗", label: "Pollos Preparados",   id: "rest" },
+                { emoji: "🐟", label: "Pescados y Mariscos", id: "rest" },
+                { emoji: "🍲", label: "Pozolería",           id: "rest" },
+                { emoji: "🫙", label: "Cochinita Pibil",     id: "rest" },
+                { emoji: "🥩", label: "Carnitas",            id: "rest" },
+                { emoji: "🫕", label: "Barbacoa",            id: "rest" },
+                { emoji: "🌶️", label: "Birria",              id: "rest" },
+                { emoji: "🍗", label: "Alitas y Boneless",   id: "rest" },
+                { emoji: "🌽", label: "Elotes y Antojitos",  id: "elotes" },
+                { emoji: "🥞", label: "Crepas",              id: "rest" },
+                { emoji: "🥙", label: "Cheesesteak",         id: "cheese" },
+                { emoji: "☕", label: "Cafeterías",          id: "rest" },
+              ].map(function (btn, i) {
                 return (
                   <button
-                    key={btn.id}
+                    key={btn.label + i}
                     onClick={function () {
-                      const el = document.getElementById("seccion-" + btn.id);
+                      const target = btn.id === "rest" ? "seccion-restaurantes" : "seccion-" + btn.id;
+                      const el = document.getElementById(target);
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                     }}
                     style={estiloBotonCat}
@@ -2492,48 +2525,10 @@ export default function Dashboard(props: DashboardProps) {
             </div>
           </div>
 
-          {/* ── SECCIÓN MANDADITOS ── */}
-          <div id="seccion-mandaditos" style={{ paddingBottom: "8px" }}>
-            <div style={{ margin: "0 16px 16px", padding: "12px 16px", borderRadius: "14px", background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: "1px solid var(--border-subtle)" }}>
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, margin: 0 }}>
-                ✍️{" "}
-                <strong style={{ color: "var(--text-primary)" }}>Cómo funciona:</strong>{" "}
-                Toca el negocio, escribe tu pedido y se guarda en el carrito. Puedes pedir de varios negocios a la vez.
-              </p>
-            </div>
-            {SECCIONES_MAND.map(function (sec) {
-              const lista = porKeys(sec.keys);
-              if (!loading && lista.length === 0) return null;
-              const abierta = seccionAbierta === sec.titulo;
-              return (
-                <div key={sec.titulo} id={tituloAId(sec.titulo)} style={{ marginBottom: "8px", padding: "0 16px" }}>
-                  <button
-                    onClick={function () { setSeccionAbierta(abierta ? null : sec.titulo); }}
-                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: "16px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", cursor: "pointer" }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ fontSize: "20px" }}>{sec.emoji}</span>
-                      <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>{sec.titulo}</span>
-                      <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>({lista.length})</span>
-                    </div>
-                    {abierta
-                      ? <ChevronUp style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
-                      : <ChevronDown style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />}
-                  </button>
-                  {abierta && (
-                    <div style={{ paddingTop: "8px", overflowX: "auto", display: "flex", gap: "12px", scrollbarWidth: "none", paddingBottom: "8px" }}>
-                      {lista.map(function (m) {
-                        return <TarjetaNegocio key={m.id} merchant={m} onClick={function () { setModalMandadito(m); }} />;
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {botonChanguiBot}
 
           {/* ── SECCIONES RESTAURANTES ── */}
-          <div id="seccion-comida">
+          <div id="seccion-restaurantes" style={{ marginTop: "8px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
               if (!loading && lista.length === 0) return null;
@@ -2549,21 +2544,6 @@ export default function Dashboard(props: DashboardProps) {
                 />
               );
             })}
-          </div>
-
-          {/* ── CHANGUIBOT ── */}
-          <div style={{ padding: "8px 16px 24px" }}>
-            <button
-              onClick={function () { setChanguiAbierto(true); }}
-              style={{ width: "100%", padding: "16px", borderRadius: "18px", background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)", border: "2px solid rgba(250,204,21,0.35)", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}
-            >
-              <span style={{ fontSize: "28px" }}>🐒</span>
-              <div style={{ textAlign: "left", flex: 1 }}>
-                <p style={{ fontSize: "14px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 2px 0" }}>ChanguiBot IA</p>
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué quieres comer hoy?</p>
-              </div>
-              <ChevronRight style={{ width: "18px", height: "18px", color: "var(--text-muted)" }} />
-            </button>
           </div>
         </div>
       );
