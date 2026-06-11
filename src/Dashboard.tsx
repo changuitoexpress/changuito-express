@@ -2571,6 +2571,159 @@ export default function Dashboard(props: DashboardProps) {
       );
     }
 
+    if (tabActiva === "mandaditos") {
+      return (
+        <div style={{ paddingBottom: "40px" }}>
+          {/* Banner mandaditos */}
+          <div
+            style={{
+              margin: "16px",
+              padding: "20px",
+              borderRadius: "20px",
+              background: "linear-gradient(135deg,#f97316,#ea580c)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                right: "-10px",
+                top: "-10px",
+                width: "80px",
+                height: "80px",
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.15)",
+              }}
+            />
+            <p
+              style={{
+                fontSize: "9px",
+                fontWeight: 900,
+                color: "rgba(255,255,255,0.6)",
+                textTransform: "uppercase",
+                letterSpacing: "0.2em",
+                margin: "0 0 4px 0",
+              }}
+            >
+              Servicio Express
+            </p>
+            <h2
+              style={{
+                fontSize: "22px",
+                fontWeight: 900,
+                color: "#fff",
+                margin: "0 0 4px 0",
+              }}
+            >
+              🛵 Mandaditos
+            </h2>
+            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", margin: 0 }}>
+              Pedidos a domicilio de tus tiendas favoritas
+            </p>
+          </div>
+
+          {/* Cómo funciona */}
+          <div
+            style={{
+              margin: "0 16px 16px",
+              padding: "12px 16px",
+              borderRadius: "14px",
+              background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, margin: 0 }}>
+              ✍️{" "}
+              <strong style={{ color: "var(--text-primary)" }}>Cómo funciona:</strong>{" "}
+              Toca el negocio, escribe tu pedido y se guarda en el carrito. Puedes pedir de varios negocios a la vez.
+            </p>
+          </div>
+
+          {/* Acordeón de secciones */}
+          {SECCIONES_MAND.map(function (sec) {
+            const lista = porKeys(sec.keys);
+            if (!loading && lista.length === 0) return null;
+            const abierta = seccionAbierta === sec.titulo;
+            return (
+              <div key={sec.titulo} id={tituloAId(sec.titulo)} style={{ marginBottom: "8px", padding: "0 16px" }}>
+                <button
+                  onClick={function () { setSeccionAbierta(abierta ? null : sec.titulo); }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "14px 16px",
+                    borderRadius: "16px",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "20px" }}>{sec.emoji}</span>
+                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>{sec.titulo}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>({lista.length})</span>
+                  </div>
+                  {abierta
+                    ? <ChevronUp style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
+                    : <ChevronDown style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />}
+                </button>
+                {abierta && (
+                  <div
+                    style={{
+                      paddingTop: "8px",
+                      overflowX: "auto",
+                      display: "flex",
+                      gap: "12px",
+                      scrollbarWidth: "none",
+                      paddingBottom: "8px",
+                    }}
+                  >
+                    {lista.map(function (m) {
+                      return (
+                        <TarjetaNegocio
+                          key={m.id}
+                          merchant={m}
+                          onClick={function () { setModalMandadito(m); }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* ChanguiBot */}
+          <div style={{ padding: "16px 16px 8px" }}>
+            <button
+              onClick={function () { setChanguiAbierto(true); }}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                borderRadius: "16px",
+                background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)",
+                border: "2px solid rgba(250,204,21,0.35)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+              <span style={{ fontSize: "24px" }}>🐒</span>
+              <div style={{ textAlign: "left", flex: 1 }}>
+                <p style={{ fontSize: "13px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 1px 0" }}>ChanguiBot IA</p>
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué necesitas hoy?</p>
+              </div>
+              <ChevronRight style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (tabActiva === "tiendita") {
       const lista = merchants.filter(function (m) {
         return m.category?.toLowerCase() === "tiendita";
