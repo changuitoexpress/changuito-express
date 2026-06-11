@@ -2478,6 +2478,28 @@ export default function Dashboard(props: DashboardProps) {
             </div>
           </div>
 
+          {/* ── SECCIÓN MANDADITOS ── */}
+          <div id="seccion-mandaditos" style={{ padding: "0 16px 8px 16px", marginTop: "12px" }}>
+            {merchants.filter(function (m) { return m.category?.toLowerCase() === "mandaditos"; }).length > 0 && (
+              <h3 style={{ fontSize: "14px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 10px 0" }}>
+                Negocios disponibles
+              </h3>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {merchants
+                .filter(function (m) { return m.category?.toLowerCase() === "mandaditos"; })
+                .map(function (m) {
+                  return (
+                    <TarjetaNegocio
+                      key={m.id}
+                      merchant={m}
+                      onClick={function () { setModalMandadito(m); }}
+                    />
+                  );
+                })}
+            </div>
+          </div>
+
           {botonChanguiBot}
 
           {/* ── GRUPO 2: BOTONES RESTAURANTES ── */}
