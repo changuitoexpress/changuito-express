@@ -123,7 +123,7 @@ const SECCIONES_REST = [
   { titulo: "Taquerías", cats: ["taqueria"], emoji: "🌮" },
   { titulo: "Pizzerías", cats: ["pizzeria"], emoji: "🍕" },
   { titulo: "Hamburguesas", cats: ["hamburguesas"], emoji: "🍔" },
-  { titulo: "Comida Asiática", cats: ["comida asiatica"], emoji: "🍜" },
+  { titulo: "Comida Asiática", cats: ["comida asiatica"], emoji: "🍜", customId: "seccion-asiatica" },
   { titulo: "Pollos Preparados", cats: ["pollos preparados"], emoji: "🍗" },
   { titulo: "Pescados y Mariscos", cats: ["pescados y mariscos"], emoji: "🦐" },
   { titulo: "Pozolería", cats: ["pozoleria"], emoji: "🍲" },
@@ -132,9 +132,9 @@ const SECCIONES_REST = [
   { titulo: "Barbacoa", cats: ["barbacoa"], emoji: "🫕" },
   { titulo: "Birria", cats: ["birria"], emoji: "🌶️" },
   { titulo: "Alitas y Boneless", cats: ["alitas y boneless"], emoji: "🍗" },
-  { titulo: "Elotes y Antojitos", cats: ["elotes y antojitos"], emoji: "🌽" },
+  { titulo: "Elotes y Antojitos", cats: ["elotes y antojitos"], emoji: "🌽", customId: "seccion-elotes" },
   { titulo: "Cafeterías", cats: ["cafeteria"], emoji: "☕" },
-  { titulo: "Cheesesteak", cats: ["cheesesteak"], names: ["philly steak"], emoji: "🥩" },
+  { titulo: "Cheesesteak", cats: ["cheesesteak"], names: ["philly steak"], emoji: "🥩", customId: "seccion-cheese" },
 ];
 
 const SECCIONES_MAND = [
@@ -435,10 +435,11 @@ function SeccionH(props: {
   merchants: Merchant[];
   loading: boolean;
   onSelect: (m: Merchant) => void;
+  customId?: string;
 }) {
   if (!props.loading && props.merchants.length === 0) return null;
   return (
-    <div id={tituloAId(props.titulo)} style={{ marginBottom: "24px" }}>
+    <div id={props.customId ?? tituloAId(props.titulo)} style={{ marginBottom: "24px" }}>
       <div
         style={{
           display: "flex",
@@ -2399,60 +2400,99 @@ export default function Dashboard(props: DashboardProps) {
     }
 
     if (tabActiva === "restaurantes") {
-      const estiloStrip: React.CSSProperties = {
-        display: "flex",
-        overflowX: "auto",
-        gap: "10px",
-        padding: "2px 16px 8px",
-        scrollSnapType: "x mandatory",
-        WebkitOverflowScrolling: "touch" as any,
-        msOverflowStyle: "none" as any,
-        scrollbarWidth: "none" as any,
-      };
-      const estiloBotonStrip: React.CSSProperties = {
+      const estiloBotonCat: React.CSSProperties = {
+        minWidth: "90px",
+        padding: "12px 8px",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "14px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
         gap: "6px",
-        minWidth: "72px",
-        padding: "12px 8px",
-        borderRadius: "16px",
-        border: "1px solid var(--border-subtle)",
-        background: "var(--bg-card)",
         cursor: "pointer",
+        fontSize: "11px",
+        fontWeight: 700,
+        color: "var(--text-primary)",
         flexShrink: 0,
-        scrollSnapAlign: "start",
+      };
+      const estiloScrollRow: React.CSSProperties = {
+        display: "flex",
+        overflowX: "auto",
+        gap: "12px",
+        paddingBottom: "12px",
+        scrollbarWidth: "none" as any,
+        msOverflowStyle: "none" as any,
+        WebkitOverflowScrolling: "touch" as any,
       };
       return (
         <div style={{ paddingBottom: "40px" }}>
           <Banner />
 
-          {/* ── BOTONES MANDADITOS ── */}
-          <div style={{ padding: "16px 0 4px" }}>
-            <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
-              🛒 Mandaditos y Súper
-            </p>
-            <div style={estiloStrip}>
-              {botonesMandaditos.map(function (b) {
+          {/* ── GRUPO 1: BOTONES MANDADITOS ── */}
+          <div style={{ padding: "16px", marginBottom: "0" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--text-primary)", margin: "0 0 12px 0" }}>
+              Mandaditos
+            </h3>
+            <div style={estiloScrollRow}>
+              {[
+                { emoji: "🛒", label: "ChanguiSuper", id: "super" },
+                { emoji: "🍎", label: "Frutas",       id: "frutas" },
+                { emoji: "🥩", label: "Carnes",       id: "carnes" },
+                { emoji: "🍗", label: "Pollo",        id: "pollo" },
+                { emoji: "🐟", label: "Pescado",      id: "pescado" },
+                { emoji: "🥛", label: "Lácteos",      id: "lacteos" },
+                { emoji: "📚", label: "Papelería",    id: "papeleria" },
+                { emoji: "🧺", label: "Lavandería",   id: "lavanderia" },
+                { emoji: "🐕", label: "Mascotas",     id: "mascotas" },
+              ].map(function (btn) {
                 return (
                   <button
-                    key={b.id}
+                    key={btn.id}
                     onClick={function () {
-                      const el = document.getElementById(b.sectionId);
+                      const el = document.getElementById("seccion-mandaditos");
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                     }}
-                    style={estiloBotonStrip}
+                    style={estiloBotonCat}
                   >
-                    <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.emoji}</span>
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>{b.label}</span>
+                    <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                    {btn.label}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* ── SECCIONES MANDADITOS ── */}
+          {/* ── GRUPO 2: BOTONES RESTAURANTES ── */}
+          <div style={{ padding: "0 16px 16px 16px" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px", color: "var(--text-primary)", margin: "0 0 12px 0" }}>
+              Restaurantes
+            </h3>
+            <div style={estiloScrollRow}>
+              {[
+                { emoji: "🍕", label: "Comida",      id: "comida" },
+                { emoji: "🍜", label: "Asiática",    id: "asiatica" },
+                { emoji: "🌽", label: "Elotes",      id: "elotes" },
+                { emoji: "🥙", label: "Cheesesteak", id: "cheese" },
+              ].map(function (btn) {
+                return (
+                  <button
+                    key={btn.id}
+                    onClick={function () {
+                      const el = document.getElementById("seccion-" + btn.id);
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                    style={estiloBotonCat}
+                  >
+                    <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                    {btn.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── SECCIÓN MANDADITOS ── */}
           <div id="seccion-mandaditos" style={{ paddingBottom: "8px" }}>
             <div style={{ margin: "0 16px 16px", padding: "12px 16px", borderRadius: "14px", background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: "1px solid var(--border-subtle)" }}>
               <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, margin: 0 }}>
@@ -2483,9 +2523,7 @@ export default function Dashboard(props: DashboardProps) {
                   {abierta && (
                     <div style={{ paddingTop: "8px", overflowX: "auto", display: "flex", gap: "12px", scrollbarWidth: "none", paddingBottom: "8px" }}>
                       {lista.map(function (m) {
-                        return (
-                          <TarjetaNegocio key={m.id} merchant={m} onClick={function () { setModalMandadito(m); }} />
-                        );
+                        return <TarjetaNegocio key={m.id} merchant={m} onClick={function () { setModalMandadito(m); }} />;
                       })}
                     </div>
                   )}
@@ -2494,32 +2532,8 @@ export default function Dashboard(props: DashboardProps) {
             })}
           </div>
 
-          {/* ── BOTONES RESTAURANTES ── */}
-          <div style={{ padding: "16px 0 4px", marginTop: "8px" }}>
-            <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 10px 16px" }}>
-              🍽️ Restaurantes
-            </p>
-            <div style={estiloStrip}>
-              {botonesRestaurantes.map(function (b) {
-                return (
-                  <button
-                    key={b.id}
-                    onClick={function () {
-                      const el = document.getElementById(b.sectionId);
-                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }}
-                    style={estiloBotonStrip}
-                  >
-                    <span style={{ fontSize: "24px", lineHeight: 1 }}>{b.emoji}</span>
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-primary)", textAlign: "center", lineHeight: 1.2 }}>{b.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* ── SECCIONES RESTAURANTES ── */}
-          <div id="seccion-restaurantes">
+          <div id="seccion-comida">
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
               if (!loading && lista.length === 0) return null;
@@ -2531,6 +2545,7 @@ export default function Dashboard(props: DashboardProps) {
                   merchants={lista}
                   loading={loading}
                   onSelect={setSelectedMerchant}
+                  customId={(sec as any).customId}
                 />
               );
             })}
