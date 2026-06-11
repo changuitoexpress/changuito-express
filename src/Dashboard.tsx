@@ -2443,20 +2443,32 @@ export default function Dashboard(props: DashboardProps) {
             </h3>
             <div style={estiloScrollRow}>
               {[
-                { emoji: "🛒", label: "ChanguiSuper" },
-                { emoji: "🍎", label: "Frutas" },
-                { emoji: "🥩", label: "Carnes" },
-                { emoji: "🍗", label: "Pollo" },
-                { emoji: "🐟", label: "Pescado" },
-                { emoji: "🥛", label: "Lácteos" },
-                { emoji: "📚", label: "Papelería" },
-                { emoji: "🧺", label: "Lavandería" },
-                { emoji: "🐕", label: "Mascotas" },
+                { emoji: "🛒", label: "ChanguiSuper", sec: "Supermercados" },
+                { emoji: "🍎", label: "Frutas",        sec: "Frutas y Verduras" },
+                { emoji: "🥩", label: "Carnes",        sec: "Carnicerías" },
+                { emoji: "🍗", label: "Pollo",         sec: "Pollerías" },
+                { emoji: "🐟", label: "Pescado",       sec: "Pescadería" },
+                { emoji: "🥛", label: "Lácteos",       sec: "Lácteos" },
+                { emoji: "📚", label: "Papelería",     sec: "Papelerías" },
+                { emoji: "🧺", label: "Lavandería",    sec: "Lavandería" },
+                { emoji: "🐕", label: "Mascotas",      sec: null },
               ].map(function (btn) {
                 return (
                   <button
                     key={btn.label}
-                    onClick={function () { setTabActiva("mandaditos"); setSearch(""); }}
+                    onClick={function () {
+                      setTabActiva("mandaditos");
+                      setSearch("");
+                      if (btn.sec) { setSeccionAbierta(btn.sec); }
+                      setTimeout(function () {
+                        const id = btn.sec ? tituloAId(btn.sec) : "seccion-mandaditos-top";
+                        const el = document.getElementById(id);
+                        if (el) {
+                          const y = el.getBoundingClientRect().top + window.scrollY - 120;
+                          window.scrollTo({ top: y, behavior: "smooth" });
+                        }
+                      }, 160);
+                    }}
                     style={estiloBotonCat}
                   >
                     <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
@@ -2481,33 +2493,35 @@ export default function Dashboard(props: DashboardProps) {
             </h3>
             <div style={estiloScrollRow}>
               {[
-                { emoji: "🍳", label: "Desayunos y Comidas", id: "rest" },
-                { emoji: "🫓", label: "Cemitas",             id: "rest" },
-                { emoji: "🥖", label: "Tortas",              id: "rest" },
-                { emoji: "🌮", label: "Taquerías",           id: "rest" },
-                { emoji: "🍕", label: "Pizzerías",           id: "rest" },
-                { emoji: "🍔", label: "Hamburguesas",        id: "rest" },
-                { emoji: "🍜", label: "Comida Asiática",     id: "asiatica" },
-                { emoji: "🍗", label: "Pollos Preparados",   id: "rest" },
-                { emoji: "🐟", label: "Pescados y Mariscos", id: "rest" },
-                { emoji: "🍲", label: "Pozolerías",          id: "rest" },
-                { emoji: "🫙", label: "Cochinita Pibil",     id: "rest" },
-                { emoji: "🥩", label: "Carnitas",            id: "rest" },
-                { emoji: "🫕", label: "Barbacoa",            id: "rest" },
-                { emoji: "🌶️", label: "Birria",              id: "rest" },
-                { emoji: "🍗", label: "Alitas y Boneless",   id: "rest" },
-                { emoji: "🌽", label: "Elotes y Antojitos",  id: "elotes" },
-                { emoji: "🥞", label: "Crepas",              id: "rest" },
-                { emoji: "🥙", label: "Cheesesteak",         id: "cheese" },
-                { emoji: "☕", label: "Cafeterías",          id: "rest" },
+                { emoji: "🍳", label: "Desayunos y Comidas", secId: "seccion-desayunos-y-comidas" },
+                { emoji: "🫓", label: "Cemitas",             secId: "seccion-cemitas" },
+                { emoji: "🥖", label: "Tortas",              secId: "seccion-tortas" },
+                { emoji: "🌮", label: "Taquerías",           secId: "seccion-taquerias" },
+                { emoji: "🍕", label: "Pizzerías",           secId: "seccion-pizzerias" },
+                { emoji: "🍔", label: "Hamburguesas",        secId: "seccion-hamburguesas" },
+                { emoji: "🍜", label: "Comida Asiática",     secId: "seccion-asiatica" },
+                { emoji: "🍗", label: "Pollos Preparados",   secId: "seccion-pollos-preparados" },
+                { emoji: "🐟", label: "Pescados y Mariscos", secId: "seccion-pescados-y-mariscos" },
+                { emoji: "🍲", label: "Pozolerías",          secId: "seccion-pozoleria" },
+                { emoji: "🫙", label: "Cochinita Pibil",     secId: "seccion-cochinita-pibil" },
+                { emoji: "🥩", label: "Carnitas",            secId: "seccion-carnitas" },
+                { emoji: "🫕", label: "Barbacoa",            secId: "seccion-barbacoa" },
+                { emoji: "🌶️", label: "Birria",              secId: "seccion-birria" },
+                { emoji: "🍗", label: "Alitas y Boneless",   secId: "seccion-alitas-y-boneless" },
+                { emoji: "🌽", label: "Elotes y Antojitos",  secId: "seccion-elotes" },
+                { emoji: "🥞", label: "Crepas",              secId: "seccion-crepas" },
+                { emoji: "🥙", label: "Cheesesteak",         secId: "seccion-cheese" },
+                { emoji: "☕", label: "Cafeterías",          secId: "seccion-cafeterias" },
               ].map(function (btn, i) {
                 return (
                   <button
                     key={btn.label + i}
                     onClick={function () {
-                      const target = btn.id === "rest" ? "seccion-restaurantes" : "seccion-" + btn.id;
-                      const el = document.getElementById(target);
-                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      const el = document.getElementById(btn.secId);
+                      if (el) {
+                        const y = el.getBoundingClientRect().top + window.scrollY - 120;
+                        window.scrollTo({ top: y, behavior: "smooth" });
+                      }
                     }}
                     style={estiloBotonCat}
                   >
