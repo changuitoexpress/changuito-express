@@ -2425,49 +2425,38 @@ export default function Dashboard(props: DashboardProps) {
         msOverflowStyle: "none" as any,
         WebkitOverflowScrolling: "touch" as any,
       };
-      const botonChanguiBot = (
-        <div style={{ padding: "8px 16px" }}>
-          <button
-            onClick={function () { setChanguiAbierto(true); }}
-            style={{ width: "100%", padding: "14px 16px", borderRadius: "16px", background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)", border: "2px solid rgba(250,204,21,0.35)", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}
-          >
-            <span style={{ fontSize: "24px" }}>🐒</span>
-            <div style={{ textAlign: "left", flex: 1 }}>
-              <p style={{ fontSize: "13px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 1px 0" }}>ChanguiBot IA</p>
-              <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué quieres comer hoy?</p>
-            </div>
-            <ChevronRight style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
-          </button>
-        </div>
-      );
+      const estiloBotonChanguiBot: React.CSSProperties = {
+        ...estiloBotonCat,
+        background: isDark ? "rgba(250,204,21,0.15)" : "rgba(250,204,21,0.22)",
+        border: "1.5px solid rgba(250,204,21,0.55)",
+        color: isDark ? "#facc15" : "#92400e",
+      };
       return (
         <div style={{ paddingBottom: "40px" }}>
           <Banner />
+          <Monedero session={props.session} theme={props.theme} />
 
           {/* ── GRUPO 1: BOTONES MANDADITOS ── */}
-          <div style={{ padding: "16px", marginBottom: "0" }}>
+          <div style={{ padding: "16px 16px 0 16px" }}>
             <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
               Mandaditos
             </h3>
             <div style={estiloScrollRow}>
               {[
-                { emoji: "🛒", label: "ChanguiSuper", id: "super" },
-                { emoji: "🍎", label: "Frutas",        id: "frutas" },
-                { emoji: "🥩", label: "Carnes",        id: "carnes" },
-                { emoji: "🍗", label: "Pollo",         id: "pollo" },
-                { emoji: "🐟", label: "Pescado",       id: "pescado" },
-                { emoji: "🥛", label: "Lácteos",       id: "lacteos" },
-                { emoji: "📚", label: "Papelería",     id: "papeleria" },
-                { emoji: "🧺", label: "Lavandería",    id: "lavanderia" },
-                { emoji: "🐕", label: "Mascotas",      id: "mascotas" },
+                { emoji: "🛒", label: "ChanguiSuper" },
+                { emoji: "🍎", label: "Frutas" },
+                { emoji: "🥩", label: "Carnes" },
+                { emoji: "🍗", label: "Pollo" },
+                { emoji: "🐟", label: "Pescado" },
+                { emoji: "🥛", label: "Lácteos" },
+                { emoji: "📚", label: "Papelería" },
+                { emoji: "🧺", label: "Lavandería" },
+                { emoji: "🐕", label: "Mascotas" },
               ].map(function (btn) {
                 return (
                   <button
-                    key={btn.id}
-                    onClick={function () {
-                      const el = document.getElementById("seccion-mandaditos");
-                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }}
+                    key={btn.label}
+                    onClick={function () { setTabActiva("mandaditos"); setSearch(""); }}
                     style={estiloBotonCat}
                   >
                     <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
@@ -2475,35 +2464,18 @@ export default function Dashboard(props: DashboardProps) {
                   </button>
                 );
               })}
+              <button
+                onClick={function () { setChanguiAbierto(true); }}
+                style={estiloBotonChanguiBot}
+              >
+                <span style={{ fontSize: "20px" }}>🐒</span>
+                ChanguiBot
+              </button>
             </div>
           </div>
-
-          {/* ── SECCIÓN MANDADITOS ── */}
-          <div id="seccion-mandaditos" style={{ padding: "0 16px 8px 16px", marginTop: "12px" }}>
-            {merchants.filter(function (m) { return m.category?.toLowerCase() === "mandaditos"; }).length > 0 && (
-              <h3 style={{ fontSize: "14px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 10px 0" }}>
-                Negocios disponibles
-              </h3>
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {merchants
-                .filter(function (m) { return m.category?.toLowerCase() === "mandaditos"; })
-                .map(function (m) {
-                  return (
-                    <TarjetaNegocio
-                      key={m.id}
-                      merchant={m}
-                      onClick={function () { setModalMandadito(m); }}
-                    />
-                  );
-                })}
-            </div>
-          </div>
-
-          {botonChanguiBot}
 
           {/* ── GRUPO 2: BOTONES RESTAURANTES ── */}
-          <div style={{ padding: "16px 16px 0 16px", marginTop: "12px" }}>
+          <div style={{ padding: "16px 16px 0 16px", marginTop: "8px" }}>
             <h3 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px 0" }}>
               Restaurantes
             </h3>
@@ -2518,7 +2490,7 @@ export default function Dashboard(props: DashboardProps) {
                 { emoji: "🍜", label: "Comida Asiática",     id: "asiatica" },
                 { emoji: "🍗", label: "Pollos Preparados",   id: "rest" },
                 { emoji: "🐟", label: "Pescados y Mariscos", id: "rest" },
-                { emoji: "🍲", label: "Pozolería",           id: "rest" },
+                { emoji: "🍲", label: "Pozolerías",          id: "rest" },
                 { emoji: "🫙", label: "Cochinita Pibil",     id: "rest" },
                 { emoji: "🥩", label: "Carnitas",            id: "rest" },
                 { emoji: "🫕", label: "Barbacoa",            id: "rest" },
@@ -2544,13 +2516,18 @@ export default function Dashboard(props: DashboardProps) {
                   </button>
                 );
               })}
+              <button
+                onClick={function () { setChanguiAbierto(true); }}
+                style={estiloBotonChanguiBot}
+              >
+                <span style={{ fontSize: "20px" }}>🐒</span>
+                ChanguiBot
+              </button>
             </div>
           </div>
 
-          {botonChanguiBot}
-
           {/* ── SECCIONES RESTAURANTES ── */}
-          <div id="seccion-restaurantes" style={{ marginTop: "8px" }}>
+          <div id="seccion-restaurantes" style={{ marginTop: "16px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
               if (!loading && lista.length === 0) return null;
@@ -3577,7 +3554,6 @@ export default function Dashboard(props: DashboardProps) {
       )}
 
       <div style={{ paddingTop: "8px", paddingBottom: "90px" }}>
-        <Monedero session={props.session} theme={props.theme} />
         {renderContenido()}
       </div>
 
