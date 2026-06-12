@@ -123,7 +123,12 @@ const SECCIONES_REST = [
   { titulo: "Taquerías", cats: ["taqueria"], emoji: "🌮" },
   { titulo: "Pizzerías", cats: ["pizzeria"], emoji: "🍕" },
   { titulo: "Hamburguesas", cats: ["hamburguesas"], emoji: "🍔" },
-  { titulo: "Comida Asiática", cats: ["comida asiatica"], emoji: "🍜", customId: "seccion-asiatica" },
+  {
+    titulo: "Comida Asiática",
+    cats: ["comida asiatica"],
+    emoji: "🍜",
+    customId: "seccion-asiatica",
+  },
   { titulo: "Pollos Preparados", cats: ["pollos preparados"], emoji: "🍗" },
   { titulo: "Pescados y Mariscos", cats: ["pescados y mariscos"], emoji: "🦐" },
   { titulo: "Pozolería", cats: ["pozoleria"], emoji: "🍲" },
@@ -132,9 +137,20 @@ const SECCIONES_REST = [
   { titulo: "Barbacoa", cats: ["barbacoa"], emoji: "🫕" },
   { titulo: "Birria", cats: ["birria"], emoji: "🌶️" },
   { titulo: "Alitas y Boneless", cats: ["alitas y boneless"], emoji: "🍗" },
-  { titulo: "Elotes y Antojitos", cats: ["elotes y antojitos"], emoji: "🌽", customId: "seccion-elotes" },
+  {
+    titulo: "Elotes y Antojitos",
+    cats: ["elotes y antojitos"],
+    emoji: "🌽",
+    customId: "seccion-elotes",
+  },
   { titulo: "Cafeterías", cats: ["cafeteria"], emoji: "☕" },
-  { titulo: "Cheesesteak", cats: ["cheesesteak"], names: ["philly steak"], emoji: "🥩", customId: "seccion-cheese" },
+  {
+    titulo: "Cheesesteak",
+    cats: ["cheesesteak"],
+    names: ["philly steak"],
+    emoji: "🥩",
+    customId: "seccion-cheese",
+  },
 ];
 
 const SECCIONES_MAND = [
@@ -207,8 +223,8 @@ const SECCIONES_MAND = [
 function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
   const ahora = new Date();
   const horaActual = ahora.getHours() * 60 + ahora.getMinutes();
-  const partsAp = horarioApertura.split(':').map(Number);
-  const partsCi = horarioCierre.split(':').map(Number);
+  const partsAp = horarioApertura.split(":").map(Number);
+  const partsCi = horarioCierre.split(":").map(Number);
   const apertura = partsAp[0] * 60 + partsAp[1];
   const cierre = partsCi[0] * 60 + partsCi[1];
   return horaActual >= apertura && horaActual < cierre;
@@ -216,22 +232,87 @@ function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
 
 // ─── Botones acceso rápido ─────────────────────────────────────────────────────
 const botonesMandaditos = [
-  { id: 'super',      emoji: '🛒', label: 'ChanguiSuper',     sectionId: 'seccion-supermercados' },
-  { id: 'frutas',     emoji: '🍎', label: 'Frutas y Verduras', sectionId: 'seccion-frutas-y-verduras' },
-  { id: 'carnes',     emoji: '🥩', label: 'Carnicerías',       sectionId: 'seccion-carniceriass' },
-  { id: 'pollo',      emoji: '🍗', label: 'Pollerías',         sectionId: 'seccion-pollerias' },
-  { id: 'pescado',    emoji: '🐟', label: 'Pescaderías',       sectionId: 'seccion-pescaderia' },
-  { id: 'lacteos',    emoji: '🥛', label: 'Lácteos',           sectionId: 'seccion-lacteos' },
-  { id: 'papeleria',  emoji: '📚', label: 'Papelería',         sectionId: 'seccion-papelerias' },
-  { id: 'lavanderia', emoji: '🧺', label: 'Lavanderías',       sectionId: 'seccion-lavanderia' },
-  { id: 'mascotas',   emoji: '🐕', label: 'Mascotas',          sectionId: 'seccion-mascotas' },
+  {
+    id: "super",
+    emoji: "🛒",
+    label: "Supermercados",
+    sectionId: "seccion-supermercados",
+  },
+  {
+    id: "frutas",
+    emoji: "🍎",
+    label: "Frutas y Verduras",
+    sectionId: "seccion-frutas-y-verduras",
+  },
+  {
+    id: "carnes",
+    emoji: "🥩",
+    label: "Carnicerías",
+    sectionId: "seccion-carniceriass",
+  },
+  {
+    id: "pollo",
+    emoji: "🍗",
+    label: "Pollerías",
+    sectionId: "seccion-pollerias",
+  },
+  {
+    id: "pescado",
+    emoji: "🐟",
+    label: "Pescaderías",
+    sectionId: "seccion-pescaderia",
+  },
+  {
+    id: "lacteos",
+    emoji: "🥛",
+    label: "Lácteos",
+    sectionId: "seccion-lacteos",
+  },
+  {
+    id: "papeleria",
+    emoji: "📚",
+    label: "Papelería",
+    sectionId: "seccion-papelerias",
+  },
+  {
+    id: "lavanderia",
+    emoji: "🧺",
+    label: "Lavanderías",
+    sectionId: "seccion-lavanderia",
+  },
+  {
+    id: "mascotas",
+    emoji: "🐕",
+    label: "Mascotas",
+    sectionId: "seccion-mascotas",
+  },
 ];
 
 const botonesRestaurantes = [
-  { id: 'comida',      emoji: '🍕', label: 'Comida',            sectionId: 'seccion-restaurantes' },
-  { id: 'asiatica',    emoji: '🍜', label: 'Asiática',          sectionId: 'seccion-comida-asiatica' },
-  { id: 'elotes',      emoji: '🌽', label: 'Elotes y Antojitos', sectionId: 'seccion-elotes-y-antojitos' },
-  { id: 'cheesesteak', emoji: '🥙', label: 'Cheesesteak',       sectionId: 'seccion-cheesesteak' },
+  {
+    id: "comida",
+    emoji: "🍕",
+    label: "Comida",
+    sectionId: "seccion-restaurantes",
+  },
+  {
+    id: "asiatica",
+    emoji: "🍜",
+    label: "Asiática",
+    sectionId: "seccion-comida-asiatica",
+  },
+  {
+    id: "elotes",
+    emoji: "🌽",
+    label: "Elotes y Antojitos",
+    sectionId: "seccion-elotes-y-antojitos",
+  },
+  {
+    id: "cheesesteak",
+    emoji: "🥙",
+    label: "Cheesesteak",
+    sectionId: "seccion-cheesesteak",
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -320,9 +401,10 @@ function Skeleton() {
 // ─── Tarjeta Negocio ──────────────────────────────────────────────────────────
 function TarjetaNegocio(props: { merchant: Merchant; onClick: () => void }) {
   const m = props.merchant;
-  const isClosed = m.horario_apertura && m.horario_cierre
-    ? !esAbierto(m.horario_apertura, m.horario_cierre)
-    : !m.is_open;
+  const isClosed =
+    m.horario_apertura && m.horario_cierre
+      ? !esAbierto(m.horario_apertura, m.horario_cierre)
+      : !m.is_open;
   return (
     <div
       onClick={props.onClick}
@@ -422,11 +504,15 @@ function TarjetaNegocio(props: { merchant: Merchant; onClick: () => void }) {
 
 // ─── Sección Horizontal ───────────────────────────────────────────────────────
 function tituloAId(titulo: string): string {
-  return "seccion-" + titulo
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+  return (
+    "seccion-" +
+    titulo
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+  );
 }
 
 function SeccionH(props: {
@@ -439,7 +525,10 @@ function SeccionH(props: {
 }) {
   if (!props.loading && props.merchants.length === 0) return null;
   return (
-    <div id={props.customId ?? tituloAId(props.titulo)} style={{ marginBottom: "24px" }}>
+    <div
+      id={props.customId ?? tituloAId(props.titulo)}
+      style={{ marginBottom: "24px" }}
+    >
       <div
         style={{
           display: "flex",
@@ -734,9 +823,9 @@ function ModalCheckout(props: {
   onRemoveItem: (id: string) => void;
   onUpdateCantidad: (id: string, delta: number) => void;
 }) {
-  const [paso, setPaso] = useState<"carrito" | "direccion" | "pago" | "resumen">(
-    "carrito",
-  );
+  const [paso, setPaso] = useState<
+    "carrito" | "direccion" | "pago" | "resumen"
+  >("carrito");
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [dirSeleccionada, setDirSel] = useState<Direccion | null>(null);
   const [formaNueva, setFormaNueva] = useState(false);
@@ -875,22 +964,27 @@ function ModalCheckout(props: {
         const userId = props.session?.user?.id;
         if (userId) {
           const { data: mon } = await supabase
-            .from('monedero_cliente')
-            .select('id, pedidos_realizados')
-            .eq('user_id', userId)
+            .from("monedero_cliente")
+            .select("id, pedidos_realizados")
+            .eq("user_id", userId)
             .single();
           if (mon) {
             await supabase
-              .from('monedero_cliente')
-              .update({ pedidos_realizados: (mon.pedidos_realizados ?? 0) + 1, updated_at: new Date().toISOString() })
-              .eq('id', mon.id);
+              .from("monedero_cliente")
+              .update({
+                pedidos_realizados: (mon.pedidos_realizados ?? 0) + 1,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", mon.id);
           } else {
             await supabase
-              .from('monedero_cliente')
+              .from("monedero_cliente")
               .insert([{ user_id: userId, pedidos_realizados: 1 }]);
           }
         }
-      } catch (_) { /* silencioso */ }
+      } catch (_) {
+        /* silencioso */
+      }
 
       // Mensaje WhatsApp estructurado
       const linea = "━━━━━━━━━━━━━━━━━━━━━━";
@@ -1029,44 +1123,56 @@ function ModalCheckout(props: {
 
         {/* Pasos */}
         <div style={{ display: "flex", gap: "6px", marginBottom: "20px" }}>
-          {(["carrito", "direccion", "pago", "resumen"] as const).map(function (p, i) {
-            const activo = paso === p;
-            const pasoIdx = ["carrito", "direccion", "pago", "resumen"].indexOf(paso);
-            const done = i < pasoIdx;
-            const labels = ["🛒 Carrito", "📍 Dirección", "💳 Pago", "✅ Confirmar"];
-            return (
-              <div
-                key={p}
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  padding: "7px 2px",
-                  borderRadius: "12px",
-                  background: activo
-                    ? "var(--color-yellow-dim)"
-                    : done
-                      ? "rgba(34,197,94,0.1)"
-                      : "var(--bg-base)",
-                  border: `1px solid ${activo ? "var(--color-yellow)" : done ? "var(--color-green)" : border}`,
-                }}
-              >
-                <p
+          {(["carrito", "direccion", "pago", "resumen"] as const).map(
+            function (p, i) {
+              const activo = paso === p;
+              const pasoIdx = [
+                "carrito",
+                "direccion",
+                "pago",
+                "resumen",
+              ].indexOf(paso);
+              const done = i < pasoIdx;
+              const labels = [
+                "🛒 Carrito",
+                "📍 Dirección",
+                "💳 Pago",
+                "✅ Confirmar",
+              ];
+              return (
+                <div
+                  key={p}
                   style={{
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    color: activo
-                      ? "var(--color-yellow)"
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "7px 2px",
+                    borderRadius: "12px",
+                    background: activo
+                      ? "var(--color-yellow-dim)"
                       : done
-                        ? "var(--color-green)"
-                        : textMuted,
-                    margin: 0,
+                        ? "rgba(34,197,94,0.1)"
+                        : "var(--bg-base)",
+                    border: `1px solid ${activo ? "var(--color-yellow)" : done ? "var(--color-green)" : border}`,
                   }}
                 >
-                  {labels[i]}
-                </p>
-              </div>
-            );
-          })}
+                  <p
+                    style={{
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      color: activo
+                        ? "var(--color-yellow)"
+                        : done
+                          ? "var(--color-green)"
+                          : textMuted,
+                      margin: 0,
+                    }}
+                  >
+                    {labels[i]}
+                  </p>
+                </div>
+              );
+            },
+          )}
         </div>
 
         {/* ── PASO 0: CARRITO ── */}
@@ -1084,7 +1190,14 @@ function ModalCheckout(props: {
             </h3>
 
             {props.carrito.length === 0 ? (
-              <p style={{ fontSize: "13px", color: textMuted, textAlign: "center", padding: "30px 0" }}>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: textMuted,
+                  textAlign: "center",
+                  padding: "30px 0",
+                }}
+              >
                 Tu carrito está vacío
               </p>
             ) : (
@@ -1102,51 +1215,122 @@ function ModalCheckout(props: {
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: "13px", fontWeight: 700, color: textPrim, margin: "0 0 2px 0" }}>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: textPrim,
+                            margin: "0 0 2px 0",
+                          }}
+                        >
                           {item.emoji ?? "🍽️"} {item.nombre}
                         </p>
-                        <p style={{ fontSize: "11px", color: textMuted, margin: 0 }}>
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: textMuted,
+                            margin: 0,
+                          }}
+                        >
                           {item.negocio}
                         </p>
                       </div>
                       {item.tipo === "producto" && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
                           <button
-                            onClick={function () { props.onUpdateCantidad(item.id, -1); }}
-                            style={{
-                              width: "26px", height: "26px", borderRadius: "8px",
-                              border: `1px solid ${border}`, background: bgBase,
-                              color: textPrim, fontSize: "16px", cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
+                            onClick={function () {
+                              props.onUpdateCantidad(item.id, -1);
                             }}
-                          >−</button>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: textPrim, minWidth: "16px", textAlign: "center" }}>
+                            style={{
+                              width: "26px",
+                              height: "26px",
+                              borderRadius: "8px",
+                              border: `1px solid ${border}`,
+                              background: bgBase,
+                              color: textPrim,
+                              fontSize: "16px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            −
+                          </button>
+                          <span
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: textPrim,
+                              minWidth: "16px",
+                              textAlign: "center",
+                            }}
+                          >
                             {item.cantidad}
                           </span>
                           <button
-                            onClick={function () { props.onUpdateCantidad(item.id, 1); }}
-                            style={{
-                              width: "26px", height: "26px", borderRadius: "8px",
-                              border: `1px solid ${border}`, background: bgBase,
-                              color: textPrim, fontSize: "16px", cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
+                            onClick={function () {
+                              props.onUpdateCantidad(item.id, 1);
                             }}
-                          >+</button>
+                            style={{
+                              width: "26px",
+                              height: "26px",
+                              borderRadius: "8px",
+                              border: `1px solid ${border}`,
+                              background: bgBase,
+                              color: textPrim,
+                              fontSize: "16px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            +
+                          </button>
                         </div>
                       )}
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-yellow)", minWidth: "50px", textAlign: "right" }}>
-                        ${item.tipo === "producto" ? (item.precio * item.cantidad).toFixed(2) : "—"}
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 800,
+                          color: "var(--color-yellow)",
+                          minWidth: "50px",
+                          textAlign: "right",
+                        }}
+                      >
+                        $
+                        {item.tipo === "producto"
+                          ? (item.precio * item.cantidad).toFixed(2)
+                          : "—"}
                       </span>
                       <button
-                        onClick={function () { props.onRemoveItem(item.id); }}
+                        onClick={function () {
+                          props.onRemoveItem(item.id);
+                        }}
                         style={{
-                          width: "26px", height: "26px", borderRadius: "8px",
-                          border: "none", background: "rgba(239,68,68,0.1)",
-                          color: "#ef4444", fontSize: "14px", cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: "26px",
+                          height: "26px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "rgba(239,68,68,0.1)",
+                          color: "#ef4444",
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           flexShrink: 0,
                         }}
-                      >×</button>
+                      >
+                        ×
+                      </button>
                     </div>
                   );
                 })}
@@ -1163,19 +1347,34 @@ function ModalCheckout(props: {
                   borderTop: `1px solid ${border}`,
                 }}
               >
-                <span style={{ fontSize: "14px", fontWeight: 700, color: textPrim }}>Subtotal</span>
-                <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-yellow)" }}>
+                <span
+                  style={{ fontSize: "14px", fontWeight: 700, color: textPrim }}
+                >
+                  Subtotal
+                </span>
+                <span
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 900,
+                    color: "var(--color-yellow)",
+                  }}
+                >
                   ${subtotal.toFixed(2)}
                 </span>
               </div>
             )}
 
             <button
-              onClick={function () { setPaso("direccion"); }}
+              onClick={function () {
+                setPaso("direccion");
+              }}
               disabled={props.carrito.length === 0}
               style={{
                 width: "100%",
-                background: props.carrito.length === 0 ? "rgba(245,158,11,0.3)" : "var(--color-yellow)",
+                background:
+                  props.carrito.length === 0
+                    ? "rgba(245,158,11,0.3)"
+                    : "var(--color-yellow)",
                 color: "#020617",
                 fontWeight: 900,
                 fontSize: "14px",
@@ -1659,7 +1858,9 @@ function ModalCheckout(props: {
 
             <div style={{ display: "flex", gap: "10px" }}>
               <button
-                onClick={function () { setPaso("carrito"); }}
+                onClick={function () {
+                  setPaso("carrito");
+                }}
                 style={{
                   flex: 1,
                   padding: "14px",
@@ -2178,22 +2379,34 @@ export default function Dashboard(props: DashboardProps) {
     [fetchMerchants],
   );
 
-  useEffect(function () {
-    const term = search.trim();
-    if (!term) { setProductosBusqueda([]); return; }
-    const timer = setTimeout(async function () {
-      try {
-        const { data } = await supabase
-          .from('products')
-          .select('id, name, price, merchant_id, merchants:merchant_id(id, name, phone_number)')
-          .ilike('name', '%' + term + '%')
-          .eq('is_available', true)
-          .limit(30);
-        setProductosBusqueda(data ?? []);
-      } catch (_) { setProductosBusqueda([]); }
-    }, 350);
-    return function () { clearTimeout(timer); };
-  }, [search]);
+  useEffect(
+    function () {
+      const term = search.trim();
+      if (!term) {
+        setProductosBusqueda([]);
+        return;
+      }
+      const timer = setTimeout(async function () {
+        try {
+          const { data } = await supabase
+            .from("products")
+            .select(
+              "id, name, price, merchant_id, merchants:merchant_id(id, name, phone_number)",
+            )
+            .ilike("name", "%" + term + "%")
+            .eq("is_available", true)
+            .limit(30);
+          setProductosBusqueda(data ?? []);
+        } catch (_) {
+          setProductosBusqueda([]);
+        }
+      }, 350);
+      return function () {
+        clearTimeout(timer);
+      };
+    },
+    [search],
+  );
 
   if (selectedMerchant !== null) {
     return (
@@ -2218,7 +2431,7 @@ export default function Dashboard(props: DashboardProps) {
       });
       if (byCategory) return true;
       if (!names || names.length === 0) return false;
-      const n = m.name?.toLowerCase().trim() ?? '';
+      const n = m.name?.toLowerCase().trim() ?? "";
       return names.some(function (nm) {
         return n.includes(nm.toLowerCase());
       });
@@ -2265,20 +2478,22 @@ export default function Dashboard(props: DashboardProps) {
       return i.id === producto.id;
     });
     if (existente) {
-      props.onUpdateCarritoGlobal(props.carritoGlobal.map(function (i) {
-        if (i.id !== producto.id) return i;
-        return { ...i, cantidad: i.cantidad + 1 };
-      }));
+      props.onUpdateCarritoGlobal(
+        props.carritoGlobal.map(function (i) {
+          if (i.id !== producto.id) return i;
+          return { ...i, cantidad: i.cantidad + 1 };
+        }),
+      );
     } else {
       const item: CartItem = {
         id: producto.id,
         nombre: producto.name,
         precio: producto.price ?? 0,
         cantidad: 1,
-        negocio: mer?.name ?? '',
-        negocio_id: mer?.id ?? producto.merchant_id ?? '',
+        negocio: mer?.name ?? "",
+        negocio_id: mer?.id ?? producto.merchant_id ?? "",
         phone_number: mer?.phone_number ?? PHONE_OPERATIVO,
-        tipo: 'producto',
+        tipo: "producto",
       };
       props.onUpdateCarritoGlobal([...props.carritoGlobal, item]);
     }
@@ -2286,12 +2501,12 @@ export default function Dashboard(props: DashboardProps) {
 
   function irASeccion(tab: MainTab, seccion?: string) {
     setTabActiva(tab);
-    setSearch('');
+    setSearch("");
     if (seccion) {
       setSeccionAbierta(seccion);
       setTimeout(function () {
         const el = document.getElementById(tituloAId(seccion));
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 250);
     }
   }
@@ -2325,38 +2540,110 @@ export default function Dashboard(props: DashboardProps) {
       const totalRes = resNegocios.length + productosBusqueda.length;
       return (
         <div style={{ padding: "0 16px 40px" }}>
-          <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: "0 0 14px 0" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--text-muted)",
+              margin: "0 0 14px 0",
+            }}
+          >
             {totalRes} resultados para "{search}"
           </p>
 
           {/* Productos encontrados */}
           {productosBusqueda.length > 0 && (
             <div style={{ marginBottom: "20px" }}>
-              <p style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px 0" }}>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  margin: "0 0 10px 0",
+                }}
+              >
                 🛍️ Productos
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              >
                 {productosBusqueda.map(function (p) {
-                  const yaEnCarrito = props.carritoGlobal.find(function (i) { return i.id === p.id; });
+                  const yaEnCarrito = props.carritoGlobal.find(function (i) {
+                    return i.id === p.id;
+                  });
                   const mer = p.merchants as any;
                   return (
-                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "14px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)" }}>
+                    <div
+                      key={p.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "12px 14px",
+                        borderRadius: "14px",
+                        background: "var(--bg-card)",
+                        border: "1px solid var(--border-subtle)",
+                        boxShadow: "var(--shadow-card)",
+                      }}
+                    >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-primary)", margin: "0 0 2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 800,
+                            color: "var(--text-primary)",
+                            margin: "0 0 2px 0",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {p.name}
                         </p>
-                        <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-muted)",
+                            margin: 0,
+                          }}
+                        >
                           {mer?.name ?? ""}
                         </p>
                       </div>
-                      <p style={{ fontSize: "15px", fontWeight: 900, color: "var(--color-yellow)", margin: "0 8px 0 0", flexShrink: 0 }}>
+                      <p
+                        style={{
+                          fontSize: "15px",
+                          fontWeight: 900,
+                          color: "var(--color-yellow)",
+                          margin: "0 8px 0 0",
+                          flexShrink: 0,
+                        }}
+                      >
                         ${(p.price ?? 0).toFixed(0)}
                       </p>
                       <button
-                        onClick={function () { agregarProductoBusqueda(p); }}
-                        style={{ padding: "7px 14px", borderRadius: "10px", border: "none", background: yaEnCarrito ? "var(--color-green)" : "var(--color-yellow)", color: "#020617", fontSize: "12px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+                        onClick={function () {
+                          agregarProductoBusqueda(p);
+                        }}
+                        style={{
+                          padding: "7px 14px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: yaEnCarrito
+                            ? "var(--color-green)"
+                            : "var(--color-yellow)",
+                          color: "#020617",
+                          fontSize: "12px",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
                       >
-                        {yaEnCarrito ? "✓ " + yaEnCarrito.cantidad : "+ Agregar"}
+                        {yaEnCarrito
+                          ? "✓ " + yaEnCarrito.cantidad
+                          : "+ Agregar"}
                       </button>
                     </div>
                   );
@@ -2368,10 +2655,25 @@ export default function Dashboard(props: DashboardProps) {
           {/* Negocios encontrados */}
           {resNegocios.length > 0 && (
             <div>
-              <p style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px 0" }}>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  margin: "0 0 10px 0",
+                }}
+              >
                 🏪 Negocios
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
                 {resNegocios.map(function (m) {
                   return (
                     <TarjetaNegocio
@@ -2392,7 +2694,9 @@ export default function Dashboard(props: DashboardProps) {
           {totalRes === 0 && (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <p style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</p>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>Sin resultados para "{search}"</p>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                Sin resultados para "{search}"
+              </p>
             </div>
           )}
         </div>
@@ -2403,7 +2707,9 @@ export default function Dashboard(props: DashboardProps) {
       minWidth: "90px",
       padding: "12px 8px",
       background: isDark ? "#1E1E1E" : "var(--bg-card)",
-      border: isDark ? "1px solid rgba(212,175,55,0.35)" : "1px solid var(--border-subtle)",
+      border: isDark
+        ? "1px solid rgba(212,175,55,0.35)"
+        : "1px solid var(--border-subtle)",
       borderRadius: "14px",
       display: "flex",
       flexDirection: "column",
@@ -2427,7 +2733,9 @@ export default function Dashboard(props: DashboardProps) {
     const estiloBotonChanguiBot: React.CSSProperties = {
       ...estiloBotonCat,
       background: isDark ? "rgba(212,175,55,0.18)" : "rgba(250,204,21,0.22)",
-      border: isDark ? "1.5px solid rgba(212,175,55,0.65)" : "1.5px solid rgba(250,204,21,0.55)",
+      border: isDark
+        ? "1.5px solid rgba(212,175,55,0.65)"
+        : "1.5px solid rgba(250,204,21,0.55)",
       color: isDark ? "#E5C158" : "#92400e",
     };
     function irAMandadito(sec: string | null) {
@@ -2435,11 +2743,18 @@ export default function Dashboard(props: DashboardProps) {
         setTabActiva("mandaditos");
         setSearch("");
       }
-      if (sec) { setSeccionAbierta(sec); }
+      if (sec) {
+        setSeccionAbierta(sec);
+      }
       setTimeout(function () {
         const id = sec ? tituloAId(sec) : "seccion-mandaditos-top";
         const el = document.getElementById(id);
-        if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+        if (el) {
+          window.scrollTo({
+            top: el.getBoundingClientRect().top + window.scrollY - 120,
+            behavior: "smooth",
+          });
+        }
       }, 160);
     }
     function irARestaurante(secId: string) {
@@ -2448,15 +2763,26 @@ export default function Dashboard(props: DashboardProps) {
         setSearch("");
         setTimeout(function () {
           const el = document.getElementById(secId);
-          if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+          if (el) {
+            window.scrollTo({
+              top: el.getBoundingClientRect().top + window.scrollY - 120,
+              behavior: "smooth",
+            });
+          }
         }, 160);
       } else {
         const el = document.getElementById(secId);
-        if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" }); }
+        if (el) {
+          window.scrollTo({
+            top: el.getBoundingClientRect().top + window.scrollY - 120,
+            behavior: "smooth",
+          });
+        }
       }
     }
     const tituloBloqueStyle: React.CSSProperties = {
-      fontSize: "14px", fontWeight: 700,
+      fontSize: "14px",
+      fontWeight: 700,
       color: isDark ? "#D4AF37" : "var(--text-primary)",
       margin: "0 0 12px 0",
     };
@@ -2466,24 +2792,39 @@ export default function Dashboard(props: DashboardProps) {
           <h3 style={tituloBloqueStyle}>Mandaditos</h3>
           <div style={estiloScrollRow}>
             {[
-              { emoji: "🛒", label: "ChanguiSuper", sec: "Supermercados" },
-              { emoji: "🍎", label: "Frutas",        sec: "Frutas y Verduras" },
-              { emoji: "🥩", label: "Carnes",        sec: "Carnicerías" },
-              { emoji: "🍗", label: "Pollo",         sec: "Pollerías" },
-              { emoji: "🐟", label: "Pescado",       sec: "Pescadería" },
-              { emoji: "🥛", label: "Lácteos",       sec: "Lácteos" },
-              { emoji: "📚", label: "Papelería",     sec: "Papelerías" },
-              { emoji: "🧺", label: "Lavandería",    sec: "Lavandería" },
-              { emoji: "🐕", label: "Mascotas",      sec: null },
+              { emoji: "🛒", label: "Supermercados", sec: "Supermercados" },
+              {
+                emoji: "🍎",
+                label: "Frutas y Verduras",
+                sec: "Frutas y Verduras",
+              },
+              { emoji: "🥩", label: "Carnicerías", sec: "Carnicerías" },
+              { emoji: "🍗", label: "Pollerías", sec: "Pollerías" },
+              { emoji: "🐟", label: "Pescaderías", sec: "Pescadería" },
+              { emoji: "🥛", label: "Lácteos", sec: "Lácteos" },
+              { emoji: "📚", label: "Papelerías", sec: "Papelerías" },
+              { emoji: "🧺", label: "Lavanderías", sec: "Lavandería" },
+              { emoji: "🐕", label: "Mascotas", sec: null },
             ].map(function (btn) {
               return (
-                <button key={btn.label} onClick={function () { irAMandadito(btn.sec); }} style={estiloBotonCat}>
+                <button
+                  key={btn.label}
+                  onClick={function () {
+                    irAMandadito(btn.sec);
+                  }}
+                  style={estiloBotonCat}
+                >
                   <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
                   {btn.label}
                 </button>
               );
             })}
-            <button onClick={function () { setChanguiAbierto(true); }} style={estiloBotonChanguiBot}>
+            <button
+              onClick={function () {
+                setChanguiAbierto(true);
+              }}
+              style={estiloBotonChanguiBot}
+            >
               <span style={{ fontSize: "20px" }}>🐒</span>
               ChanguiBot
             </button>
@@ -2493,34 +2834,77 @@ export default function Dashboard(props: DashboardProps) {
           <h3 style={tituloBloqueStyle}>Restaurantes</h3>
           <div style={estiloScrollRow}>
             {[
-              { emoji: "🍳", label: "Desayunos y Comidas", secId: "seccion-desayunos-y-comidas" },
-              { emoji: "🫓", label: "Cemitas",             secId: "seccion-cemitas" },
-              { emoji: "🥖", label: "Tortas",              secId: "seccion-tortas" },
-              { emoji: "🌮", label: "Taquerías",           secId: "seccion-taquerias" },
-              { emoji: "🍕", label: "Pizzerías",           secId: "seccion-pizzerias" },
-              { emoji: "🍔", label: "Hamburguesas",        secId: "seccion-hamburguesas" },
-              { emoji: "🍜", label: "Comida Asiática",     secId: "seccion-asiatica" },
-              { emoji: "🍗", label: "Pollos Preparados",   secId: "seccion-pollos-preparados" },
-              { emoji: "🐟", label: "Pescados y Mariscos", secId: "seccion-pescados-y-mariscos" },
-              { emoji: "🍲", label: "Pozolerías",          secId: "seccion-pozoleria" },
-              { emoji: "🫙", label: "Cochinita Pibil",     secId: "seccion-cochinita-pibil" },
-              { emoji: "🥩", label: "Carnitas",            secId: "seccion-carnitas" },
-              { emoji: "🫕", label: "Barbacoa",            secId: "seccion-barbacoa" },
-              { emoji: "🌶️", label: "Birria",              secId: "seccion-birria" },
-              { emoji: "🍗", label: "Alitas y Boneless",   secId: "seccion-alitas-y-boneless" },
-              { emoji: "🌽", label: "Elotes y Antojitos",  secId: "seccion-elotes" },
-              { emoji: "🥞", label: "Crepas",              secId: "seccion-crepas" },
-              { emoji: "🥙", label: "Cheesesteak",         secId: "seccion-cheese" },
-              { emoji: "☕", label: "Cafeterías",          secId: "seccion-cafeterias" },
+              {
+                emoji: "🍳",
+                label: "Desayunos y Comidas",
+                secId: "seccion-desayunos-y-comidas",
+              },
+              { emoji: "🫓", label: "Cemitas", secId: "seccion-cemitas" },
+              { emoji: "🥖", label: "Tortas", secId: "seccion-tortas" },
+              { emoji: "🌮", label: "Taquerías", secId: "seccion-taquerias" },
+              { emoji: "🍕", label: "Pizzerías", secId: "seccion-pizzerias" },
+              {
+                emoji: "🍔",
+                label: "Hamburguesas",
+                secId: "seccion-hamburguesas",
+              },
+              {
+                emoji: "🍜",
+                label: "Comida Asiática",
+                secId: "seccion-asiatica",
+              },
+              {
+                emoji: "🍗",
+                label: "Pollos Preparados",
+                secId: "seccion-pollos-preparados",
+              },
+              {
+                emoji: "🐟",
+                label: "Pescados y Mariscos",
+                secId: "seccion-pescados-y-mariscos",
+              },
+              { emoji: "🍲", label: "Pozolerías", secId: "seccion-pozoleria" },
+              {
+                emoji: "🫙",
+                label: "Cochinita Pibil",
+                secId: "seccion-cochinita-pibil",
+              },
+              { emoji: "🥩", label: "Carnitas", secId: "seccion-carnitas" },
+              { emoji: "🫕", label: "Barbacoa", secId: "seccion-barbacoa" },
+              { emoji: "🌶️", label: "Birria", secId: "seccion-birria" },
+              {
+                emoji: "🍗",
+                label: "Alitas y Boneless",
+                secId: "seccion-alitas-y-boneless",
+              },
+              {
+                emoji: "🌽",
+                label: "Elotes y Antojitos",
+                secId: "seccion-elotes",
+              },
+              { emoji: "🥞", label: "Crepas", secId: "seccion-crepas" },
+              { emoji: "🥙", label: "Cheesesteak", secId: "seccion-cheese" },
+              { emoji: "☕", label: "Cafeterías", secId: "seccion-cafeterias" },
             ].map(function (btn, i) {
               return (
-                <button key={btn.label + i} onClick={function () { irARestaurante(btn.secId); }} style={estiloBotonCat}>
+                <button
+                  key={btn.label + i}
+                  onClick={function () {
+                    irARestaurante(btn.secId);
+                  }}
+                  style={estiloBotonCat}
+                >
                   <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
                   {btn.label}
                 </button>
               );
             })}
-            <button onClick={function () { setChanguiAbierto(true); }} style={estiloBotonChanguiBot}>
+            <button
+              onClick={function () {
+                setChanguiAbierto(true);
+              }}
+              style={estiloBotonChanguiBot}
+            >
               <span style={{ fontSize: "20px" }}>🐒</span>
               ChanguiBot
             </button>
@@ -2605,7 +2989,13 @@ export default function Dashboard(props: DashboardProps) {
             >
               🛵 Mandaditos
             </h2>
-            <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.85)", margin: 0 }}>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "rgba(255,255,255,0.85)",
+                margin: 0,
+              }}
+            >
               Pedidos a domicilio de tus tiendas favoritas
             </p>
           </div>
@@ -2616,14 +3006,26 @@ export default function Dashboard(props: DashboardProps) {
               margin: "0 16px 16px",
               padding: "12px 16px",
               borderRadius: "14px",
-              background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+              background: isDark
+                ? "rgba(255,255,255,0.04)"
+                : "rgba(0,0,0,0.03)",
               border: "1px solid var(--border-subtle)",
             }}
           >
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, margin: 0 }}>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
               ✍️{" "}
-              <strong style={{ color: "var(--text-primary)" }}>Cómo funciona:</strong>{" "}
-              Toca el negocio, escribe tu pedido y se guarda en el carrito. Puedes pedir de varios negocios a la vez.
+              <strong style={{ color: "var(--text-primary)" }}>
+                Cómo funciona:
+              </strong>{" "}
+              Toca el negocio, escribe tu pedido y se guarda en el carrito.
+              Puedes pedir de varios negocios a la vez.
             </p>
           </div>
 
@@ -2635,9 +3037,15 @@ export default function Dashboard(props: DashboardProps) {
             if (!loading && lista.length === 0) return null;
             const abierta = seccionAbierta === sec.titulo;
             return (
-              <div key={sec.titulo} id={tituloAId(sec.titulo)} style={{ marginBottom: "8px", padding: "0 16px" }}>
+              <div
+                key={sec.titulo}
+                id={tituloAId(sec.titulo)}
+                style={{ marginBottom: "8px", padding: "0 16px" }}
+              >
                 <button
-                  onClick={function () { setSeccionAbierta(abierta ? null : sec.titulo); }}
+                  onClick={function () {
+                    setSeccionAbierta(abierta ? null : sec.titulo);
+                  }}
                   style={{
                     width: "100%",
                     display: "flex",
@@ -2650,14 +3058,46 @@ export default function Dashboard(props: DashboardProps) {
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
                     <span style={{ fontSize: "20px" }}>{sec.emoji}</span>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>{sec.titulo}</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>({lista.length})</span>
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {sec.titulo}
+                    </span>
+                    <span
+                      style={{ fontSize: "11px", color: "var(--text-muted)" }}
+                    >
+                      ({lista.length})
+                    </span>
                   </div>
-                  {abierta
-                    ? <ChevronUp style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
-                    : <ChevronDown style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />}
+                  {abierta ? (
+                    <ChevronUp
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        color: "var(--text-muted)",
+                      }}
+                    />
+                  ) : (
+                    <ChevronDown
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        color: "var(--text-muted)",
+                      }}
+                    />
+                  )}
                 </button>
                 {abierta && (
                   <div
@@ -2675,7 +3115,9 @@ export default function Dashboard(props: DashboardProps) {
                         <TarjetaNegocio
                           key={m.id}
                           merchant={m}
-                          onClick={function () { setModalMandadito(m); }}
+                          onClick={function () {
+                            setModalMandadito(m);
+                          }}
                         />
                       );
                     })}
@@ -2688,12 +3130,16 @@ export default function Dashboard(props: DashboardProps) {
           {/* ChanguiBot */}
           <div style={{ padding: "16px 16px 8px" }}>
             <button
-              onClick={function () { setChanguiAbierto(true); }}
+              onClick={function () {
+                setChanguiAbierto(true);
+              }}
               style={{
                 width: "100%",
                 padding: "14px 16px",
                 borderRadius: "16px",
-                background: isDark ? "rgba(250,204,21,0.1)" : "rgba(250,204,21,0.12)",
+                background: isDark
+                  ? "rgba(250,204,21,0.1)"
+                  : "rgba(250,204,21,0.12)",
                 border: "2px solid rgba(250,204,21,0.35)",
                 cursor: "pointer",
                 display: "flex",
@@ -2703,10 +3149,33 @@ export default function Dashboard(props: DashboardProps) {
             >
               <span style={{ fontSize: "24px" }}>🐒</span>
               <div style={{ textAlign: "left", flex: 1 }}>
-                <p style={{ fontSize: "13px", fontWeight: 900, color: "var(--text-primary)", margin: "0 0 1px 0" }}>ChanguiBot IA</p>
-                <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>¿Qué necesitas hoy?</p>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 900,
+                    color: "var(--text-primary)",
+                    margin: "0 0 1px 0",
+                  }}
+                >
+                  ChanguiBot IA
+                </p>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                    margin: 0,
+                  }}
+                >
+                  ¿Qué necesitas hoy?
+                </p>
               </div>
-              <ChevronRight style={{ width: "16px", height: "16px", color: "var(--text-muted)" }} />
+              <ChevronRight
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  color: "var(--text-muted)",
+                }}
+              />
             </button>
           </div>
         </div>
@@ -3055,7 +3524,9 @@ export default function Dashboard(props: DashboardProps) {
           {/* ChanguiBot trigger — embedded in search bar right edge */}
           {props.onAddToCart && (
             <button
-              onClick={function () { setChanguiAbierto(true); }}
+              onClick={function () {
+                setChanguiAbierto(true);
+              }}
               title="ChanguiBot IA"
               style={{
                 position: "absolute",
@@ -3225,8 +3696,13 @@ export default function Dashboard(props: DashboardProps) {
                         setSearch("");
                         setMenuAbierto(false);
                         setTimeout(function () {
-                          const el = document.getElementById("seccion-mandaditos");
-                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          const el =
+                            document.getElementById("seccion-mandaditos");
+                          if (el)
+                            el.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            });
                         }, 350);
                       } else {
                         setTabActiva(it.key as MainTab);
@@ -3648,16 +4124,17 @@ export default function Dashboard(props: DashboardProps) {
           }}
           onRemoveItem={function (id) {
             props.onUpdateCarritoGlobal(
-              props.carritoGlobal.filter(function (i) { return i.id !== id; })
+              props.carritoGlobal.filter(function (i) {
+                return i.id !== id;
+              }),
             );
           }}
           onUpdateCantidad={function (id, delta) {
             props.onUpdateCarritoGlobal(
-              props.carritoGlobal
-                .map(function (i) {
-                  if (i.id !== id) return i;
-                  return { ...i, cantidad: Math.max(1, i.cantidad + delta) };
-                })
+              props.carritoGlobal.map(function (i) {
+                if (i.id !== id) return i;
+                return { ...i, cantidad: Math.max(1, i.cantidad + delta) };
+              }),
             );
           }}
         />
@@ -3779,11 +4256,15 @@ export default function Dashboard(props: DashboardProps) {
           onAddToCart={props.onAddToCart}
           onRemoveFromCart={function (id) {
             props.onUpdateCarritoGlobal(
-              props.carritoGlobal.filter(function (i) { return i.id !== id; })
+              props.carritoGlobal.filter(function (i) {
+                return i.id !== id;
+              }),
             );
           }}
           abierto={changuiAbierto}
-          onCerrar={function () { setChanguiAbierto(false); }}
+          onCerrar={function () {
+            setChanguiAbierto(false);
+          }}
         />
       )}
 
