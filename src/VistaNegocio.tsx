@@ -214,6 +214,21 @@ function SkeletonProducto() {
 export default function VistaNegocio(props: VistaNegocioProps) {
   const { merchant: m, theme } = props;
   const isDark = theme === "dark";
+  const isClosed = (function () {
+    if (m.horario_apertura && m.horario_cierre) {
+      const ahora = new Date();
+      const horaActual = ahora.getHours() * 60 + ahora.getMinutes();
+      const ap = m.horario_apertura.split(":").map(Number);
+      const ci = m.horario_cierre.split(":").map(Number);
+      const aMin = ap[0] * 60 + ap[1];
+      const cMin = ci[0] * 60 + ci[1];
+      const abierto = cMin > aMin
+        ? horaActual >= aMin && horaActual < cMin
+        : horaActual >= aMin || horaActual < cMin;
+      return !abierto;
+    }
+    return !m.is_open;
+  })();
   const clienteEmail = props.clienteEmail ?? "cliente@app.com";
   const phoneNegocio = m.phone_number?.replace(/\D/g, "") || "522223339999";
 
@@ -491,7 +506,6 @@ export default function VistaNegocio(props: VistaNegocioProps) {
           cliente_id: uid,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
-          detalle: items.map(function(i) { return i.nombre + (i.tipo === 'producto' ? ' x' + i.cantidad : ''); }).join(', '),
           subtotal: sub,
           costo_envio: totalEnvio,
           total: sub + totalEnvio,
@@ -1025,7 +1039,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                     >
                       ${product.price.toFixed(2)}
                     </span>
-                    {!m.is_open ? null : unavailable ? (
+                    {isClosed ? null : unavailable ? (
                       <span
                         style={{
                           fontSize: "10px",

@@ -527,7 +527,7 @@ function SeccionH(props: {
   return (
     <div
       id={props.customId ?? tituloAId(props.titulo)}
-      style={{ marginBottom: "14px" }}
+      style={{ marginBottom: "8px" }}
     >
       <div
         style={{
@@ -535,7 +535,7 @@ function SeccionH(props: {
           alignItems: "center",
           gap: "8px",
           padding: "0 16px",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         <span style={{ fontSize: "20px" }}>{props.emoji}</span>
@@ -707,6 +707,9 @@ function ModalMandadito(props: {
   onAgregar: (texto: string) => void;
 }) {
   const [texto, setTexto] = useState("");
+  const cerrado = props.merchant.horario_apertura && props.merchant.horario_cierre
+    ? !esAbierto(props.merchant.horario_apertura, props.merchant.horario_cierre)
+    : !props.merchant.is_open;
   return (
     <div
       style={{
@@ -760,7 +763,7 @@ function ModalMandadito(props: {
         >
           Escribe lo que necesitas — se agregará a tu carrito
         </p>
-        {!props.merchant.is_open && (
+        {cerrado && (
           <div
             style={{
               padding: "10px 14px",
@@ -779,12 +782,12 @@ function ModalMandadito(props: {
         <textarea
           value={texto}
           onChange={function (e) {
-            if (!props.merchant.is_open) return;
+            if (cerrado) return;
             setTexto(e.target.value);
           }}
-          disabled={!props.merchant.is_open}
+          disabled={cerrado}
           placeholder={
-            props.merchant.is_open
+            !cerrado
               ? "Ej: 1 pizza pepperoni mediana, 2 refrescos de cola..."
               : "Servicio cerrado"
           }
@@ -802,11 +805,11 @@ function ModalMandadito(props: {
             resize: "none",
             fontFamily: "system-ui,sans-serif",
             marginBottom: "12px",
-            opacity: props.merchant.is_open ? 1 : 0.45,
-            cursor: props.merchant.is_open ? "text" : "not-allowed",
+            opacity: cerrado ? 0.45 : 1,
+            cursor: cerrado ? "not-allowed" : "text",
           }}
         />
-        {props.merchant.is_open && (
+        {!cerrado && (
           <button
             onClick={function () {
               if (texto.trim() === "") return;
@@ -973,7 +976,6 @@ function ModalCheckout(props: {
           cliente_id: props.clienteId,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
-          detalle,
           subtotal: sub,
           costo_envio: totalEnvio,
           total: sub + totalEnvio,
@@ -2754,8 +2756,8 @@ export default function Dashboard(props: DashboardProps) {
     const estiloScrollRow: React.CSSProperties = {
       display: "flex",
       overflowX: "auto",
-      gap: "12px",
-      paddingBottom: "12px",
+      gap: "8px",
+      paddingBottom: "6px",
       scrollbarWidth: "none" as any,
       msOverflowStyle: "none" as any,
       WebkitOverflowScrolling: "touch" as any,
@@ -2814,11 +2816,11 @@ export default function Dashboard(props: DashboardProps) {
       fontSize: "14px",
       fontWeight: 700,
       color: isDark ? "#D4AF37" : "var(--text-primary)",
-      margin: "0 0 12px 0",
+      margin: "0 0 5px 0",
     };
     const bloqueBotones = (
       <div>
-        <div style={{ padding: "10px 16px 0 16px" }}>
+        <div style={{ padding: "4px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Mandaditos</h3>
           <div style={estiloScrollRow}>
             {[
@@ -2860,7 +2862,7 @@ export default function Dashboard(props: DashboardProps) {
             </button>
           </div>
         </div>
-        <div style={{ padding: "6px 16px 0 16px" }}>
+        <div style={{ padding: "3px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Restaurantes</h3>
           <div style={estiloScrollRow}>
             {[
@@ -2951,7 +2953,7 @@ export default function Dashboard(props: DashboardProps) {
           {bloqueBotones}
 
           {/* ── SECCIONES RESTAURANTES ── */}
-          <div id="seccion-restaurantes" style={{ marginTop: "8px" }}>
+          <div id="seccion-restaurantes" style={{ marginTop: "4px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
               if (!loading && lista.length === 0) return null;
@@ -4072,7 +4074,7 @@ export default function Dashboard(props: DashboardProps) {
         </div>
       )}
 
-      <div style={{ paddingTop: "8px", paddingBottom: "90px" }}>
+      <div style={{ paddingTop: "2px", paddingBottom: "90px" }}>
         {renderContenido()}
       </div>
 
@@ -4210,7 +4212,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "shopping",
-              label: "ChanguiShopping",
+              label: "Shopping",
               emoji: "🛍️",
               onClick: function () {
                 props.onIrShopping && props.onIrShopping();
