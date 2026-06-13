@@ -1025,7 +1025,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                     >
                       ${product.price.toFixed(2)}
                     </span>
-                    {unavailable ? (
+                    {!m.is_open ? null : unavailable ? (
                       <span
                         style={{
                           fontSize: "10px",

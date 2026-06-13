@@ -214,7 +214,7 @@ const SECCIONES_MAND = [
   { titulo: "Heladerías", keys: ["santa clara", "biancolatte"], emoji: "🍦" },
   { titulo: "Bebidas", keys: ["rapichela", "clama"], emoji: "🧃" },
   { titulo: "Comida Libanesa", keys: ["biblos"], emoji: "🫔" },
-  { titulo: "Pescados y Mariscos", keys: ["taco cabo"], emoji: "🐟" },
+  { titulo: "Pescados y Mariscos", keys: ["taco cabo"], emoji: "🦐" },
   { titulo: "Mascotas", keys: ["petco"], emoji: "🐾" },
   { titulo: "Conveniencia", keys: ["oxxo", "seven", "circle"], emoji: "🏪" },
 ];
@@ -233,49 +233,49 @@ function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
 // ─── Botones acceso rápido ─────────────────────────────────────────────────────
 const botonesMandaditos = [
   {
-    id: "super",
+    id: "supermercados",
     emoji: "🛒",
     label: "Supermercados",
     sectionId: "seccion-supermercados",
   },
   {
-    id: "frutas",
+    id: "frutas y verduras",
     emoji: "🍎",
     label: "Frutas y Verduras",
     sectionId: "seccion-frutas-y-verduras",
   },
   {
-    id: "carnes",
+    id: "carnicerías",
     emoji: "🥩",
     label: "Carnicerías",
     sectionId: "seccion-carniceriass",
   },
   {
-    id: "pollo",
-    emoji: "🍗",
+    id: "pollerías",
+    emoji: "🐓",
     label: "Pollerías",
     sectionId: "seccion-pollerias",
   },
   {
-    id: "pescado",
+    id: "pescaderías",
     emoji: "🐟",
     label: "Pescaderías",
     sectionId: "seccion-pescaderia",
   },
   {
     id: "lacteos",
-    emoji: "🥛",
+    emoji: "🧀",
     label: "Lácteos",
     sectionId: "seccion-lacteos",
   },
   {
-    id: "papeleria",
+    id: "papelerías",
     emoji: "📚",
     label: "Papelería",
     sectionId: "seccion-papelerias",
   },
   {
-    id: "lavanderia",
+    id: "lavanderias",
     emoji: "🧺",
     label: "Lavanderías",
     sectionId: "seccion-lavanderia",
@@ -328,8 +328,8 @@ function getEmoji(cat: string): string {
     "pollos preparados": "🍗",
     "pescados y mariscos": "🦐",
     pozoleria: "🍲",
-    "cochinita pibil": "🫙",
-    carnitas: "🥩",
+    "cochinita pibil": "🐽",
+    carnitas: "🐖",
     barbacoa: "🫕",
     birria: "🌶️",
     "alitas y boneless": "🍗",
@@ -527,7 +527,7 @@ function SeccionH(props: {
   return (
     <div
       id={props.customId ?? tituloAId(props.titulo)}
-      style={{ marginBottom: "24px" }}
+      style={{ marginBottom: "14px" }}
     >
       <div
         style={{
@@ -535,7 +535,7 @@ function SeccionH(props: {
           alignItems: "center",
           gap: "8px",
           padding: "0 16px",
-          marginBottom: "12px",
+          marginBottom: "8px",
         }}
       >
         <span style={{ fontSize: "20px" }}>{props.emoji}</span>
@@ -625,10 +625,10 @@ function Banner() {
   return (
     <div
       style={{
-        margin: "0 16px 20px",
+        margin: "0 16px 8px",
         borderRadius: "18px",
         background: s.bg,
-        padding: "18px 20px",
+        padding: "14px 18px",
         position: "relative",
         overflow: "hidden",
         cursor: "pointer",
@@ -760,12 +760,34 @@ function ModalMandadito(props: {
         >
           Escribe lo que necesitas — se agregará a tu carrito
         </p>
+        {!props.merchant.is_open && (
+          <div
+            style={{
+              padding: "10px 14px",
+              borderRadius: "12px",
+              background: "rgba(239,68,68,0.10)",
+              border: "1px solid rgba(239,68,68,0.22)",
+              marginBottom: "12px",
+              textAlign: "center",
+            }}
+          >
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-red)" }}>
+              🔴 Servicio cerrado — pedidos no disponibles en este momento
+            </span>
+          </div>
+        )}
         <textarea
           value={texto}
           onChange={function (e) {
+            if (!props.merchant.is_open) return;
             setTexto(e.target.value);
           }}
-          placeholder="Ej: 1 pizza pepperoni mediana, 2 refrescos de cola..."
+          disabled={!props.merchant.is_open}
+          placeholder={
+            props.merchant.is_open
+              ? "Ej: 1 pizza pepperoni mediana, 2 refrescos de cola..."
+              : "Servicio cerrado"
+          }
           rows={4}
           style={{
             width: "100%",
@@ -780,33 +802,37 @@ function ModalMandadito(props: {
             resize: "none",
             fontFamily: "system-ui,sans-serif",
             marginBottom: "12px",
+            opacity: props.merchant.is_open ? 1 : 0.45,
+            cursor: props.merchant.is_open ? "text" : "not-allowed",
           }}
         />
-        <button
-          onClick={function () {
-            if (texto.trim() === "") return;
-            props.onAgregar(texto.trim());
-          }}
-          disabled={texto.trim() === ""}
-          style={{
-            width: "100%",
-            background:
-              texto.trim() === ""
-                ? "rgba(250,204,21,0.4)"
-                : "var(--color-yellow)",
-            color: "#020617",
-            fontWeight: 900,
-            fontSize: "13px",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            padding: "14px",
-            borderRadius: "14px",
-            border: "none",
-            cursor: texto.trim() === "" ? "not-allowed" : "pointer",
-          }}
-        >
-          Agregar al carrito
-        </button>
+        {props.merchant.is_open && (
+          <button
+            onClick={function () {
+              if (texto.trim() === "") return;
+              props.onAgregar(texto.trim());
+            }}
+            disabled={texto.trim() === ""}
+            style={{
+              width: "100%",
+              background:
+                texto.trim() === ""
+                  ? "rgba(250,204,21,0.4)"
+                  : "var(--color-yellow)",
+              color: "#020617",
+              fontWeight: 900,
+              fontSize: "13px",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              padding: "14px",
+              borderRadius: "14px",
+              border: "none",
+              cursor: texto.trim() === "" ? "not-allowed" : "pointer",
+            }}
+          >
+            Agregar al carrito
+          </button>
+        )}
       </div>
     </div>
   );
@@ -943,7 +969,7 @@ function ModalCheckout(props: {
         const sub = items.reduce(function (a, i) {
           return a + i.precio * i.cantidad;
         }, 0);
-        await supabase.from("pedidos").insert({
+        const { error: errPedido } = await supabase.from("pedidos").insert({
           cliente_id: props.clienteId,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
@@ -957,6 +983,10 @@ function ModalCheckout(props: {
           forma_pago: formaPago,
           direccion: dir ? dir.calle + " " + dir.numero_casa : "",
         });
+        if (errPedido) {
+          console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
+          throw new Error("Error al guardar pedido: " + errPedido.message);
+        }
       }
 
       // Actualizar monedero: +1 pedido
@@ -2788,7 +2818,7 @@ export default function Dashboard(props: DashboardProps) {
     };
     const bloqueBotones = (
       <div>
-        <div style={{ padding: "16px 16px 0 16px" }}>
+        <div style={{ padding: "10px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Mandaditos</h3>
           <div style={estiloScrollRow}>
             {[
@@ -2830,13 +2860,13 @@ export default function Dashboard(props: DashboardProps) {
             </button>
           </div>
         </div>
-        <div style={{ padding: "12px 16px 0 16px" }}>
+        <div style={{ padding: "6px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Restaurantes</h3>
           <div style={estiloScrollRow}>
             {[
               {
                 emoji: "🍳",
-                label: "Desayunos y Comidas",
+                label: "Desayunos/Comidas",
                 secId: "seccion-desayunos-y-comidas",
               },
               { emoji: "🫓", label: "Cemitas", secId: "seccion-cemitas" },
@@ -2859,7 +2889,7 @@ export default function Dashboard(props: DashboardProps) {
                 secId: "seccion-pollos-preparados",
               },
               {
-                emoji: "🐟",
+                emoji: "🦐",
                 label: "Pescados y Mariscos",
                 secId: "seccion-pescados-y-mariscos",
               },
@@ -2921,7 +2951,7 @@ export default function Dashboard(props: DashboardProps) {
           {bloqueBotones}
 
           {/* ── SECCIONES RESTAURANTES ── */}
-          <div id="seccion-restaurantes" style={{ marginTop: "16px" }}>
+          <div id="seccion-restaurantes" style={{ marginTop: "8px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
               if (!loading && lista.length === 0) return null;
@@ -4162,7 +4192,7 @@ export default function Dashboard(props: DashboardProps) {
           [
             {
               key: "inicio",
-              label: "Inicio",
+              label: "Restaurantes",
               emoji: "🍽️",
               onClick: function () {
                 setTabActiva("restaurantes");
@@ -4171,7 +4201,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "tiendita",
-              label: "Tiendita",
+              label: "ChanguiSuper",
               emoji: "🛒",
               onClick: function () {
                 setTabActiva("tiendita");
@@ -4180,7 +4210,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "shopping",
-              label: "Shopping",
+              label: "ChanguiShopping",
               emoji: "🛍️",
               onClick: function () {
                 props.onIrShopping && props.onIrShopping();
@@ -4188,8 +4218,8 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "bazar",
-              label: "Bazar",
-              emoji: "🏠",
+              label: "Bazar Lomas",
+              emoji: "🏘",
               onClick: function () {
                 props.onIrBazar && props.onIrBazar();
               },
@@ -4197,7 +4227,7 @@ export default function Dashboard(props: DashboardProps) {
             {
               key: "servicios",
               label: "Directorio",
-              emoji: "📱",
+              emoji: "📞",
               onClick: function () {
                 props.onIrServicios && props.onIrServicios();
               },
