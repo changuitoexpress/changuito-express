@@ -976,9 +976,6 @@ function ModalCheckout(props: {
           cliente_id: props.clienteId,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
-          subtotal: sub,
-          costo_envio: totalEnvio,
-          total: sub + totalEnvio,
           estatus: "pendiente",
           canal: "webapp",
           cliente_email: props.clienteEmail,
@@ -1396,6 +1393,30 @@ function ModalCheckout(props: {
               </div>
             )}
 
+            {props.carrito.some(function (i) {
+              return i.tipo === "mandadito";
+            }) && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "12px",
+                  background: "rgba(212,175,55,0.08)",
+                  border: "1px solid rgba(212,175,55,0.25)",
+                  marginBottom: "12px",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "11px",
+                    lineHeight: "1.5",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  ⚠️ <strong style={{ color: "var(--color-yellow)" }}>Nota sobre Mandaditos:</strong> El total a pagar puede variar dependiendo del ticket final de compra en solicitudes de Mandaditos (pedidos escritos), ya que los precios exactos se verificarán al momento de la compra.
+                </p>
+              </div>
+            )}
             <button
               onClick={function () {
                 setPaso("direccion");
@@ -2825,18 +2846,19 @@ export default function Dashboard(props: DashboardProps) {
           <div style={estiloScrollRow}>
             {[
               { emoji: "🛒", label: "Supermercados", sec: "Supermercados" },
+              { emoji: "💊", label: "Farmacias", sec: "Farmacias" },
               {
                 emoji: "🍎",
-                label: "Frutas y Verduras",
+                label: "Verdulerías",
                 sec: "Frutas y Verduras",
               },
               { emoji: "🥩", label: "Carnicerías", sec: "Carnicerías" },
-              { emoji: "🍗", label: "Pollerías", sec: "Pollerías" },
+              { emoji: "🐓", label: "Pollerías", sec: "Pollerías" },
               { emoji: "🐟", label: "Pescaderías", sec: "Pescadería" },
-              { emoji: "🥛", label: "Lácteos", sec: "Lácteos" },
+              { emoji: "🧀", label: "Lácteos/Embutidos", sec: "Lácteos" },
               { emoji: "📚", label: "Papelerías", sec: "Papelerías" },
               { emoji: "🧺", label: "Lavanderías", sec: "Lavandería" },
-              { emoji: "🐕", label: "Mascotas", sec: null },
+              { emoji: "🐕", label: "Mascotas", sec: "Mascotas" },
             ].map(function (btn) {
               return (
                 <button
