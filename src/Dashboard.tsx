@@ -976,6 +976,7 @@ function ModalCheckout(props: {
           cliente_id: props.clienteId,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
+          total_pagar: sub + totalEnvio,
           estatus: "pendiente",
           canal: "webapp",
           cliente_email: props.clienteEmail,

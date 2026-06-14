@@ -506,6 +506,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
           cliente_id: uid,
           negocio_id: negId,
           negocio_nombre: items[0].negocio,
+          total_pagar: sub + totalEnvio,
           estatus: 'pendiente',
           canal: 'webapp',
           cliente_email: clienteEmail,

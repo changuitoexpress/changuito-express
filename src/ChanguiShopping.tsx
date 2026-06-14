@@ -176,7 +176,7 @@ export default function ChanguiShopping(props: Props) {
           { key:'tiendita',  label:'Tiendita',   emoji:'🛒', onClick: function(){ props.onIrDashboard && props.onIrDashboard(); } },
           { key:'shopping',  label:'Shopping',   emoji:'🛍️', onClick: function(){} },
           { key:'bazar',     label:'Bazar',      emoji:'🏠', onClick: function(){ props.onIrBazar     && props.onIrBazar();     } },
-          { key:'directorio',label:'Directorio', emoji:'📱', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
+          { key:'directorio',label:'Directorio', emoji:'📞', onClick: function(){ props.onIrServicios && props.onIrServicios(); } },
         ] as const).map(function(it){
           const activo = it.key === 'shopping';
           return (
