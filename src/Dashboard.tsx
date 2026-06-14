@@ -4251,7 +4251,7 @@ export default function Dashboard(props: DashboardProps) {
             {
               key: "servicios",
               label: "Directorio",
-              emoji: "☎️",
+              emoji: "📞",
               onClick: function () {
                 props.onIrServicios && props.onIrServicios();
               },
