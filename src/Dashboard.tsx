@@ -37,6 +37,7 @@ import {
   Car,
   ShoppingBasket,
   Smartphone,
+  Wallet,
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
@@ -99,6 +100,7 @@ interface DashboardProps {
   onIrRepas?: () => void;
   onIrBienes?: () => void;
   onIrAutos?: () => void;
+  onIrMonedero?: () => void;
   carritoGlobal: CartItem[];
   onUpdateCarritoGlobal: (items: CartItem[]) => void;
   onAddToCart?: (items: any[]) => void;
@@ -956,6 +958,13 @@ function ModalCheckout(props: {
           return;
         }
       }
+
+      // Agrupar por negocio (para mensaje WhatsApp)
+      const porNegocio: Record<string, CartItem[]> = {};
+      props.carrito.forEach(function(item) {
+        if (!porNegocio[item.negocio_id]) porNegocio[item.negocio_id] = [];
+        porNegocio[item.negocio_id].push(item);
+      });
 
       // Un solo pedido para todo el carrito
       const negocioNombres = Array.from(new Set(props.carrito.map(function(i) { return i.negocio; }))).join(', ');
@@ -3818,6 +3827,38 @@ export default function Dashboard(props: DashboardProps) {
                 />
                 <span>Bazar Vecinal</span>
               </button>
+
+              {/* ChangoMonedero */}
+              <button
+                onClick={function () {
+                  setMenuAbierto(false);
+                  props.onIrMonedero && props.onIrMonedero();
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "13px 12px",
+                  borderRadius: "12px",
+                  background: "rgba(250,204,21,0.08)",
+                  border: "1.5px solid rgba(250,204,21,0.25)",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 800,
+                  textAlign: "left",
+                }}
+              >
+                <Wallet
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    color: "#facc15",
+                  }}
+                />
+                <span>💰 ChangoMonedero</span>
+              </button>
               <button
                 onClick={function () {
                   setMenuAbierto(false);
@@ -4089,7 +4130,7 @@ export default function Dashboard(props: DashboardProps) {
       </div>
 
       {/* FAB carrito flotante */}
-      {totalItems > 0 && (
+      {totalItems > 0 && !modalCheckout && (
         <button
           onClick={function () {
             setModalCheckout(true);

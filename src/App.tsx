@@ -21,6 +21,7 @@ import DashboardNegocio from "./DashboardNegocio"; // Agregado: Import del Dashb
 import RepasDashboard from "./RepasDashboard";
 import BienesRaices from "./BienesRaices";
 import VentaAutos from "./VentaAutos";
+import ChangoMonedero from "./ChangoMonedero";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
@@ -46,7 +47,8 @@ type Pantalla =
   | "negocio"
   | "repas"
   | "bienes"
-  | "autos";
+  | "autos"
+  | "monedero";
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -920,6 +922,9 @@ export default function App() {
           onIrAutos={function () {
             setPantalla("autos");
           }}
+          onIrMonedero={function () {
+            setPantalla("monedero");
+          }}
           // Agregado: Props del negocio y carrito
           carritoGlobal={carritoGlobal}
           onUpdateCarritoGlobal={setCarritoGlobal}
@@ -1049,6 +1054,17 @@ export default function App() {
 
       {pantalla === "autos" && (
         <VentaAutos
+          session={session}
+          theme={theme}
+          onThemeToggle={toggle}
+          onVolver={function () {
+            setPantalla("dashboard");
+          }}
+        />
+      )}
+
+      {pantalla === "monedero" && (
+        <ChangoMonedero
           session={session}
           theme={theme}
           onThemeToggle={toggle}

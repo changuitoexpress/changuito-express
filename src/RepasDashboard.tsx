@@ -201,41 +201,62 @@ export default function RepasDashboard(props: Props) {
     fetchPedidos();
   }
 
+  async function cargarMensajes(pedidoId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('mensajes_chat')
+        .select('id, pedido_id, autor_id, autor_rol, texto, created_at')
+        .eq('pedido_id', pedidoId)
+        .order('created_at', { ascending: true });
+      if (error) {
+        // tabla puede no existir aún — mostrar mensaje de setup
+        setMensajes([{ id: 'setup', pedido_id: pedidoId, autor: 'sistema', texto: '⚠️ Para activar el chat, crea la tabla "mensajes_chat" en Supabase con columnas: id (uuid pk), pedido_id (uuid), autor_id (uuid), autor_rol (text), texto (text), created_at (timestamptz).', hora: new Date().toISOString() }]);
+        return;
+      }
+      const uid = props.session.user.id;
+      const mapped: MensajeChat[] = (data ?? []).map(function(m: any) {
+        const rol: MensajeChat['autor'] = m.autor_rol === 'repartidor' ? 'repartidor' : m.autor_rol === 'cliente' ? 'cliente' : 'sistema';
+        return { id: m.id, pedido_id: m.pedido_id, autor: m.autor_id === uid ? 'repartidor' : rol, texto: m.texto, hora: m.created_at };
+      });
+      if (mapped.length === 0) {
+        setMensajes([{ id: 'inicio', pedido_id: pedidoId, autor: 'sistema', texto: '🛵 Chat iniciado. Escríbele al cliente sobre su pedido.', hora: new Date().toISOString() }]);
+      } else {
+        setMensajes(mapped);
+      }
+    } catch(e) {
+      console.error('[Chat]', e);
+    }
+  }
+
   function abrirChat(pedido: Pedido) {
     setChatPedido(pedido);
     setTab("chat");
-    // Simular mensajes previos
-    setMensajes([
-      {
-        id: "m1",
-        pedido_id: pedido.id,
-        autor: "sistema",
-        texto: "Pedido asignado. Puedes chatear con el cliente.",
-        hora: new Date().toISOString(),
-      },
-      {
-        id: "m2",
-        pedido_id: pedido.id,
-        autor: "cliente",
-        texto: "¿Cuánto tardan aproximadamente?",
-        hora: new Date().toISOString(),
-      },
-    ]);
+    setMensajes([]);
+    cargarMensajes(pedido.id);
   }
 
   async function enviarMensaje() {
     if (!textoCorrecto.trim() || !chatPedido) return;
     setEnviandoMsg(true);
-    const nuevo: MensajeChat = {
-      id: "msg-" + Date.now(),
-      pedido_id: chatPedido.id,
-      autor: "repartidor",
-      texto: textoCorrecto.trim(),
-      hora: new Date().toISOString(),
-    };
-    setMensajes(function (prev) {
-      return [...prev, nuevo];
-    });
+    const texto = textoCorrecto.trim();
+    try {
+      const { error } = await supabase.from('mensajes_chat').insert({
+        pedido_id: chatPedido.id,
+        autor_id:  props.session.user.id,
+        autor_rol: 'repartidor',
+        texto:     texto,
+      });
+      if (error) {
+        // Fallback: mostrar mensaje localmente si la tabla no existe
+        setMensajes(function(prev) {
+          return [...prev, { id: 'local-' + Date.now(), pedido_id: chatPedido!.id, autor: 'repartidor' as const, texto: texto, hora: new Date().toISOString() }];
+        });
+      } else {
+        cargarMensajes(chatPedido.id);
+      }
+    } catch(e) {
+      console.error('[Chat enviar]', e);
+    }
     setTextoChat("");
     setTextoCorrecto("");
     setEnviandoMsg(false);

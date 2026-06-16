@@ -102,8 +102,8 @@ export default function AdminGodMode(props: AdminProps) {
       const hoyISO = hoy.toISOString();
 
       const [rTodos, rHoy, rMerch, rClientes] = await Promise.all([
-        supabase.from('pedidos').select('id, total, estatus, created_at'),
-        supabase.from('pedidos').select('id, total').gte('created_at', hoyISO),
+        supabase.from('pedidos').select('id, total_pagar, estatus, created_at'),
+        supabase.from('pedidos').select('id, total_pagar').gte('created_at', hoyISO),
         supabase.from('merchants').select('id, is_open'),
         supabase.from('perfiles').select('id'),
       ]);
@@ -154,8 +154,19 @@ export default function AdminGodMode(props: AdminProps) {
   useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores]);
 
   async function cambiarEstatus(pedidoId: string, nuevoEstatus: string) {
-    const { error: err } = await supabase.from('pedidos').update({ estatus: nuevoEstatus }).eq('id', pedidoId);
-    if (err) { alert('Error al cambiar estatus: ' + err.message); return; }
+    const { error: err, data } = await supabase
+      .from('pedidos')
+      .update({ estatus: nuevoEstatus })
+      .eq('id', pedidoId)
+      .select('id');
+    if (err) {
+      alert('Error al cambiar estatus: ' + err.message + '\n\nRevisa las políticas RLS en Supabase → tabla pedidos → UPDATE policy.');
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert('⚠️ El pedido no se actualizó. Verifica que el id sea correcto y que la política RLS permita UPDATE al admin.');
+      return;
+    }
     fetchPedidos(); fetchMetricas();
   }
 
@@ -404,15 +415,15 @@ export default function AdminGodMode(props: AdminProps) {
                           )}
                         </div>
 
-                        {/* Contactar cliente */}
-                        {pedido.cliente_email && (
-                          <a href={'https://wa.me/522223339999?text=' + encodeURIComponent('📦 Pedido #' + pedido.id.slice(0,8) + '\nCliente: ' + pedido.cliente_email + '\nEstatus: ' + pedido.estatus + '\nTotal: $' + (pedido.total_pagar ?? 0).toFixed(0))}
-                            target="_blank" rel="noopener noreferrer"
-                            style={{ display:'inline-flex', alignItems:'center', gap:'6px', padding:'9px 14px', borderRadius:'12px', background:'rgba(37,211,102,0.15)', color:'#25d366', fontSize:'12px', fontWeight:700, textDecoration:'none', alignSelf:'flex-start' }}>
-                            <MessageCircle style={{ width:'14px', height:'14px' }} />
-                            Contactar (WhatsApp)
-                          </a>
-                        )}
+                        {/* Chat interno */}
+                        <div style={{ padding:'10px 12px', borderRadius:'12px', background:'var(--border-subtle)' }}>
+                          <p style={{ fontSize:'11px', fontWeight:700, color:'var(--text-muted)', margin:'0 0 2px 0' }}>
+                            💬 Chat interno
+                          </p>
+                          <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>
+                            El repartidor asignado puede chatear con el cliente desde su panel 🛵
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
