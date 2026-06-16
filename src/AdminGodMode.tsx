@@ -115,8 +115,8 @@ export default function AdminGodMode(props: AdminProps) {
       setMetricas({
         totalPedidos:      todos.length,
         pedidosHoy:        hoyData.length,
-        ingresoTotal:      todos.reduce(function(a: number, p: any){ return a + (p.total ?? 0); }, 0),
-        ingresoHoy:        hoyData.reduce(function(a: number, p: any){ return a + (p.total ?? 0); }, 0),
+        ingresoTotal:      todos.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0),
+        ingresoHoy:        hoyData.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0),
         totalMerchants:    merch.length,
         merchantsAbiertos: merch.filter(function(m: any){ return m.is_open; }).length,
         totalClientes:     (rClientes.data ?? []).length,
@@ -154,7 +154,8 @@ export default function AdminGodMode(props: AdminProps) {
   useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores]);
 
   async function cambiarEstatus(pedidoId: string, nuevoEstatus: string) {
-    await supabase.from('pedidos').update({ estatus: nuevoEstatus }).eq('id', pedidoId);
+    const { error: err } = await supabase.from('pedidos').update({ estatus: nuevoEstatus }).eq('id', pedidoId);
+    if (err) { alert('Error al cambiar estatus: ' + err.message); return; }
     fetchPedidos(); fetchMetricas();
   }
 
@@ -296,7 +297,7 @@ export default function AdminGodMode(props: AdminProps) {
                       </p>
                     </div>
                     <div style={{ textAlign:'right', flexShrink:0 }}>
-                      <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(pedido.total ?? 0).toFixed(0)}</p>
+                      <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(pedido.total_pagar ?? 0).toFixed(0)}</p>
                       <span style={{ fontSize:'9px', fontWeight:800, padding:'2px 8px', borderRadius:'8px', background:cfg.bg, color:cfg.color, textTransform:'uppercase' }}>{cfg.label}</span>
                     </div>
                     {abierto ? <ChevronUp style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} /> : <ChevronDown style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} />}
@@ -405,10 +406,11 @@ export default function AdminGodMode(props: AdminProps) {
 
                         {/* Contactar cliente */}
                         {pedido.cliente_email && (
-                          <a href={'mailto:' + pedido.cliente_email}
-                            style={{ display:'inline-flex', alignItems:'center', gap:'6px', padding:'9px 14px', borderRadius:'12px', background:'var(--color-blue-dim)', color:'var(--color-blue)', fontSize:'12px', fontWeight:700, textDecoration:'none', alignSelf:'flex-start' }}>
+                          <a href={'https://wa.me/522223339999?text=' + encodeURIComponent('📦 Pedido #' + pedido.id.slice(0,8) + '\nCliente: ' + pedido.cliente_email + '\nEstatus: ' + pedido.estatus + '\nTotal: $' + (pedido.total_pagar ?? 0).toFixed(0))}
+                            target="_blank" rel="noopener noreferrer"
+                            style={{ display:'inline-flex', alignItems:'center', gap:'6px', padding:'9px 14px', borderRadius:'12px', background:'rgba(37,211,102,0.15)', color:'#25d366', fontSize:'12px', fontWeight:700, textDecoration:'none', alignSelf:'flex-start' }}>
                             <MessageCircle style={{ width:'14px', height:'14px' }} />
-                            Contactar cliente
+                            Contactar (WhatsApp)
                           </a>
                         )}
                       </div>

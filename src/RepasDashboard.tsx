@@ -24,7 +24,7 @@ interface Pedido {
   cliente_email: string | null;
   detalle: string | null;
   direccion: string | null;
-  total: number | null;
+  total_pagar: number | null;
   estatus: string;
   forma_pago: string | null;
   canal: string | null;
@@ -180,13 +180,14 @@ export default function RepasDashboard(props: Props) {
   });
 
   async function tomarPedido(pedidoId: string) {
-    await supabase
+    const { error: err } = await supabase
       .from("pedidos")
       .update({
         repartidor_id: miId,
         estatus: "en_camino",
       })
       .eq("id", pedidoId);
+    if (err) { alert('Error al tomar pedido: ' + err.message); return; }
     fetchPedidos();
   }
 
@@ -843,7 +844,7 @@ export default function RepasDashboard(props: Props) {
                             margin: "0 0 4px 0",
                           }}
                         >
-                          ${(pedido.total ?? 0).toFixed(0)}
+                          ${(pedido.total_pagar ?? 0).toFixed(0)}
                         </p>
                         <span
                           style={{
@@ -1056,7 +1057,7 @@ export default function RepasDashboard(props: Props) {
                                 }}
                               >
                                 💳 Cobrar: {pedido.forma_pago} · $
-                                {(pedido.total ?? 0).toFixed(2)}
+                                {(pedido.total_pagar ?? 0).toFixed(2)}
                               </p>
                             </div>
                           )}
@@ -1149,7 +1150,7 @@ export default function RepasDashboard(props: Props) {
                           margin: 0,
                         }}
                       >
-                        ${(pedido.total ?? 0).toFixed(0)}
+                        ${(pedido.total_pagar ?? 0).toFixed(0)}
                       </p>
                     </div>
 

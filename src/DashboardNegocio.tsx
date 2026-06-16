@@ -443,7 +443,7 @@ export default function DashboardNegocio(props: Props) {
 
         {/* ── TAB VENTAS ── */}
         {tab === 'stats' && (
-          <StatsTab merchantId={merchant?.id ?? ''} isDark={isDark} />
+          <StatsTab merchantId={merchant?.id ?? ''} merchantName={merchant?.name ?? ''} isDark={isDark} />
         )}
       </div>
 
@@ -498,25 +498,30 @@ export default function DashboardNegocio(props: Props) {
 }
 
 // ─── Tab Estadísticas ─────────────────────────────────────────────────────────
-function StatsTab(props: { merchantId: string; isDark: boolean }) {
+function StatsTab(props: { merchantId: string; merchantName: string; isDark: boolean }) {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(function() {
-    if (!props.merchantId) return;
-    supabase.from('pedidos')
-      .select('id, total, estatus, created_at, detalle, cliente_email')
-      .eq('negocio_id', props.merchantId)
-      .order('created_at', { ascending: false })
+    if (!props.merchantId && !props.merchantName) return;
+    const nombre = props.merchantName;
+    let q = supabase.from('pedidos')
+      .select('id, total_pagar, estatus, created_at, negocio_nombre, cliente_email');
+    if (nombre) {
+      q = q.ilike('negocio_nombre', '%' + nombre + '%');
+    } else {
+      q = q.eq('negocio_id', props.merchantId);
+    }
+    q.order('created_at', { ascending: false })
       .limit(50)
       .then(function(r) {
         setPedidos(r.data ?? []);
         setLoading(false);
       });
-  }, [props.merchantId]);
+  }, [props.merchantId, props.merchantName]);
 
   const totalVentas = pedidos.filter(function(p){ return p.estatus === 'entregado'; })
-    .reduce(function(a, p){ return a + (p.total ?? 0); }, 0);
+    .reduce(function(a, p){ return a + (p.total_pagar ?? 0); }, 0);
   const pedidosHoy = pedidos.filter(function(p){
     return new Date(p.created_at).toDateString() === new Date().toDateString();
   }).length;
@@ -553,11 +558,11 @@ function StatsTab(props: { merchantId: string; isDark: boolean }) {
         return (
           <div key={p.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:'14px', background:'var(--bg-card)', border:'1px solid var(--border-subtle)', marginBottom:'8px' }}>
             <div style={{ minWidth:0 }}>
-              <p style={{ fontSize:'12px', fontWeight:700, color:'var(--text-primary)', margin:'0 0 2px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'200px' }}>{p.detalle ?? 'Pedido'}</p>
+              <p style={{ fontSize:'12px', fontWeight:700, color:'var(--text-primary)', margin:'0 0 2px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'200px' }}>{p.negocio_nombre ?? 'Pedido'}</p>
               <p style={{ fontSize:'10px', color:'var(--text-muted)', margin:0 }}>{label}</p>
             </div>
             <div style={{ textAlign:'right', flexShrink:0 }}>
-              <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(p.total ?? 0).toFixed(0)}</p>
+              <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
               <span style={{ fontSize:'9px', fontWeight:800, padding:'2px 7px', borderRadius:'8px', background:'rgba(255,255,255,0.06)', color:colorEstatus[p.estatus] ?? 'var(--text-muted)', textTransform:'uppercase' }}>{p.estatus}</span>
             </div>
           </div>

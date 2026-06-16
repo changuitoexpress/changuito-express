@@ -97,6 +97,8 @@ interface DashboardProps {
   onIrShopping?: () => void;
   onIrNegocio?: () => void;
   onIrRepas?: () => void;
+  onIrBienes?: () => void;
+  onIrAutos?: () => void;
   carritoGlobal: CartItem[];
   onUpdateCarritoGlobal: (items: CartItem[]) => void;
   onAddToCart?: (items: any[]) => void;
@@ -955,38 +957,23 @@ function ModalCheckout(props: {
         }
       }
 
-      // Agrupar por negocio e insertar en pedidos
-      const porNegocio: Record<string, CartItem[]> = {};
-      props.carrito.forEach(function (item) {
-        if (!porNegocio[item.negocio_id]) porNegocio[item.negocio_id] = [];
-        porNegocio[item.negocio_id].push(item);
+      // Un solo pedido para todo el carrito
+      const negocioNombres = Array.from(new Set(props.carrito.map(function(i) { return i.negocio; }))).join(', ');
+      const primerNegocioId = props.carrito[0]?.negocio_id ?? '';
+      const { error: errPedido } = await supabase.from("pedidos").insert({
+        cliente_id: props.clienteId,
+        negocio_id: primerNegocioId,
+        negocio_nombre: negocioNombres,
+        total_pagar: total,
+        estatus: "pendiente",
+        canal: "webapp",
+        cliente_email: props.clienteEmail,
+        forma_pago: formaPago,
+        direccion: dir ? dir.calle + " " + dir.numero_casa : "",
       });
-
-      for (const negId of Object.keys(porNegocio)) {
-        const items = porNegocio[negId];
-        const detalle = items
-          .map(function (i) {
-            return i.nombre + (i.tipo === "producto" ? " x" + i.cantidad : "");
-          })
-          .join(", ");
-        const sub = items.reduce(function (a, i) {
-          return a + i.precio * i.cantidad;
-        }, 0);
-        const { error: errPedido } = await supabase.from("pedidos").insert({
-          cliente_id: props.clienteId,
-          negocio_id: negId,
-          negocio_nombre: items[0].negocio,
-          total_pagar: sub + totalEnvio,
-          estatus: "pendiente",
-          canal: "webapp",
-          cliente_email: props.clienteEmail,
-          forma_pago: formaPago,
-          direccion: dir ? dir.calle + " " + dir.numero_casa : "",
-        });
-        if (errPedido) {
-          console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
-          throw new Error("Error al guardar pedido: " + errPedido.message);
-        }
+      if (errPedido) {
+        console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
+        throw new Error("Error al guardar pedido: " + errPedido.message);
       }
 
       // Actualizar monedero: +1 pedido
@@ -3934,11 +3921,11 @@ export default function Dashboard(props: DashboardProps) {
                 </button>
               )}
 
-              {/* BIENES RAÍCES — reactivado, abre bazar */}
+              {/* BIENES RAÍCES */}
               <button
                 onClick={function () {
                   setMenuAbierto(false);
-                  props.onIrBazar && props.onIrBazar();
+                  props.onIrBienes && props.onIrBienes();
                 }}
                 style={{
                   width: "100%",
@@ -3966,11 +3953,11 @@ export default function Dashboard(props: DashboardProps) {
                 <span>Bienes Raíces</span>
               </button>
 
-              {/* VENTA DE AUTOS — reactivado, abre bazar */}
+              {/* VENTA DE AUTOS */}
               <button
                 onClick={function () {
                   setMenuAbierto(false);
-                  props.onIrBazar && props.onIrBazar();
+                  props.onIrAutos && props.onIrAutos();
                 }}
                 style={{
                   width: "100%",

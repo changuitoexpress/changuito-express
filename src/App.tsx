@@ -19,6 +19,8 @@ import AdminGodMode from "./AdminGodMode";
 import ChanguiShopping from "./ChanguiShopping";
 import DashboardNegocio from "./DashboardNegocio"; // Agregado: Import del Dashboard de Negocio
 import RepasDashboard from "./RepasDashboard";
+import BienesRaices from "./BienesRaices";
+import VentaAutos from "./VentaAutos";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
@@ -42,7 +44,9 @@ type Pantalla =
   | "admin"
   | "shopping"
   | "negocio"
-  | "repas";
+  | "repas"
+  | "bienes"
+  | "autos";
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -910,6 +914,12 @@ export default function App() {
           onIrRepas={function () {
             setPantalla("repas");
           }}
+          onIrBienes={function () {
+            setPantalla("bienes");
+          }}
+          onIrAutos={function () {
+            setPantalla("autos");
+          }}
           // Agregado: Props del negocio y carrito
           carritoGlobal={carritoGlobal}
           onUpdateCarritoGlobal={setCarritoGlobal}
@@ -1017,6 +1027,28 @@ export default function App() {
 
       {pantalla === "repas" && (
         <RepasDashboard
+          session={session}
+          theme={theme}
+          onThemeToggle={toggle}
+          onVolver={function () {
+            setPantalla("dashboard");
+          }}
+        />
+      )}
+
+      {pantalla === "bienes" && (
+        <BienesRaices
+          session={session}
+          theme={theme}
+          onThemeToggle={toggle}
+          onVolver={function () {
+            setPantalla("dashboard");
+          }}
+        />
+      )}
+
+      {pantalla === "autos" && (
+        <VentaAutos
           session={session}
           theme={theme}
           onThemeToggle={toggle}

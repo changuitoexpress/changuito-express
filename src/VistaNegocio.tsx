@@ -498,21 +498,23 @@ export default function VistaNegocio(props: VistaNegocioProps) {
         porNegocio[item.negocio_id].push(item);
       });
 
-      // Insert one pedido per negocio
-      for (const negId of Object.keys(porNegocio)) {
-        const items = porNegocio[negId];
-        const sub = items.reduce(function(a, i) { return a + i.precio * i.cantidad; }, 0);
-        await supabase.from('pedidos').insert({
-          cliente_id: uid,
-          negocio_id: negId,
-          negocio_nombre: items[0].negocio,
-          total_pagar: sub + totalEnvio,
-          estatus: 'pendiente',
-          canal: 'webapp',
-          cliente_email: clienteEmail,
-          forma_pago: formaPago,
-          direccion: dirString,
-        });
+      // Un solo pedido para todo el carrito
+      const negocioNombres = Array.from(new Set(todosLosItems.map(function(i) { return i.negocio; }))).join(', ');
+      const primerNegocioId = todosLosItems[0]?.negocio_id ?? '';
+      const { error: errPedido } = await supabase.from('pedidos').insert({
+        cliente_id: uid,
+        negocio_id: primerNegocioId,
+        negocio_nombre: negocioNombres,
+        total_pagar: totalFinal,
+        estatus: 'pendiente',
+        canal: 'webapp',
+        cliente_email: clienteEmail,
+        forma_pago: formaPago,
+        direccion: dirString,
+      });
+      if (errPedido) {
+        console.error('[Changuito] Error guardando pedido:', errPedido);
+        throw new Error(errPedido.message);
       }
 
       // Build WhatsApp message
