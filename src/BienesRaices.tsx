@@ -42,12 +42,13 @@ export default function BienesRaices(props: Props) {
   const [tipo, setTipo]           = useState('todos');
   const [search, setSearch]       = useState('');
   const [modalAbierto, setModal]  = useState(false);
-  const [form, setForm]           = useState({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa' });
+  const [form, setForm]           = useState({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa', recamaras: '', banos: '', amueblado: 'no' });
+  const [solicitando, setSolicitando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const isDark      = props.theme === 'dark';
   const rol         = props.session.user.rol ?? 'cliente';
-  const puedePublicar = rol === 'admin' || rol === 'admin_inmuebles' || rol === 'admin_bazar';
+  const puedePublicar = rol === 'admin' || rol === 'admin_inmuebles' || rol === 'admin_bazar' || rol === 'agente_inmuebles';
 
   const fetchItems = useCallback(async function() {
     setLoading(true); setError('');
@@ -66,16 +67,36 @@ export default function BienesRaices(props: Props) {
 
   useEffect(function() { fetchItems(); }, [fetchItems]);
 
+  async function solicitarRolInmuebles() {
+    setSolicitando(true);
+    try {
+      const { error } = await supabase.from('solicitudes_rol').insert({
+        user_id:    props.session.user.id,
+        email:      props.session.user.email ?? '',
+        rol_pedido: 'agente_inmuebles',
+      });
+      if (error) throw error;
+      alert('✅ Solicitud enviada. El administrador revisará tu solicitud y te notificará.');
+    } catch(e: any) { alert('Error: ' + e.message); }
+    finally { setSolicitando(false); }
+  }
+
   async function publicar() {
     if (!form.titulo.trim()) return;
     setGuardando(true);
     try {
       const precio = parseFloat(form.precio) || null;
+      const extras = [
+        form.recamaras ? '🛏 Recámaras: ' + form.recamaras : '',
+        form.banos     ? '🚿 Baños: '     + form.banos      : '',
+        form.amueblado !== 'no' ? '🛋 Amueblado: ' + (form.amueblado === 'si' ? 'Sí' : 'Parcial') : '',
+      ].filter(Boolean).join(' | ');
+      const descripcionFinal = [form.descripcion.trim(), extras].filter(Boolean).join('\n──────────\n');
       const { error: err } = await supabase.from('bazar_items').insert({
         vendedor_id:    props.session.user.id,
         vendedor_email: props.session.user.email ?? '',
         titulo:         form.titulo.trim(),
-        descripcion:    form.descripcion.trim() || null,
+        descripcion:    descripcionFinal || null,
         precio:         precio,
         categoria:      'inmuebles',
         fotos:          null,
@@ -86,7 +107,7 @@ export default function BienesRaices(props: Props) {
       });
       if (err) throw err;
       setModal(false);
-      setForm({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa' });
+      setForm({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa', recamaras: '', banos: '', amueblado: 'no' });
       fetchItems();
     } catch(e: any) { alert('Error: ' + e.message); }
     finally { setGuardando(false); }
@@ -234,11 +255,18 @@ export default function BienesRaices(props: Props) {
         })}
       </div>
 
-      {/* FAB publicar */}
-      {puedePublicar && (
+      {/* FAB publicar / Solicitar rol */}
+      {puedePublicar ? (
         <button onClick={function() { setModal(true); }}
           style={{ position: 'fixed', bottom: '24px', right: '24px', width: '56px', height: '56px', borderRadius: '18px', background: 'var(--color-yellow)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(250,204,21,0.4)', zIndex: 100 }}>
           <Plus style={{ width: '24px', height: '24px', color: '#020617' }} />
+        </button>
+      ) : (
+        <button onClick={solicitarRolInmuebles} disabled={solicitando}
+          style={{ position: 'fixed', bottom: '24px', right: '16px', padding: '12px 18px', borderRadius: '18px', background: 'rgba(37,99,235,0.9)', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: solicitando ? 'not-allowed' : 'pointer', boxShadow: '0 8px 24px rgba(37,99,235,0.3)', zIndex: 100 }}>
+          {solicitando
+            ? <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />
+            : <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>🏡 Quiero publicar</span>}
         </button>
       )}
 
@@ -265,6 +293,29 @@ export default function BienesRaices(props: Props) {
                   </div>
                 );
               })}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '5px' }}>🛏 Recámaras</label>
+                  <input value={form.recamaras} type="number" min="0" placeholder="3"
+                    onChange={function(e){ setForm(function(prev){ return { ...prev, recamaras: e.target.value }; }); }}
+                    style={{ width: '100%', padding: '11px 13px', borderRadius: '12px', border: '1px solid var(--border-medium)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '5px' }}>🚿 Baños</label>
+                  <input value={form.banos} type="number" min="0" placeholder="2"
+                    onChange={function(e){ setForm(function(prev){ return { ...prev, banos: e.target.value }; }); }}
+                    style={{ width: '100%', padding: '11px 13px', borderRadius: '12px', border: '1px solid var(--border-medium)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '5px' }}>🛋 Amueblado</label>
+                <select value={form.amueblado} onChange={function(e){ setForm(function(prev){ return { ...prev, amueblado: e.target.value }; }); }}
+                  style={{ width: '100%', padding: '11px 13px', borderRadius: '12px', border: '1px solid var(--border-medium)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                  <option value="no">Sin amueblar</option>
+                  <option value="si">Completamente amueblado</option>
+                  <option value="parcial">Semi-amueblado</option>
+                </select>
+              </div>
             </div>
             <button onClick={publicar} disabled={guardando || !form.titulo.trim()}
               style={{ width: '100%', marginTop: '20px', background: !form.titulo.trim() ? 'var(--border-subtle)' : 'var(--color-yellow)', color: !form.titulo.trim() ? 'var(--text-muted)' : '#020617', fontWeight: 900, fontSize: '14px', padding: '15px', borderRadius: '14px', border: 'none', cursor: !form.titulo.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>

@@ -3730,364 +3730,102 @@ export default function Dashboard(props: DashboardProps) {
             </div>
 
             <div style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
-              {(
-                [
-                  { key: "restaurantes", label: "Restaurantes", icon: Store },
-                  { key: "mandaditos", label: "Mandaditos", icon: Bike },
-                  { key: "tiendita", label: "Tiendita", icon: ShoppingCart },
-                ] as const
-              ).map(function (it) {
-                const Icon = it.icon;
-                return (
-                  <button
-                    key={it.key}
-                    onClick={function () {
-                      if (it.key === "mandaditos") {
-                        setTabActiva("restaurantes");
-                        setSearch("");
-                        setMenuAbierto(false);
-                        setTimeout(function () {
-                          const el =
-                            document.getElementById("seccion-mandaditos");
-                          if (el)
-                            el.scrollIntoView({
-                              behavior: "smooth",
-                              block: "center",
-                            });
-                        }, 350);
-                      } else {
-                        setTabActiva(it.key as MainTab);
-                        setSearch("");
-                        setMenuAbierto(false);
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      padding: "13px 12px",
-                      borderRadius: "12px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "var(--text-primary)",
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      textAlign: "left",
-                    }}
-                  >
-                    <Icon
-                      style={{
-                        width: "18px",
-                        height: "18px",
-                        color: "var(--color-yellow)",
-                      }}
-                    />
-                    <span>{it.label}</span>
-                  </button>
-                );
-              })}
 
-              <div
-                style={{
-                  height: "1px",
-                  background: "var(--border-subtle)",
-                  margin: "10px 8px",
-                }}
-              />
-
+              {/* ─ 1 · ChangoMonedero (SIEMPRE PRIMERO) ─ */}
               <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrBazar && props.onIrBazar();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
+                onClick={function () { setMenuAbierto(false); props.onIrMonedero && props.onIrMonedero(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"14px 12px", borderRadius:"14px", background:"linear-gradient(135deg,rgba(250,204,21,0.2),rgba(245,158,11,0.1))", border:"1.5px solid rgba(250,204,21,0.45)", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:900, textAlign:"left", marginBottom:"4px" }}
               >
-                <Sparkles
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+                <Wallet style={{ width:"20px", height:"20px", color:"#facc15", flexShrink:0 }} />
+                <div>
+                  <span style={{ display:"block", fontSize:"14px", fontWeight:900 }}>💰 ChangoMonedero</span>
+                  <span style={{ display:"block", fontSize:"10px", color:"#f59e0b", fontWeight:700 }}>Saldo · ChangoPesos · Beneficios</span>
+                </div>
+              </button>
+
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
+
+              {/* ─ 2 · Restaurantes / Mandaditos / La Tiendita ─ */}
+              <button
+                onClick={function () { setTabActiva("restaurantes"); setSearch(""); setMenuAbierto(false); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
+              >
+                <Store style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span>Restaurantes</span>
+              </button>
+              <button
+                onClick={function () { setTabActiva("mandaditos"); setSearch(""); setMenuAbierto(false); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
+              >
+                <Bike style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span>Mandaditos</span>
+              </button>
+              <button
+                onClick={function () { setTabActiva("tiendita"); setSearch(""); setMenuAbierto(false); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
+              >
+                <ShoppingCart style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span>La Tiendita</span>
+              </button>
+
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
+
+              {/* ─ 3 · Bazar / Directorio / Shopping ─ */}
+              <button onClick={function(){ setMenuAbierto(false); props.onIrBazar && props.onIrBazar(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                <Sparkles style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>Bazar Vecinal</span>
               </button>
-
-              {/* ChangoMonedero */}
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrMonedero && props.onIrMonedero();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "rgba(250,204,21,0.08)",
-                  border: "1.5px solid rgba(250,204,21,0.25)",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 800,
-                  textAlign: "left",
-                }}
-              >
-                <Wallet
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "#facc15",
-                  }}
-                />
-                <span>💰 ChangoMonedero</span>
-              </button>
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrServicios && props.onIrServicios();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <Smartphone
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+              <button onClick={function(){ setMenuAbierto(false); props.onIrServicios && props.onIrServicios(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                <Smartphone style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>Directorio Telefónico</span>
               </button>
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrShopping && props.onIrShopping();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <ShoppingBasket
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+              <button onClick={function(){ setMenuAbierto(false); props.onIrShopping && props.onIrShopping(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                <ShoppingBasket style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>ChanguiShopping</span>
               </button>
 
-              <div
-                style={{
-                  height: "1px",
-                  background: "var(--border-subtle)",
-                  margin: "10px 8px",
-                }}
-              />
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
 
-              {/* PANEL NEGOCIO — solo rol negocio/admin */}
-              {puedeNegocio && (
-                <button
-                  onClick={function () {
-                    setMenuAbierto(false);
-                    props.onIrNegocio && props.onIrNegocio();
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "13px 12px",
-                    borderRadius: "12px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-primary)",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                    textAlign: "left",
-                  }}
-                >
-                  <Store
-                    style={{
-                      width: "18px",
-                      height: "18px",
-                      color: "var(--color-yellow)",
-                    }}
-                  />
-                  <span>Panel de Negocio</span>
-                </button>
-              )}
-
-              {/* BIENES RAÍCES */}
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrBienes && props.onIrBienes();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <Building2
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+              {/* ─ 4 · Bienes Raíces / Venta de Autos ─ */}
+              <button onClick={function(){ setMenuAbierto(false); props.onIrBienes && props.onIrBienes(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                <Building2 style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>Bienes Raíces</span>
               </button>
-
-              {/* VENTA DE AUTOS */}
-              <button
-                onClick={function () {
-                  setMenuAbierto(false);
-                  props.onIrAutos && props.onIrAutos();
-                }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "13px 12px",
-                  borderRadius: "12px",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <Car
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    color: "var(--color-yellow)",
-                  }}
-                />
+              <button onClick={function(){ setMenuAbierto(false); props.onIrAutos && props.onIrAutos(); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                <Car style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>Venta de Autos</span>
               </button>
 
-              {/* PANEL REPARTIDOR — solo rol repartidor/admin */}
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
+
+              {/* ─ 5 · Paneles condicionales (rol) ─ */}
+              {puedeNegocio && (
+                <button onClick={function(){ setMenuAbierto(false); props.onIrNegocio && props.onIrNegocio(); }}
+                  style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}>
+                  <Store style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                  <span>Panel de Negocios</span>
+                </button>
+              )}
+
               {puedeRepartidor && (
-                <button
-                  onClick={function () {
-                    setMenuAbierto(false);
-                    props.onIrRepas && props.onIrRepas();
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "13px 12px",
-                    borderRadius: "12px",
-                    background: "rgba(34,197,94,0.12)",
-                    border: "1px solid rgba(34,197,94,0.35)",
-                    cursor: "pointer",
-                    color: "var(--color-green)",
-                    fontSize: "14px",
-                    fontWeight: 900,
-                    textAlign: "left",
-                  }}
-                >
-                  <span style={{ fontSize: "18px" }}>🛵</span>
+                <button onClick={function(){ setMenuAbierto(false); props.onIrRepas && props.onIrRepas(); }}
+                  style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"rgba(34,197,94,0.12)", border:"1px solid rgba(34,197,94,0.3)", cursor:"pointer", color:"var(--color-green)", fontSize:"14px", fontWeight:900, textAlign:"left" }}>
+                  <span style={{ fontSize:"18px", flexShrink:0 }}>🛵</span>
                   <span>Panel Repartidor</span>
                 </button>
               )}
 
               {esAdmin && (
-                <>
-                  <div
-                    style={{
-                      height: "1px",
-                      background: "var(--border-subtle)",
-                      margin: "10px 8px",
-                    }}
-                  />
-                  <button
-                    onClick={function () {
-                      setMenuAbierto(false);
-                      props.onIrAdmin && props.onIrAdmin();
-                    }}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      padding: "13px 12px",
-                      borderRadius: "12px",
-                      background: "rgba(250,204,21,0.12)",
-                      border: "1px solid rgba(250,204,21,0.35)",
-                      cursor: "pointer",
-                      color: "var(--color-yellow)",
-                      fontSize: "14px",
-                      fontWeight: 900,
-                      textAlign: "left",
-                    }}
-                  >
-                    <Shield style={{ width: "18px", height: "18px" }} />
-                    <span>God Mode</span>
-                  </button>
-                </>
+                <button onClick={function(){ setMenuAbierto(false); props.onIrAdmin && props.onIrAdmin(); }}
+                  style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"rgba(250,204,21,0.12)", border:"1px solid rgba(250,204,21,0.3)", cursor:"pointer", color:"var(--color-yellow)", fontSize:"14px", fontWeight:900, textAlign:"left" }}>
+                  <Shield style={{ width:"18px", height:"18px", flexShrink:0 }} />
+                  <span>God Mode</span>
+                </button>
               )}
             </div>
 

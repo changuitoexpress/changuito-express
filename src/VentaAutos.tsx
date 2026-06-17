@@ -43,12 +43,13 @@ export default function VentaAutos(props: Props) {
   const [tipo, setTipo]           = useState('todos');
   const [search, setSearch]       = useState('');
   const [modalAbierto, setModal]  = useState(false);
-  const [form, setForm]           = useState({ titulo: '', descripcion: '', precio: '', contacto_wa: '', anio: '', km: '' });
+  const [form, setForm]           = useState({ titulo: '', descripcion: '', precio: '', contacto_wa: '', anio: '', km: '', transmision: 'manual' });
+  const [solicitando, setSolicitando] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   const isDark        = props.theme === 'dark';
   const rol           = props.session.user.rol ?? 'cliente';
-  const puedePublicar = rol === 'admin' || rol === 'admin_autos' || rol === 'admin_bazar';
+  const puedePublicar = rol === 'admin' || rol === 'admin_autos' || rol === 'admin_bazar' || rol === 'agente_autos';
 
   const fetchItems = useCallback(async function() {
     setLoading(true); setError('');
@@ -67,13 +68,32 @@ export default function VentaAutos(props: Props) {
 
   useEffect(function() { fetchItems(); }, [fetchItems]);
 
+  async function solicitarRolAutos() {
+    setSolicitando(true);
+    try {
+      const { error } = await supabase.from('solicitudes_rol').insert({
+        user_id:    props.session.user.id,
+        email:      props.session.user.email ?? '',
+        rol_pedido: 'agente_autos',
+      });
+      if (error) throw error;
+      alert('✅ Solicitud enviada. El administrador revisará y te notificará.');
+    } catch(e: any) { alert('Error: ' + e.message); }
+    finally { setSolicitando(false); }
+  }
+
   async function publicar() {
     if (!form.titulo.trim()) return;
     setGuardando(true);
     try {
       const precio = parseFloat(form.precio) || null;
-      const extra  = (form.anio ? 'Año: ' + form.anio : '') + (form.km ? ' · ' + form.km + ' km' : '');
-      const desc   = [form.descripcion.trim(), extra].filter(Boolean).join(' · ') || null;
+      const extraParts = [
+        form.anio ? '📅 Año: ' + form.anio : '',
+        form.km   ? '🛣 ' + form.km + ' km' : '',
+        form.transmision ? '⚙ ' + (form.transmision === 'manual' ? 'Manual' : 'Automático') : '',
+      ].filter(Boolean);
+      const extra = extraParts.join(' · ');
+      const desc  = [form.descripcion.trim(), extra].filter(Boolean).join('\n──────────\n') || null;
       const { error: err } = await supabase.from('bazar_items').insert({
         vendedor_id:    props.session.user.id,
         vendedor_email: props.session.user.email ?? '',
@@ -89,7 +109,7 @@ export default function VentaAutos(props: Props) {
       });
       if (err) throw err;
       setModal(false);
-      setForm({ titulo: '', descripcion: '', precio: '', contacto_wa: '', anio: '', km: '' });
+      setForm({ titulo: '', descripcion: '', precio: '', contacto_wa: '', anio: '', km: '', transmision: 'manual' });
       fetchItems();
     } catch(e: any) { alert('Error: ' + e.message); }
     finally { setGuardando(false); }
@@ -232,11 +252,18 @@ export default function VentaAutos(props: Props) {
         })}
       </div>
 
-      {/* FAB publicar */}
-      {puedePublicar && (
+      {/* FAB publicar / Solicitar rol */}
+      {puedePublicar ? (
         <button onClick={function() { setModal(true); }}
           style={{ position: 'fixed', bottom: '24px', right: '24px', width: '56px', height: '56px', borderRadius: '18px', background: 'var(--color-yellow)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(250,204,21,0.4)', zIndex: 100 }}>
           <Plus style={{ width: '24px', height: '24px', color: '#020617' }} />
+        </button>
+      ) : (
+        <button onClick={solicitarRolAutos} disabled={solicitando}
+          style={{ position: 'fixed', bottom: '24px', right: '16px', padding: '12px 18px', borderRadius: '18px', background: 'rgba(124,58,237,0.9)', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', cursor: solicitando ? 'not-allowed' : 'pointer', boxShadow: '0 8px 24px rgba(124,58,237,0.3)', zIndex: 100 }}>
+          {solicitando
+            ? <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />
+            : <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>🚗 Quiero publicar</span>}
         </button>
       )}
 
@@ -265,6 +292,15 @@ export default function VentaAutos(props: Props) {
                   </div>
                 );
               })}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '5px' }}>⚙ Transmisión</label>
+                <select value={form.transmision} onChange={function(e){ setForm(function(prev){ return { ...prev, transmision: e.target.value }; }); }}
+                  style={{ width: '100%', padding: '11px 13px', borderRadius: '12px', border: '1px solid var(--border-medium)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                  <option value="manual">Manual</option>
+                  <option value="automatico">Automático</option>
+                  <option value="cvt">CVT</option>
+                </select>
+              </div>
             </div>
             <button onClick={publicar} disabled={guardando || !form.titulo.trim()}
               style={{ width: '100%', marginTop: '20px', background: !form.titulo.trim() ? 'var(--border-subtle)' : 'var(--color-yellow)', color: !form.titulo.trim() ? 'var(--text-muted)' : '#020617', fontWeight: 900, fontSize: '14px', padding: '15px', borderRadius: '14px', border: 'none', cursor: !form.titulo.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>

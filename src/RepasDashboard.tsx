@@ -180,15 +180,23 @@ export default function RepasDashboard(props: Props) {
   });
 
   async function tomarPedido(pedidoId: string) {
-    const { error: err } = await supabase
-      .from("pedidos")
-      .update({
-        repartidor_id: miId,
-        estatus: "en_camino",
-      })
-      .eq("id", pedidoId);
-    if (err) { alert('Error al tomar pedido: ' + err.message); return; }
-    fetchPedidos();
+    // Intentar vía RPC primero (bypasa RLS — requiere supabase_setup.sql ejecutado)
+    const { data: rpcData, error: rpcErr } = await supabase
+      .rpc('tomar_pedido_repartidor', { p_pedido_id: pedidoId, p_repartidor_id: miId });
+
+    if (rpcErr || !rpcData?.ok) {
+      const { error: err } = await supabase
+        .from("pedidos")
+        .update({ repartidor_id: miId, estatus: "en_camino" })
+        .eq("id", pedidoId);
+      if (err) {
+        alert('Error al tomar pedido: ' + err.message + '\n\nEjecuta supabase_setup.sql en Supabase para habilitar los permisos.');
+        return;
+      }
+    }
+
+    await fetchPedidos();
+    setTab("mis");
   }
 
   async function avanzarEstatus(pedido: Pedido) {
@@ -740,6 +748,23 @@ export default function RepasDashboard(props: Props) {
         {/* ── MIS PEDIDOS ── */}
         {tab === "mis" && (
           <div>
+            {/* Banner pedido en curso */}
+            {!loading && misPedidos.some(function(p){ return p.estatus === "en_camino"; }) && (
+              <div style={{ marginBottom: "16px", padding: "14px 16px", borderRadius: "16px", background: "linear-gradient(135deg,rgba(34,197,94,0.15),rgba(16,185,129,0.08))", border: "1px solid rgba(34,197,94,0.35)", display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "28px", flexShrink: 0 }}>🛵</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-green)", margin: "0 0 2px 0" }}>Pedido en curso</p>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {(function(){
+                      const p = misPedidos.find(function(p){ return p.estatus === "en_camino"; });
+                      return (p?.negocio_nombre ?? '') + (p?.direccion ? ' · ' + p.direccion : '');
+                    })()}
+                  </p>
+                </div>
+                <span style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", background: "rgba(34,197,94,0.2)", color: "var(--color-green)", fontWeight: 800, flexShrink: 0 }}>En camino</span>
+              </div>
+            )}
+
             {loading &&
               [1, 2, 3].map(function (i) {
                 return (

@@ -1,2 +1,3 @@
 - [Build shell env](build-shell-env.md) — agent shell has no npm/node on PATH; run vite build via explicit nodejs-20 bin path.
 - [ChanguitoAI integration](changuitoai-integration.md) — keep controlled abierto/onCerrar props; cart items must match CartItem shape (negocio/negocio_id/phone_number) or checkout crashes.
+- [Project rules](project-rules.md) — flat Vite+React+TS, inline styles only, `function(){}` syntax (NO arrow functions in runtime), `/* DO NOT TRANSLATE */` headers, git push manual por el usuario (GitHub → Vercel). Supabase `pedidos` has no `total`/`subtotal`/`detalle`/`costo_envio` — use `total_pagar`. Extra fields (recámaras/baños/transmisión) stored in `descripcion` text, no schema change needed.

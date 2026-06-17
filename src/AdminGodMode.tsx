@@ -11,10 +11,11 @@ import type { AppSession, Theme } from './App';
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
   id:               string;
+  cliente_id:       string | null;
   cliente_email:    string | null;
   negocio_nombre:   string | null;
   detalle:          string | null;
-  total:            number | null;
+  total_pagar:      number | null;
   estatus:          string;
   forma_pago:       string | null;
   direccion:        string | null;
@@ -25,14 +26,31 @@ interface Pedido {
 }
 
 interface Metricas {
-  totalPedidos:    number;
-  pedidosHoy:      number;
-  ingresoTotal:    number;
-  ingresoHoy:      number;
-  totalMerchants:  number;
+  totalPedidos:      number;
+  pedidosHoy:        number;
+  ingresoTotal:      number;
+  ingresoHoy:        number;
+  comisionTotal:     number;
+  ingresosNetos:     number;
+  totalMerchants:    number;
   merchantsAbiertos: number;
-  totalClientes:   number;
+  totalClientes:     number;
   pedidosPendientes: number;
+}
+
+const RESTAURANTES_CASHBACK = ['cubiertos', 'atomica', 'tripoli'];
+const COMISION_PCT = 0.15;
+
+function estaAbiertoAhora(m: any): boolean {
+  if (m.hora_apertura && m.hora_cierre) {
+    const ahora = new Date();
+    const hh = ahora.getHours() * 100 + ahora.getMinutes();
+    const ap = parseInt(String(m.hora_apertura).replace(':', ''), 10);
+    const ci = parseInt(String(m.hora_cierre).replace(':', ''), 10);
+    if (ap <= ci) return hh >= ap && hh <= ci;
+    return hh >= ap || hh <= ci;
+  }
+  return m.is_open ?? false;
 }
 
 interface AdminProps {
@@ -112,11 +130,15 @@ export default function AdminGodMode(props: AdminProps) {
       const hoyData  = rHoy.data ?? [];
       const merch    = rMerch.data ?? [];
 
+      const ingresoTotal = todos.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0);
+      const ingresoHoy   = hoyData.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0);
       setMetricas({
         totalPedidos:      todos.length,
         pedidosHoy:        hoyData.length,
-        ingresoTotal:      todos.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0),
-        ingresoHoy:        hoyData.reduce(function(a: number, p: any){ return a + (p.total_pagar ?? 0); }, 0),
+        ingresoTotal,
+        ingresoHoy,
+        comisionTotal:     Math.round(ingresoTotal * COMISION_PCT * 100) / 100,
+        ingresosNetos:     Math.round(ingresoTotal * (1 - COMISION_PCT) * 100) / 100,
         totalMerchants:    merch.length,
         merchantsAbiertos: merch.filter(function(m: any){ return m.is_open; }).length,
         totalClientes:     (rClientes.data ?? []).length,
@@ -154,19 +176,41 @@ export default function AdminGodMode(props: AdminProps) {
   useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores]);
 
   async function cambiarEstatus(pedidoId: string, nuevoEstatus: string) {
-    const { error: err, data } = await supabase
-      .from('pedidos')
-      .update({ estatus: nuevoEstatus })
-      .eq('id', pedidoId)
-      .select('id');
-    if (err) {
-      alert('Error al cambiar estatus: ' + err.message + '\n\nRevisa las políticas RLS en Supabase → tabla pedidos → UPDATE policy.');
-      return;
+    // Intentar vía RPC (bypasa RLS — requiere haber ejecutado supabase_setup.sql)
+    const { data: rpcData, error: rpcErr } = await supabase
+      .rpc('cambiar_estatus_pedido', { p_id: pedidoId, p_estatus: nuevoEstatus });
+
+    if (rpcErr || !rpcData?.ok) {
+      // Fallback: actualización directa
+      const { error: err, data: upData } = await supabase
+        .from('pedidos')
+        .update({ estatus: nuevoEstatus })
+        .eq('id', pedidoId)
+        .select('id');
+      if (err || !upData?.length) {
+        alert('⚠️ No se pudo cambiar el estatus.\n\nEjecuta supabase_setup.sql en el SQL Editor de Supabase para habilitar los permisos.\n\n' + (err?.message ?? 'Sin filas afectadas.'));
+        return;
+      }
     }
-    if (!data || data.length === 0) {
-      alert('⚠️ El pedido no se actualizó. Verifica que el id sea correcto y que la política RLS permita UPDATE al admin.');
-      return;
+
+    // Si se marca entregado → acreditar cashback ChangoMonedero (Los Cubiertos / La Atómica / Tacos Trípoli)
+    if (nuevoEstatus === 'entregado') {
+      const pedido = pedidos.find(function(p) { return p.id === pedidoId; });
+      if (pedido && pedido.cliente_id) {
+        const negNombre = (pedido.negocio_nombre ?? '').toLowerCase();
+        const aplica = RESTAURANTES_CASHBACK.some(function(r) { return negNombre.includes(r); });
+        if (aplica) {
+          const cashback = Math.round((pedido.total_pagar ?? 0) * 0.05 * 100) / 100;
+          const { data: mon } = await supabase
+            .from('monedero_cliente').select('saldo_cashback')
+            .eq('user_id', pedido.cliente_id).maybeSingle();
+          const nuevoSaldo = (mon?.saldo_cashback ?? 0) + cashback;
+          await supabase.from('monedero_cliente')
+            .upsert({ user_id: pedido.cliente_id, saldo_cashback: nuevoSaldo }, { onConflict: 'user_id' });
+        }
+      }
     }
+
     fetchPedidos(); fetchMetricas();
   }
 
@@ -330,7 +374,7 @@ export default function AdminGodMode(props: AdminProps) {
                             <p style={{ fontSize:'12px', color:'var(--text-secondary)', margin:0 }}>{pedido.direccion}</p>
                           </div>
                         )}
-                        <div style={{ display:'flex', gap:'8px' }}>
+                        <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
                           {pedido.forma_pago && (
                             <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'8px', background:'var(--color-blue-dim)', color:'var(--color-blue)', fontWeight:700 }}>
                               💳 {pedido.forma_pago}
@@ -341,6 +385,15 @@ export default function AdminGodMode(props: AdminProps) {
                               {pedido.canal === 'webapp' ? '📱 App' : '💬 WhatsApp'}
                             </span>
                           )}
+                          {pedido.forma_pago === 'efectivo' ? (
+                            <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'8px', background:'rgba(34,197,94,0.12)', color:'var(--color-green)', fontWeight:700 }}>
+                              💵 Cobrar al entregar
+                            </span>
+                          ) : pedido.forma_pago ? (
+                            <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'8px', background:'var(--color-yellow-dim)', color:'var(--color-yellow)', fontWeight:700 }}>
+                              🔄 Pendiente transferencia
+                            </span>
+                          ) : null}
                         </div>
                         {/* Botones de estatus */}
                         <div>
@@ -451,10 +504,17 @@ export default function AdminGodMode(props: AdminProps) {
                     <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>{m.category} · ★ {(m.rating ?? 4.5).toFixed(1)}</p>
                   </div>
                   {/* Toggle abierto/cerrado */}
-                  <button onClick={function(){ toggleMerchant(m.id, m.is_open); }}
-                    style={{ padding:'6px 12px', borderRadius:'10px', border:'none', background:m.is_open?'var(--color-green-dim)':'var(--color-red-dim)', color:m.is_open?'var(--color-green)':'var(--color-red)', fontSize:'11px', fontWeight:800, cursor:'pointer', whiteSpace:'nowrap' }}>
-                    {m.is_open ? '● Abierto' : '○ Cerrado'}
-                  </button>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px', flexShrink:0 }}>
+                    <button onClick={function(){ toggleMerchant(m.id, m.is_open); }}
+                      style={{ padding:'6px 12px', borderRadius:'10px', border:'none', background:m.is_open?'var(--color-green-dim)':'var(--color-red-dim)', color:m.is_open?'var(--color-green)':'var(--color-red)', fontSize:'11px', fontWeight:800, cursor:'pointer', whiteSpace:'nowrap' }}>
+                      {m.is_open ? '● Abierto' : '○ Cerrado'}
+                    </button>
+                    {(m.hora_apertura && m.hora_cierre) && (
+                      <span style={{ fontSize:'9px', color:estaAbiertoAhora(m)?'var(--color-green)':'var(--text-muted)', fontWeight:700 }}>
+                        {m.hora_apertura}–{m.hora_cierre} {estaAbiertoAhora(m)?'✓ ahora':'○ cerrado'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -473,7 +533,11 @@ export default function AdminGodMode(props: AdminProps) {
                     <div style={{ position:'absolute', right:'-10px', top:'-10px', width:'80px', height:'80px', borderRadius:'50%', background:'rgba(255,255,255,0.15)' }} />
                     <p style={{ fontSize:'11px', fontWeight:900, color:'rgba(2,6,23,0.5)', textTransform:'uppercase', letterSpacing:'0.15em', margin:'0 0 4px 0' }}>Ingresos totales</p>
                     <p style={{ fontSize:'32px', fontWeight:900, color:'#020617', margin:'0 0 4px 0' }}>${metricas.ingresoTotal.toLocaleString('es-MX')}</p>
-                    <p style={{ fontSize:'13px', color:'rgba(2,6,23,0.6)', margin:0 }}>Hoy: ${metricas.ingresoHoy.toLocaleString('es-MX')}</p>
+                    <p style={{ fontSize:'13px', color:'rgba(2,6,23,0.6)', margin:'0 0 6px 0' }}>Hoy: ${metricas.ingresoHoy.toLocaleString('es-MX')}</p>
+                    <div style={{ display:'flex', gap:'12px', flexWrap:'wrap' }}>
+                      <span style={{ fontSize:'10px', fontWeight:800, color:'rgba(2,6,23,0.55)' }}>Comisión (15%): ${metricas.comisionTotal.toLocaleString('es-MX')}</span>
+                      <span style={{ fontSize:'10px', fontWeight:800, color:'rgba(2,6,23,0.55)' }}>Neto negocios: ${metricas.ingresosNetos.toLocaleString('es-MX')}</span>
+                    </div>
                   </div>
 
                   {[

@@ -68,13 +68,13 @@ export default function ChangoMonedero(props: Props) {
       }
       setMonedero(mon);
 
-      // Cargar historial de pedidos
+      // Cargar historial de pedidos (todos, para contar entregados reales)
       const { data: peds } = await supabase
         .from('pedidos')
         .select('id, negocio_nombre, total_pagar, estatus, created_at')
         .eq('cliente_id', uid)
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(50);
       setPedidos(peds ?? []);
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
@@ -82,9 +82,9 @@ export default function ChangoMonedero(props: Props) {
 
   useEffect(function() { cargar(); }, [cargar]);
 
-  const modulo       = (monedero?.pedidos_realizados ?? 0) % 10;
-  const progreso     = Math.round((modulo / 10) * 100);
-  const pedidosFalta = modulo === 0 && (monedero?.pedidos_realizados ?? 0) > 0 ? 0 : 10 - modulo;
+  const entregados   = pedidos.filter(function(p){ return p.estatus === 'entregado'; }).length;
+  const progreso     = Math.min(Math.round((entregados / 7) * 100), 100);
+  const pedidosFalta = entregados >= 7 ? 0 : 7 - entregados;
   const cashback     = monedero?.saldo_cashback ?? 0;
   const totalGastado = pedidos.filter(function(p){ return p.estatus === 'entregado'; })
     .reduce(function(a, p){ return a + (p.total_pagar ?? 0); }, 0);
