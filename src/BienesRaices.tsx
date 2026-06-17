@@ -1,5 +1,5 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Plus, Phone, RefreshCw, X, MapPin, DollarSign } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
@@ -45,6 +45,9 @@ export default function BienesRaices(props: Props) {
   const [form, setForm]           = useState({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa', recamaras: '', banos: '', amueblado: 'no' });
   const [solicitando, setSolicitando] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [fotosFiles, setFotosFiles]   = useState<File[]>([]);
+  const [fotosPreview, setFotosPreview] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isDark      = props.theme === 'dark';
   const rol         = props.session.user.rol ?? 'cliente';
@@ -81,6 +84,23 @@ export default function BienesRaices(props: Props) {
     finally { setSolicitando(false); }
   }
 
+  async function subirFotos(archivos: File[]): Promise<string[]> {
+    const urls: string[] = [];
+    for (let i = 0; i < archivos.length; i++) {
+      const archivo = archivos[i];
+      const ext  = archivo.name.split('.').pop() ?? 'jpg';
+      const ruta = 'inmuebles/' + Date.now() + '_' + i + '.' + ext;
+      const { data, error } = await supabase.storage
+        .from('changuito-fotos')
+        .upload(ruta, archivo, { cacheControl: '3600', upsert: false });
+      if (!error && data) {
+        const { data: pub } = supabase.storage.from('changuito-fotos').getPublicUrl(data.path);
+        urls.push(pub.publicUrl);
+      }
+    }
+    return urls;
+  }
+
   async function publicar() {
     if (!form.titulo.trim()) return;
     setGuardando(true);
@@ -92,6 +112,10 @@ export default function BienesRaices(props: Props) {
         form.amueblado !== 'no' ? '🛋 Amueblado: ' + (form.amueblado === 'si' ? 'Sí' : 'Parcial') : '',
       ].filter(Boolean).join(' | ');
       const descripcionFinal = [form.descripcion.trim(), extras].filter(Boolean).join('\n──────────\n');
+      let fotosUrls: string[] = [];
+      if (fotosFiles.length > 0) {
+        fotosUrls = await subirFotos(fotosFiles);
+      }
       const { error: err } = await supabase.from('bazar_items').insert({
         vendedor_id:    props.session.user.id,
         vendedor_email: props.session.user.email ?? '',
@@ -99,7 +123,7 @@ export default function BienesRaices(props: Props) {
         descripcion:    descripcionFinal || null,
         precio:         precio,
         categoria:      'inmuebles',
-        fotos:          null,
+        fotos:          fotosUrls.length > 0 ? fotosUrls : null,
         estado:         'activo',
         es_gratis:      !precio,
         contacto_wa:    form.contacto_wa.trim() || null,
@@ -108,6 +132,8 @@ export default function BienesRaices(props: Props) {
       if (err) throw err;
       setModal(false);
       setForm({ titulo: '', descripcion: '', precio: '', contacto_wa: '', tipo_sub: 'casa', recamaras: '', banos: '', amueblado: 'no' });
+      setFotosFiles([]);
+      setFotosPreview([]);
       fetchItems();
     } catch(e: any) { alert('Error: ' + e.message); }
     finally { setGuardando(false); }
@@ -274,7 +300,7 @@ export default function BienesRaices(props: Props) {
       {modalAbierto && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={function() { setModal(false); }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: '480px', margin: '0 auto', background: 'var(--bg-card)', borderRadius: '24px 24px 0 0', padding: '20px 20px 40px', zIndex: 301 }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '480px', margin: '0 auto', background: 'var(--bg-card)', borderRadius: '24px 24px 0 0', padding: '20px 20px 40px', zIndex: 301, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--border-medium)', margin: '0 auto 20px' }} />
             <h2 style={{ fontSize: '18px', fontWeight: 900, color: 'var(--text-primary)', margin: '0 0 20px 0' }}>📝 Publicar propiedad</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -315,6 +341,32 @@ export default function BienesRaices(props: Props) {
                   <option value="si">Completamente amueblado</option>
                   <option value="parcial">Semi-amueblado</option>
                 </select>
+              </div>
+
+              {/* ── Subir fotos ── */}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '5px' }}>📷 Fotos (máx. 5 imágenes)</label>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                  onChange={function(e) {
+                    const files = Array.from(e.target.files ?? []).slice(0, 5);
+                    setFotosFiles(files);
+                    setFotosPreview(files.map(function(f) { return URL.createObjectURL(f); }));
+                  }} />
+                <button type="button"
+                  onClick={function() { if (fileInputRef.current) { fileInputRef.current.click(); } }}
+                  style={{ width: '100%', padding: '11px 13px', borderRadius: '12px', border: '1.5px dashed var(--border-medium)', background: 'transparent', color: fotosFiles.length > 0 ? 'var(--color-yellow)' : 'var(--text-muted)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
+                  {fotosFiles.length > 0 ? '✅ ' + fotosFiles.length + ' foto(s) lista(s)' : '+ Seleccionar fotos'}
+                </button>
+                {fotosPreview.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+                    {fotosPreview.map(function(url, i) {
+                      return (
+                        <img key={i} src={url} alt={'foto ' + (i + 1)}
+                          style={{ width: '72px', height: '72px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--border-medium)' }} />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <button onClick={publicar} disabled={guardando || !form.titulo.trim()}

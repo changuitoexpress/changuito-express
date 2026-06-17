@@ -95,6 +95,9 @@ export default function AdminGodMode(props: AdminProps) {
   const [repartidores, setRepartidores]   = useState<any[]>([]);
   const [selRep, setSelRep]               = useState<Record<string, string>>({});
   const [asignando, setAsignando]         = useState<string | null>(null);
+  const [solicitudes, setSolicitudes]     = useState<any[]>([]);
+  const [resolviendoSol, setResolviendoSol] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg]             = useState('');
   const isDark = props.theme === 'dark';
 
   // Verificar que sea admin
@@ -160,9 +163,27 @@ export default function AdminGodMode(props: AdminProps) {
     finally { setLoadingP(false); }
   }, [filtroEstatus]);
 
+  async function autoSyncHorarios(lista: any[]) {
+    const desfasados = lista.filter(function(m) {
+      if (!m.hora_apertura || !m.hora_cierre) return false;
+      return m.is_open !== estaAbiertoAhora(m);
+    });
+    if (desfasados.length === 0) return;
+    for (let i = 0; i < desfasados.length; i++) {
+      const m = desfasados[i];
+      await supabase.from('merchants').update({ is_open: estaAbiertoAhora(m) }).eq('id', m.id);
+    }
+    setSyncMsg('⟳ Horarios sincronizados (' + desfasados.length + ' negocios)');
+    setTimeout(function() { setSyncMsg(''); }, 3000);
+    const { data: fresco } = await supabase.from('merchants').select('*').order('name');
+    setMerchants(fresco ?? []);
+  }
+
   const fetchMerchants = useCallback(async function() {
     const { data } = await supabase.from('merchants').select('*').order('name');
-    setMerchants(data ?? []);
+    const lista = data ?? [];
+    setMerchants(lista);
+    autoSyncHorarios(lista);
   }, []);
 
   const fetchRepartidores = useCallback(async function() {
@@ -173,7 +194,36 @@ export default function AdminGodMode(props: AdminProps) {
     setRepartidores(data ?? []);
   }, []);
 
-  useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores]);
+  const fetchSolicitudes = useCallback(async function() {
+    const { data } = await supabase
+      .from('solicitudes_rol')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setSolicitudes(data ?? []);
+  }, []);
+
+  async function resolverSolicitud(solId: string, decision: 'aprobado' | 'rechazado') {
+    setResolviendoSol(solId);
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase
+        .rpc('resolver_solicitud_rol', { p_solicitud_id: solId, p_decision: decision });
+      if (rpcErr || !rpcData?.ok) {
+        // Fallback directo
+        await supabase.from('solicitudes_rol').update({ estado: decision }).eq('id', solId);
+        if (decision === 'aprobado') {
+          const sol = solicitudes.find(function(s) { return s.id === solId; });
+          if (sol) {
+            await supabase.from('perfiles')
+              .upsert({ id: sol.user_id, rol: sol.rol_pedido }, { onConflict: 'id' });
+          }
+        }
+      }
+      fetchSolicitudes();
+    } catch(e: any) { alert('Error: ' + e.message); }
+    finally { setResolviendoSol(null); }
+  }
+
+  useEffect(function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchRepartidores(); fetchSolicitudes(); }, [fetchMetricas, fetchPedidos, fetchMerchants, fetchRepartidores, fetchSolicitudes]);
 
   async function cambiarEstatus(pedidoId: string, nuevoEstatus: string) {
     // Intentar vía RPC (bypasa RLS — requiere haber ejecutado supabase_setup.sql)
@@ -265,7 +315,7 @@ export default function AdminGodMode(props: AdminProps) {
             </div>
           </div>
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-            <button onClick={function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); }} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <button onClick={function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchSolicitudes(); }} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
               <RefreshCw style={{ width:'16px', height:'16px', color:'var(--text-muted)' }} />
             </button>
             <ThemeToggle theme={props.theme} onToggle={props.onThemeToggle} />
@@ -489,11 +539,17 @@ export default function AdminGodMode(props: AdminProps) {
         {/* ── TAB NEGOCIOS ── */}
         {tab === 'negocios' && (
           <div>
+            {syncMsg && (
+              <div style={{ padding:'8px 12px', borderRadius:'10px', background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.3)', marginBottom:'12px' }}>
+                <p style={{ fontSize:'12px', fontWeight:700, color:'var(--color-green)', margin:0 }}>{syncMsg}</p>
+              </div>
+            )}
             <div style={{ display:'flex', gap:'10px', marginBottom:'16px' }}>
               <MetricaCard emoji="🏪" titulo="Total negocios"  valor={merchants.length} />
-              <MetricaCard emoji="✅" titulo="Abiertos ahora"  valor={merchants.filter(function(m){ return m.is_open; }).length} color="var(--color-green)" />
+              <MetricaCard emoji="✅" titulo="Abiertos ahora"  valor={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} color="var(--color-green)" />
             </div>
             {merchants.map(function(m){
+              const computadoAbierto = estaAbiertoAhora(m);
               return (
                 <div key={m.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px 14px', borderRadius:'14px', background:'var(--bg-card)', border:'1px solid var(--border-subtle)', marginBottom:'8px', boxShadow:'var(--shadow-card)' }}>
                   <div style={{ width:'40px', height:'40px', borderRadius:'12px', background:'linear-gradient(135deg,#1a1a2e,#2d2d44)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', flexShrink:0 }}>
@@ -503,16 +559,18 @@ export default function AdminGodMode(props: AdminProps) {
                     <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 2px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</p>
                     <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>{m.category} · ★ {(m.rating ?? 4.5).toFixed(1)}</p>
                   </div>
-                  {/* Toggle abierto/cerrado */}
+                  {/* Toggle abierto/cerrado (basado en horario calculado) */}
                   <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px', flexShrink:0 }}>
                     <button onClick={function(){ toggleMerchant(m.id, m.is_open); }}
-                      style={{ padding:'6px 12px', borderRadius:'10px', border:'none', background:m.is_open?'var(--color-green-dim)':'var(--color-red-dim)', color:m.is_open?'var(--color-green)':'var(--color-red)', fontSize:'11px', fontWeight:800, cursor:'pointer', whiteSpace:'nowrap' }}>
-                      {m.is_open ? '● Abierto' : '○ Cerrado'}
+                      style={{ padding:'6px 12px', borderRadius:'10px', border:'none', background:computadoAbierto?'var(--color-green-dim)':'var(--color-red-dim)', color:computadoAbierto?'var(--color-green)':'var(--color-red)', fontSize:'11px', fontWeight:800, cursor:'pointer', whiteSpace:'nowrap' }}>
+                      {computadoAbierto ? '● Abierto' : '○ Cerrado'}
                     </button>
-                    {(m.hora_apertura && m.hora_cierre) && (
-                      <span style={{ fontSize:'9px', color:estaAbiertoAhora(m)?'var(--color-green)':'var(--text-muted)', fontWeight:700 }}>
-                        {m.hora_apertura}–{m.hora_cierre} {estaAbiertoAhora(m)?'✓ ahora':'○ cerrado'}
+                    {(m.hora_apertura && m.hora_cierre) ? (
+                      <span style={{ fontSize:'9px', color:computadoAbierto?'var(--color-green)':'var(--text-muted)', fontWeight:700 }}>
+                        {m.hora_apertura}–{m.hora_cierre}
                       </span>
+                    ) : (
+                      <span style={{ fontSize:'9px', color:'var(--text-muted)', fontWeight:600 }}>Manual</span>
                     )}
                   </div>
                 </div>
@@ -570,6 +628,74 @@ export default function AdminGodMode(props: AdminProps) {
                     );
                   })}
                 </div>
+
+                {/* Estado de pagos */}
+                <div style={{ padding:'16px', borderRadius:'18px', background:'var(--bg-card)', border:'1px solid var(--border-subtle)', marginBottom:'16px' }}>
+                  <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 12px 0' }}>💳 Estado de pagos (todos)</p>
+                  {[
+                    { label:'💵 Efectivo (cobrar al repartidor)', key:'efectivo', color:'var(--color-green)' },
+                    { label:'🔄 Transferencia pendiente',         key:'transferencia', color:'var(--color-yellow)' },
+                  ].map(function(tp) {
+                    const count = pedidos.filter(function(p){
+                      return tp.key === 'efectivo' ? p.forma_pago === 'efectivo' : (p.forma_pago !== null && p.forma_pago !== 'efectivo');
+                    }).length;
+                    const pct = pedidos.length > 0 ? Math.round(count / pedidos.length * 100) : 0;
+                    return (
+                      <div key={tp.key} style={{ marginBottom:'10px' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                          <span style={{ fontSize:'11px', color:'var(--text-secondary)', fontWeight:600 }}>{tp.label}</span>
+                          <span style={{ fontSize:'11px', fontWeight:800, color:tp.color }}>{count} ({pct}%)</span>
+                        </div>
+                        <div style={{ height:'5px', borderRadius:'3px', background:'var(--border-subtle)', overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:pct+'%', borderRadius:'3px', background:tp.color, transition:'width 0.5s ease' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Solicitudes de rol pendientes */}
+                {solicitudes.filter(function(s){ return s.estado === 'pendiente'; }).length > 0 && (
+                  <div style={{ marginBottom:'16px' }}>
+                    <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 12px 0' }}>
+                      📋 Solicitudes de rol <span style={{ fontSize:'11px', padding:'2px 8px', borderRadius:'8px', background:'rgba(250,204,21,0.15)', color:'var(--color-yellow)', fontWeight:700 }}>{solicitudes.filter(function(s){ return s.estado === 'pendiente'; }).length}</span>
+                    </p>
+                    {solicitudes.filter(function(s){ return s.estado === 'pendiente'; }).map(function(sol){
+                      return (
+                        <div key={sol.id} style={{ padding:'12px 14px', borderRadius:'14px', background:'var(--bg-card)', border:'1px solid rgba(250,204,21,0.3)', marginBottom:'8px' }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px' }}>
+                            <div>
+                              <p style={{ fontSize:'12px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 2px 0' }}>{sol.email}</p>
+                              <p style={{ fontSize:'11px', color:'var(--color-yellow)', fontWeight:700, margin:0 }}>
+                                {sol.rol_pedido === 'agente_inmuebles' ? '🏠 Agente Inmuebles' : '🚗 Agente Autos'}
+                              </p>
+                            </div>
+                            <span style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:600 }}>
+                              {new Date(sol.created_at).toLocaleDateString('es-MX', { day:'2-digit', month:'short' })}
+                            </span>
+                          </div>
+                          <div style={{ display:'flex', gap:'8px' }}>
+                            <button onClick={function(){ resolverSolicitud(sol.id, 'aprobado'); }}
+                              disabled={resolviendoSol === sol.id}
+                              style={{ flex:1, padding:'8px', borderRadius:'10px', border:'none', background:'rgba(34,197,94,0.15)', color:'var(--color-green)', fontSize:'12px', fontWeight:800, cursor:resolviendoSol === sol.id ? 'not-allowed':'pointer' }}>
+                              {resolviendoSol === sol.id ? '...' : '✅ Aprobar'}
+                            </button>
+                            <button onClick={function(){ resolverSolicitud(sol.id, 'rechazado'); }}
+                              disabled={resolviendoSol === sol.id}
+                              style={{ flex:1, padding:'8px', borderRadius:'10px', border:'none', background:'rgba(239,68,68,0.12)', color:'var(--color-red)', fontSize:'12px', fontWeight:800, cursor:resolviendoSol === sol.id ? 'not-allowed':'pointer' }}>
+                              {resolviendoSol === sol.id ? '...' : '❌ Rechazar'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {solicitudes.filter(function(s){ return s.estado === 'pendiente'; }).length === 0 && (
+                  <div style={{ padding:'10px 14px', borderRadius:'12px', background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)', marginBottom:'16px' }}>
+                    <p style={{ fontSize:'12px', color:'var(--color-green)', fontWeight:700, margin:0 }}>✅ Sin solicitudes pendientes</p>
+                  </div>
+                )}
 
                 {/* Info del admin */}
                 <div style={{ padding:'14px 16px', borderRadius:'16px', background:'var(--color-yellow-dim)', border:'1px solid rgba(250,204,21,0.3)' }}>
