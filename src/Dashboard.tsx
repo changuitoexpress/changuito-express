@@ -3731,25 +3731,19 @@ export default function Dashboard(props: DashboardProps) {
 
             <div style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
 
-          {/* ─ 1 · ChangoMonedero (SIEMPRE PRIMERO) ─ */}
-<button
-  onClick={function () { setMenuAbierto(false); typeof setView === 'function' ? setView('changomonedero') : (props.onIrMonedero && props.onIrMonedero()); }}
-  style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "14px 12px", borderRadius: "14px", backgroundColor: "linear-gradient(135deg, rgba(250,204,21,0.2), rgba(245,158,11,0.1))", border: "1.5px solid rgba(250,204,21,0.45)", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: "900", textAlign: "left", marginBottom: "4px" }}
->
-
-
-                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"14px 12px", borderRadius:"14px", background:"linear-gradient(135deg,rgba(250,204,21,0.2),rgba(245,158,11,0.1))", border:"1.5px solid rgba(250,204,21,0.45)", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:900, textAlign:"left", marginBottom:"4px" }}
+              {/* - 1 - ChangoMonedero (SIEMPRE PRIMERO) - */}
+              <button
+                onClick={function () { setMenuAbierto(false); typeof setView === 'function' ? setView('changomonedero') : (props.onIrMonedero && props.onIrMonedero()); }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "14px 12px", borderRadius: "14px", backgroundColor: "rgba(250,204,21,0.1)", border: "1.5px solid rgba(250,204,21,0.45)", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: "900", textAlign: "left", marginBottom: "4px" }}
               >
-                <Wallet style={{ width:"20px", height:"20px", color:"#facc15", flexShrink:0 }} />
+                <Wallet style={{ width: "20px", height: "20px", color: "#facc15", flexShrink: 0 }} />
                 <div>
-                  <span style={{ display:"block", fontSize:"14px", fontWeight:900 }}>💰 ChangoMonedero</span>
-                  <span style={{ display:"block", fontSize:"10px", color:"#f59e0b", fontWeight:700 }}>Saldo · ChangoPesos · Beneficios</span>
+                  <span style={{ display: "block", fontSize: "14px", fontWeight: "900" }}> ChangoMonedero</span>
+                  <span style={{ display: "block", fontSize: "10px", color: "#f59e0b", fontWeight: "700" }}>Saldo · ChangoPesos · Beneficios</span>
                 </div>
               </button>
 
-              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
-
-              {/* ─ 2 · Restaurantes / Mandaditos / La Tiendita ─ */}
+               {/* ─ 2 · Restaurantes / Mandaditos / La Tiendita ─ */}
               <button
                 onClick={function () { setTabActiva("restaurantes"); setSearch(""); setMenuAbierto(false); }}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
