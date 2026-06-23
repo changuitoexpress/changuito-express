@@ -1014,7 +1014,7 @@ function ModalCheckout(props: {
 
       // Mensaje WhatsApp estructurado
       const linea = "━━━━━━━━━━━━━━━━━━━━━━";
-      let msg = "*🛵 CHANGUITO EXPRESS*\n" + linea + "\n";
+      let msg = "*🛵 CHANGUITO EXPRESS APP*\n" + linea + "\n";
       msg +=
         "👤 *Cliente:* " + (props.clienteNombre || props.clienteEmail) + "\n";
       msg +=
