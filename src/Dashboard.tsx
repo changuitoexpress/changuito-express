@@ -210,6 +210,11 @@ const SECCIONES_MAND = [
     keys: ["kfc", "pollo feliz", "flautlan", "wingstop"],
     emoji: "🍗",
   },
+  {
+    titulo: " cemitas",
+    keys: ["catedral"],
+    emoji: "🫓",
+  },
   { titulo: "Crepas", keys: ["crepa"], emoji: "🥞" },
   { titulo: "Cafeterías", keys: ["starbucks", "italian coffee", "milamoure"], emoji: "☕" },
   { titulo: "Saludable", keys: ["greenbite"], emoji: "🥗" },
