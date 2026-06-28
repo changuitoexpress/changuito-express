@@ -215,6 +215,11 @@ const SECCIONES_MAND = [
     keys: ["catedral"],
     emoji: "🫓",
   },
+  {
+    titulo: " cochinita pibil",
+    keys: ["coi coi"],
+    emoji: "🐽",
+},
   { titulo: "Crepas", keys: ["crepa"], emoji: "🥞" },
   { titulo: "Cafeterías", keys: ["starbucks", "italian coffee", "milamoure"], emoji: "☕" },
   { titulo: "Saludable", keys: ["greenbite"], emoji: "🥗" },
