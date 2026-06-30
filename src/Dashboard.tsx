@@ -185,6 +185,11 @@ const SECCIONES_MAND = [
     ],
     emoji: "💊",
   },
+  {
+      titulo: "Vinos y Licores",
+      keys: ["prissa", "la vinatería"],
+      emoji: "🍾",
+  },
   { titulo: "Papelerías", keys: ["papelomas", "depot", "ofix"], emoji: "📎" },
   { titulo: "Lavandería", keys: ["yumikos"], emoji: "👕" },
   {
@@ -211,14 +216,44 @@ const SECCIONES_MAND = [
     emoji: "🍗",
   },
   {
-    titulo: " cemitas",
+      titulo: "Sandwiches",
+      keys: ["subway"],
+      emoji: "🥖",
+  },
+  {
+    titulo: " Cemitas",
     keys: ["catedral"],
     emoji: "🫓",
   },
   {
-    titulo: " cochinita pibil",
+    titulo: "Cochinita Pibil",
     keys: ["coi coi"],
     emoji: "🐽",
+  },
+  {
+      titulo: "Memelas",
+      keys: ["resurreccion"],
+      emoji: "🌮",
+  },
+  {
+    titulo: "Elotes y Esquites",
+    keys: ["danielote", "d skite"],
+    emoji: "🌽",
+  },
+  {
+    titulo: "Fresas con Crema",
+    keys: ["mi rey fresas"],
+    emoji: "🍓",
+},
+  {
+      titulo: "Las Marquesitas",
+      keys: ["las marquesitas"],
+      emoji: "🧇",
+  },
+  {
+    titulo: "waffles",
+    keys: ["wafflegg"],
+    emoji: "🥞",
 },
   { titulo: "Crepas", keys: ["crepa"], emoji: "🥞" },
   { titulo: "Cafeterías", keys: ["starbucks", "italian coffee", "milamoure"], emoji: "☕" },
@@ -231,6 +266,11 @@ const SECCIONES_MAND = [
   { titulo: "Pescados y Mariscos", keys: ["taco cabo", "marea"], emoji: "🦐" },
   { titulo: "Mascotas", keys: ["petco", "guau", "clinica", "hospital", "shop"], emoji: "🐾" },
   { titulo: "Conveniencia", keys: ["oxxo", "seven eleven", "circle", "3b", "rola", "waldo"], emoji: "🏪" },
+  {
+      titulo: "Cosméticos",
+      keys: ["el pequeño gigante"],
+      emoji: "💄",
+  },
 ];
 
 // ─── Horario helpers ──────────────────────────────────────────────────────────
