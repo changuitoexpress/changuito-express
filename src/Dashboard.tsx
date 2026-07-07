@@ -251,7 +251,7 @@ const SECCIONES_MAND = [
       emoji: "🧇",
   },
   {
-    titulo: "waffles",
+    titulo: "Waffles",
     keys: ["wafflegg"],
     emoji: "🥞",
 },
