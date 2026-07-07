@@ -237,7 +237,7 @@ const SECCIONES_MAND = [
   },
   {
     titulo: "Elotes y Esquites",
-    keys: ["danielote", "d skite"],
+    keys: ["danielote", "d'skite"],
     emoji: "🌽",
   },
   {
