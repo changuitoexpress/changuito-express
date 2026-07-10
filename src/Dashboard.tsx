@@ -197,7 +197,7 @@ const SECCIONES_MAND = [
     keys: ["toks", "viejo", "ocho", "tagers", "almorzero", "asadoja", "cuetzalan"],
     emoji: "🍳",
   },
-  { titulo: "Taquerías", keys: ["oriental", "pastor", "suprema", "diego", "sirloncito", "toda", "activo", "rickis"], emoji: "🌮" },
+  { titulo: "Taquerías", keys: ["oriental", "don pastor", "salsa premier",  "suprema", "diego", "sirloncito", "toda", "activo", "rickis"], emoji: "🌮" },
   { titulo: "Pizzerías", keys: ["caesar", "domino", "angelotti", "vittorio"], emoji: "🍕" },
   {
     titulo: "Comida Asiática",
