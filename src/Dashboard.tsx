@@ -187,7 +187,7 @@ const SECCIONES_MAND = [
   },
   {
       titulo: "Vinos y Licores",
-      keys: ["prissa", "la vinatería"],
+      keys: ["prissa", "vineria"],
       emoji: "🍾",
   },
   { titulo: "Papelerías", keys: ["papelomas", "depot", "ofix"], emoji: "📎" },
