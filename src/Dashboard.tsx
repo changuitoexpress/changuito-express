@@ -194,7 +194,7 @@ const SECCIONES_MAND = [
   { titulo: "Lavandería", keys: ["yumikos"], emoji: "👕" },
   {
     titulo: "Desayunos",
-    keys: ["toks", "viejo", "ocho", "tagers", "almorzero", "asadoja", "cuetzalan"],
+    keys: ["toks", "viejo", "ocho 30", "tagers", "almorzero", "asadoja", "cuetzalan"],
     emoji: "🍳",
   },
   { titulo: "Taquerías", keys: ["oriental", "don pastor", "salsa premier",  "suprema", "diego", "sirloncito", "toda", "activo", "rickis"], emoji: "🌮" },
