@@ -227,7 +227,7 @@ const SECCIONES_MAND = [
   },
   {
     titulo: "Cochinita Pibil",
-    keys: ["coi coi"],
+    keys: ["koi koi"],
     emoji: "🐽",
   },
   {
