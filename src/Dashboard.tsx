@@ -166,7 +166,7 @@ const SECCIONES_MAND = [
   { titulo: "Frutas y Verduras", keys: ["canasta", "mercadito"], emoji: "🥦" },
   {
     titulo: "Carnicerías",
-    keys: ["lulu", "maravillas", "ryc", "wild fork", "norte", "san juan", "abastecen"],
+    keys: ["lulu", "maravillas", "ryc", "wild fork", "norte", "san juan", "abastessen"],
     emoji: "🥩",
   },
   { titulo: "Pollerías", keys: ["gallo giro"], emoji: "🐓" },
