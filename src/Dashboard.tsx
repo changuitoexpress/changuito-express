@@ -256,7 +256,7 @@ const SECCIONES_MAND = [
     emoji: "🥞",
 },
   { titulo: "Crepas", keys: ["crepa"], emoji: "🥞" },
-  { titulo: "Cafeterías", keys: ["starbucks", "italian coffee", "milamoure"], emoji: "☕" },
+  { titulo: "Cafeterías", keys: ["starbucks", "italian coffee", "milamour"], emoji: "☕" },
   { titulo: "Saludable", keys: ["greenbite"], emoji: "🥗" },
   { titulo: "Panaderías", keys: ["hackl", "rosario", "almendra"], emoji: "🥖" },
   { titulo: "Pastelerías", keys: ["la zarza", "la europea", "therese", "postreria", "tarlets", "karamella", "margu"], emoji: "🎂" },
