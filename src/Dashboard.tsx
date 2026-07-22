@@ -261,7 +261,7 @@ const SECCIONES_MAND = [
   { titulo: "Panaderías", keys: ["hackl", "rosario", "almendra"], emoji: "🥖" },
   { titulo: "Pastelerías", keys: ["la zarza", "la europea", "therese", "postreria", "tarlets", "karamella", "margu"], emoji: "🎂" },
   { titulo: "Heladerías", keys: ["santa clara", "queen", "moyo", "biancolatte"], emoji: "🍦" },
-  { titulo: "Bebidas Preparadas", keys: ["rapichela", "clama"], emoji: "🧃" },
+  { titulo: "Bebidas Preparadas", keys: ["rapichela", "clama"], emoji: "🍻" },
   { titulo: "Comida Libanesa", keys: ["biblos"], emoji: "🫔" },
   { titulo: "Pescados y Mariscos", keys: ["taco cabo", "marea"], emoji: "🦐" },
   { titulo: "Mascotas", keys: ["petco", "guau", "clinica", "hospital", "shop"], emoji: "🐾" },
