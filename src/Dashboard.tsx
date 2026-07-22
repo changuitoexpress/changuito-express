@@ -265,7 +265,7 @@ const SECCIONES_MAND = [
   { titulo: "Comida Libanesa", keys: ["biblos"], emoji: "🫔" },
   { titulo: "Pescados y Mariscos", keys: ["taco cabo", "marea"], emoji: "🦐" },
   { titulo: "Mascotas", keys: ["petco", "guau", "clinica", "hospital", "shop"], emoji: "🐾" },
-  { titulo: "Conveniencia", keys: ["oxxo", "seven eleven", "circle", "3b", "rola", "waldo"], emoji: "🏪" },
+  { titulo: "Conveniencia", keys: ["oxxo", "seven eleven", "circle", "3b", "rola", "waldo's"], emoji: "🏪" },
   {
       titulo: "Cosméticos",
       keys: ["el pequeño gigante"],
