@@ -19,7 +19,7 @@ Flat Vite + React + TypeScript project. No monorepo — single package at the ro
 /
 ├── index.html          # HTML entry point → /src/main.tsx
 ├── package.json        # Single package, all deps here
-├── vite.config.ts      # Vite config (port 5173, host 0.0.0.0)
+├── vite.config.ts      # Vite config (port 5000, host 0.0.0.0)
 ├── tsconfig.json       # TypeScript config
 └── src/
     ├── main.tsx        # React root mount
@@ -36,5 +36,15 @@ Set these in Replit Secrets before running:
 ## Dev Server
 
 ```
-npm run dev   # starts Vite on port 5173
+npm run dev   # starts Vite on port 5000
 ```
+
+Use the **Start application** workflow (or the Run button) to open the app in
+Replit Preview. Vite accepts Replit's proxied preview hosts.
+
+Install dependencies with `npm ci` after cloning. Run `npm run build` to build
+the production bundle in `dist/`; `npm run preview` serves that bundle locally.
+
+The Supabase values above must come from the existing Supabase project. Do not
+use a service-role key in a `VITE_` variable: these values are public in the
+browser bundle. Restart the workflow after changing secrets.
