@@ -658,7 +658,7 @@ describe("sesión y cierre de sesión", function () {
     assert.equal(warningCalls, 1);
   });
 
-  it("cancela el aviso anterior cuando la sesión se renueva", function () {
+  it("ignora el aviso atrasado aunque la cuenta nueva comparta el vencimiento", function () {
     const timers: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
     let warningCalls = 0;
     const schedule = function (callback: () => void, delayMs: number) {
@@ -682,7 +682,7 @@ describe("sesión y cierre de sesión", function () {
 
     clearOldWarning();
     scheduleSessionExpiryWarning(
-      2200,
+      1600,
       function () {
         warningCalls += 1;
       },
@@ -691,11 +691,14 @@ describe("sesión y cierre de sesión", function () {
       schedule,
       cancel,
     );
-    if (!timers[0].cancelled) timers[0].callback();
+    timers[0].callback();
 
     assert.equal(timers[0].cancelled, true);
-    assert.equal(timers[1].delayMs, 900_000);
+    assert.equal(timers[1].delayMs, 300_000);
     assert.equal(warningCalls, 0);
+
+    timers[1].callback();
+    assert.equal(warningCalls, 1);
   });
 
   it("mantiene la pantalla pública si no hay sesión guardada", async function () {

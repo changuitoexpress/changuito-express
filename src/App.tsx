@@ -939,7 +939,7 @@ export default function App() {
         setSessionExpiryWarning(true);
       });
     },
-    [session?.expiresAt],
+    [session?.user.id, session?.expiresAt],
   );
 
   if (booting) {

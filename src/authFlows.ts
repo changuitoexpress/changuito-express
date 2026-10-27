@@ -60,9 +60,13 @@ export function scheduleSessionExpiryWarning(
     return function () {};
   }
 
+  let active = true;
   const delayMs = Math.max(0, expiresAt * 1000 - nowMs - warningLeadMs);
-  const timer = schedule(onWarning, delayMs);
+  const timer = schedule(function () {
+    if (active) onWarning();
+  }, delayMs);
   return function () {
+    active = false;
     cancel(timer);
   };
 }
