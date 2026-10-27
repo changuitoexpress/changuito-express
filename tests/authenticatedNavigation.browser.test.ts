@@ -58,7 +58,12 @@ async function waitForServer(url: string, server: ReturnType<typeof spawn>) {
   throw new Error("Vite did not become ready within 30 seconds.");
 }
 
-async function mockSupabase(page: import("playwright").Page) {
+async function mockSupabase(
+  page: import("playwright").Page,
+  role: "admin" | "cliente" = "admin",
+  userId = fixtureUserId,
+  email = "uliseseven.7@gmail.com",
+) {
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
@@ -69,14 +74,21 @@ async function mockSupabase(page: import("playwright").Page) {
 
     if (url.pathname === "/auth/v1/user") {
       data = {
-        id: fixtureUserId,
-        email: "uliseseven.7@gmail.com",
+        id: userId,
+        email,
         user_metadata: {},
         app_metadata: { provider: "email", providers: ["email"] },
       };
     } else if (url.pathname === "/rest/v1/perfiles" && acceptsObject) {
-      data = { nombre: "Browser Fixture Admin", rol: "admin" };
-    } else if (url.pathname === "/rest/v1/merchant_admins" && acceptsObject) {
+      data = {
+        nombre: role === "admin" ? "Browser Fixture Admin" : "Browser Fixture Customer",
+        rol: role,
+      };
+    } else if (
+      url.pathname === "/rest/v1/merchant_admins" &&
+      acceptsObject &&
+      role === "admin"
+    ) {
       data = { merchant_id: fixtureMerchant.id };
     } else if (url.pathname === "/rest/v1/merchants") {
       data = acceptsObject ? fixtureMerchant : [fixtureMerchant];
@@ -98,6 +110,25 @@ async function mockSupabase(page: import("playwright").Page) {
       body: JSON.stringify(data),
     });
   });
+}
+
+function createFixtureSession(userId: string, email: string) {
+  return {
+    access_token: "browser-fixture-access-token",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    refresh_token: "browser-fixture-refresh-token",
+    user: {
+      id: userId,
+      aud: "authenticated",
+      role: "authenticated",
+      email,
+      app_metadata: { provider: "email", providers: ["email"] },
+      user_metadata: {},
+      created_at: new Date().toISOString(),
+    },
+  };
 }
 
 it("renders every authenticated screen and returns to the dashboard", async function (t) {
@@ -141,22 +172,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
   });
 
   const context = await browser.newContext();
-  const session = {
-    access_token: "browser-fixture-access-token",
-    token_type: "bearer",
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-    refresh_token: "browser-fixture-refresh-token",
-    user: {
-      id: fixtureUserId,
-      aud: "authenticated",
-      role: "authenticated",
-      email: "uliseseven.7@gmail.com",
-      app_metadata: { provider: "email", providers: ["email"] },
-      user_metadata: {},
-      created_at: new Date().toISOString(),
-    },
-  };
+  const session = createFixtureSession(fixtureUserId, "uliseseven.7@gmail.com");
   await context.addInitScript(
     function (storedSession) {
       localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
@@ -199,5 +215,55 @@ it("renders every authenticated screen and returns to the dashboard", async func
     });
   }
 
+  const customerId = "browser-fixture-customer";
+  const customerEmail = "customer@example.test";
+  const customerContext = await browser.newContext();
+  await customerContext.addInitScript(
+    function (storedSession) {
+      localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+      localStorage.setItem("changuito-theme", "light");
+    },
+    createFixtureSession(customerId, customerEmail),
+  );
+  const customerPage = await customerContext.newPage();
+  customerPage.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+  const merchantAdminLookup = customerPage.waitForResponse(function (response) {
+    return response.url().includes("/rest/v1/merchant_admins");
+  });
+  await mockSupabase(customerPage, "cliente", customerId, customerEmail);
+  await customerPage.goto(appUrl);
+  await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await merchantAdminLookup;
+  await customerPage.getByRole("button", { name: "Abrir menú" }).click();
+
+  for (const restrictedMenuLabel of [
+    "Panel de Negocios",
+    "Panel Repartidor",
+    "God Mode",
+  ]) {
+    assert.equal(
+      await customerPage.getByRole("button", { name: new RegExp(restrictedMenuLabel) }).count(),
+      0,
+      `Regular users should not see the ${restrictedMenuLabel} menu entry.`,
+    );
+  }
+
+  await customerPage.getByRole("button", { name: "Cerrar menú" }).click();
+  await customerPage.evaluate(async function () {
+    const fixture = await import("/tests/fixtures/adminAccessHarness.tsx");
+    const container = document.createElement("div");
+    container.id = "admin-access-fixture";
+    document.body.append(container);
+    fixture.mountAdminAccessHarness(container);
+  });
+
+  const adminAccessFixture = customerPage.locator("#admin-access-fixture");
+  await adminAccessFixture.getByText("Acceso restringido", { exact: true }).waitFor();
+  await adminAccessFixture.getByRole("button", { name: "Volver" }).click();
+  await adminAccessFixture.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+
+  await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");
 });
