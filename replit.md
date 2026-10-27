@@ -40,7 +40,9 @@ npm run dev   # starts Vite on port 5000
 ```
 
 Use the **Start application** workflow (or the Run button) to open the app in
-Replit Preview. Vite accepts Replit's proxied preview hosts.
+Replit Preview. The workflow installs locked dependencies before starting Vite,
+which accepts Replit's proxied preview hosts. The `clean-build` validation
+workflow is separate and does not run from the Run button.
 
 Install dependencies with `npm ci` after cloning. Run `npm run build` to build
 the production bundle in `dist/`; `npm run preview` serves that bundle locally.
@@ -48,3 +50,6 @@ the production bundle in `dist/`; `npm run preview` serves that bundle locally.
 The Supabase values above must come from the existing Supabase project. Do not
 use a service-role key in a `VITE_` variable: these values are public in the
 browser bundle. Restart the workflow after changing secrets.
+
+After task merges, `scripts/post-merge.sh` installs locked dependencies and builds
+the app before Replit reconciles the running workflows.
