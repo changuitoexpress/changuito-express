@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 5000",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5000",
-    "test": "tsx --test tests/authFlows.test.ts tests/authenticatedNavigation.browser.test.ts tests/freeShippingProgress.test.ts"
+    "test": "tsx --test tests/authFlows.test.ts tests/authenticatedNavigation.browser.test.ts tests/freeShippingProgress.test.ts tests/walletLoading.browser.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
