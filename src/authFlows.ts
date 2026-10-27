@@ -322,17 +322,23 @@ export function startAuthSession(
   let mounted = true;
   let latestAuthEvent = 0;
   const startupAuthEvent = latestAuthEvent;
-  const subscription = watchAuthSession(
-    client,
-    function (session) {
-      if (mounted) onSession(session);
-    },
-    function () {
-      latestAuthEvent += 1;
-    },
-  );
+  let subscription: ReturnType<typeof watchAuthSession> | null = null;
+  try {
+    subscription = watchAuthSession(
+      client,
+      function (session) {
+        if (mounted) onSession(session);
+      },
+      function () {
+        latestAuthEvent += 1;
+      },
+    );
+  } catch (e) {}
 
-  restoreAuthSession(client)
+  const restoredSession = subscription
+    ? restoreAuthSession(client)
+    : Promise.resolve(null);
+  restoredSession
     .then(function (restored) {
       if (mounted && startupAuthEvent === latestAuthEvent && restored) {
         onSession(restored);
@@ -345,7 +351,7 @@ export function startAuthSession(
 
   return function () {
     mounted = false;
-    subscription.unsubscribe();
+    if (subscription) subscription.unsubscribe();
   };
 }
 

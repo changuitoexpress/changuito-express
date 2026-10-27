@@ -622,6 +622,47 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(observed, []);
   });
 
+  it("termina en estado público si no puede registrar el listener de autenticación", async function () {
+    let getSessionCalls = 0;
+    const { client } = createClientFixture({
+      getSession: async function () {
+        getSessionCalls += 1;
+        return {
+          data: {
+            session: {
+              user: { id: "saved-account", email: "saved@example.test" },
+            },
+          },
+        };
+      },
+      onAuthStateChange: function () {
+        throw new Error("Auth listener registration failed");
+      },
+    });
+    const observed: any[] = [];
+    let readyCalls = 0;
+    let markReady: Function = function () {};
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        readyCalls += 1;
+        markReady();
+      },
+    );
+    await startupReady;
+
+    assert.equal(readyCalls, 1);
+    assert.equal(getSessionCalls, 0);
+    assert.deepEqual(observed, []);
+  });
+
   it("limpia la sesión al recibir el evento de cierre de sesión", async function () {
     let authListener: Function = function () {};
     const subscription = { unsubscribe: function () {} };
