@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   completeProfileSetup,
   restoreAuthSession,
+  scheduleSessionExpiryWarning,
   signOut,
   startAuthSession,
   submitAuthForm,
@@ -395,6 +396,7 @@ describe("sesión y cierre de sesión", function () {
           data: {
             session: {
               user: { id: "fixture-user-id", email: "fixture@example.test" },
+              expires_at: 1700000000,
             },
           },
         };
@@ -416,6 +418,7 @@ describe("sesión y cierre de sesión", function () {
     };
 
     assert.deepEqual(await restoreAuthSession(fixture.client), {
+      expiresAt: 1700000000,
       user: {
         id: "fixture-user-id",
         email: "fixture@example.test",
@@ -423,6 +426,68 @@ describe("sesión y cierre de sesión", function () {
         rol: "cliente",
       },
     });
+  });
+
+  it("avisa cuando la sesión se acerca a su vencimiento", function () {
+    let warningCalls = 0;
+    let scheduledDelay = -1;
+    scheduleSessionExpiryWarning(
+      1600,
+      function () {
+        warningCalls += 1;
+      },
+      1_000_000,
+      5 * 60 * 1000,
+      function (callback, delayMs) {
+        scheduledDelay = delayMs;
+        callback();
+        return 1;
+      },
+      function () {},
+    );
+
+    assert.equal(scheduledDelay, 300_000);
+    assert.equal(warningCalls, 1);
+  });
+
+  it("cancela el aviso anterior cuando la sesión se renueva", function () {
+    const timers: Array<{ callback: () => void; delayMs: number; cancelled: boolean }> = [];
+    let warningCalls = 0;
+    const schedule = function (callback: () => void, delayMs: number) {
+      const timer = { callback, delayMs, cancelled: false };
+      timers.push(timer);
+      return timer;
+    };
+    const cancel = function (timer: unknown) {
+      (timer as (typeof timers)[number]).cancelled = true;
+    };
+    const clearOldWarning = scheduleSessionExpiryWarning(
+      1600,
+      function () {
+        warningCalls += 1;
+      },
+      1_000_000,
+      5 * 60 * 1000,
+      schedule,
+      cancel,
+    );
+
+    clearOldWarning();
+    scheduleSessionExpiryWarning(
+      2200,
+      function () {
+        warningCalls += 1;
+      },
+      1_000_000,
+      5 * 60 * 1000,
+      schedule,
+      cancel,
+    );
+    if (!timers[0].cancelled) timers[0].callback();
+
+    assert.equal(timers[0].cancelled, true);
+    assert.equal(timers[1].delayMs, 900_000);
+    assert.equal(warningCalls, 0);
   });
 
   it("mantiene la pantalla pública si no hay sesión guardada", async function () {

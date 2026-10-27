@@ -8,6 +8,7 @@ export interface AuthFormValues {
 }
 
 export interface AuthAppSession {
+  expiresAt?: number;
   user: {
     id: string;
     email?: string;
@@ -22,9 +23,36 @@ interface SupabaseAuthClient {
 }
 
 interface SupabaseSession {
+  expires_at?: number;
   user: {
     id: string;
     email?: string;
+  };
+}
+
+export function scheduleSessionExpiryWarning(
+  expiresAt: number | undefined,
+  onWarning: () => void,
+  nowMs: number = Date.now(),
+  warningLeadMs: number = 5 * 60 * 1000,
+  schedule: (callback: () => void, delayMs: number) => unknown = function (
+    callback,
+    delayMs,
+  ) {
+    return setTimeout(callback, delayMs);
+  },
+  cancel: (timer: unknown) => void = function (timer) {
+    clearTimeout(timer as ReturnType<typeof setTimeout>);
+  },
+): () => void {
+  if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt)) {
+    return function () {};
+  }
+
+  const delayMs = Math.max(0, expiresAt * 1000 - nowMs - warningLeadMs);
+  const timer = schedule(onWarning, delayMs);
+  return function () {
+    cancel(timer);
   };
 }
 
@@ -184,6 +212,7 @@ async function createAppSession(
       .eq("id", session.user.id)
       .maybeSingle();
     return {
+      ...(session.expires_at ? { expiresAt: session.expires_at } : {}),
       user: {
         id: session.user.id,
         email: session.user.email,
@@ -197,6 +226,7 @@ async function createAppSession(
     };
   } catch (e) {
     return {
+      ...(session.expires_at ? { expiresAt: session.expires_at } : {}),
       user: {
         id: session.user.id,
         email: session.user.email,

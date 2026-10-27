@@ -52,6 +52,7 @@ const ChangoMonedero = lazy(function () {
 import {
   completeProfileSetup,
   startAuthSession,
+  scheduleSessionExpiryWarning,
   submitAuthForm,
   validateAuthForm,
 } from "./authFlows";
@@ -72,6 +73,7 @@ const profileRecoveryClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Theme = "light" | "dark";
 export interface AppSession {
+  expiresAt?: number;
   user: { id: string; email?: string; nombre?: string; rol?: string };
 }
 export interface Toast {
@@ -817,6 +819,7 @@ function AuthScreen(props: {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState<AppSession | null>(null);
+  const [sessionExpiryWarning, setSessionExpiryWarning] = useState(false);
   const [booting, setBooting] = useState<boolean>(true);
   const [pantalla, setPantalla] = useState<Pantalla>("dashboard");
   const { theme, toggle } = useTheme();
@@ -862,6 +865,16 @@ export default function App() {
       },
     );
   }, []);
+
+  useEffect(
+    function () {
+      setSessionExpiryWarning(false);
+      return scheduleSessionExpiryWarning(session?.expiresAt, function () {
+        setSessionExpiryWarning(true);
+      });
+    },
+    [session?.expiresAt],
+  );
 
   if (booting) {
     return (
@@ -925,6 +938,33 @@ export default function App() {
   return (
     <>
       <ToastRack toasts={toasts} />
+      {sessionExpiryWarning && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          style={{
+            position: "fixed",
+            zIndex: 10001,
+            top: "16px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(680px, calc(100% - 32px))",
+            boxSizing: "border-box",
+            padding: "14px 18px",
+            borderRadius: "14px",
+            background: "var(--color-yellow-dim)",
+            border: "1px solid var(--color-yellow)",
+            color: "var(--text-primary)",
+            fontSize: "14px",
+            fontWeight: 600,
+            boxShadow: "var(--shadow-float)",
+          }}
+        >
+          Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas
+          que iniciar sesión nuevamente.
+        </div>
+      )}
       {pwa.mostrar && (
         <PWABanner onInstalar={pwa.instalar} onDescartar={pwa.descartar} />
       )}
