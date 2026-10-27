@@ -323,6 +323,27 @@ describe("acceso y registro Supabase", function () {
     assert.equal(getUpsertCalls(), 0);
   });
 
+  it("informa una excepción de red durante el registro sin confirmar el éxito", async function () {
+    const { client, getUpsertCalls } = createClientFixture({
+      signUp: async function () {
+        throw new Error("Network request failed");
+      },
+    });
+
+    const result = await submitAuthForm(client, {
+      ...validLogin,
+      mode: "register",
+      nombre: "Ana",
+    });
+
+    assert.deepEqual(result, {
+      status: "error",
+      message: "Network request failed",
+    });
+    assert.notEqual(result.status, "registered");
+    assert.equal(getUpsertCalls(), 0);
+  });
+
   it("no confirma el registro cuando Supabase no devuelve usuario ni error", async function () {
     const { client, getUpsertCalls } = createClientFixture({
       signUp: async function () {
