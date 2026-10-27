@@ -1039,3 +1039,118 @@ it("shows uncertain signup results as an error toast in the registration form", 
   assert.equal(signupAttempts, 1, "The registration form should submit signup.");
   assert.deepEqual(pageErrors, [], "Signup failure handling should not throw in the browser.");
 });
+
+it("shows signup confirmation when the registration form receives a created user", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  const page = await browser.newPage();
+  const pageErrors: string[] = [];
+  page.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+
+  let signupAttempts = 0;
+  let profileWrites = 0;
+  await page.route(`${supabaseUrl}/**`, async function (route) {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === "/auth/v1/signup") {
+      signupAttempts += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: {
+            id: "confirmed-browser-signup-user",
+            aud: "authenticated",
+            role: "authenticated",
+            email: "ana@example.test",
+            app_metadata: { provider: "email", providers: ["email"] },
+            user_metadata: {},
+            created_at: new Date().toISOString(),
+          },
+          session: null,
+        }),
+      });
+      return;
+    }
+    if (url.pathname === "/rest/v1/perfiles" && request.method() === "POST") {
+      profileWrites += 1;
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({}),
+    });
+  });
+
+  await page.goto(appUrl);
+  await page.getByRole("button", { name: "Registro" }).click();
+  await page.getByPlaceholder("Nombre o Alias").fill("Ana Browser");
+  await page.getByPlaceholder("tu@email.com").fill("ana@example.test");
+  await page
+    .getByPlaceholder("Contraseña (mín. 6 caracteres)")
+    .fill("fixture-password");
+  const signupResponse = page.waitForResponse(function (response) {
+    return new URL(response.url()).pathname === "/auth/v1/signup";
+  });
+  await page.getByRole("button", { name: "Crear Cuenta" }).click();
+  await signupResponse;
+
+  await page
+    .getByText("Revisá tu email para confirmar.", { exact: true })
+    .waitFor({ state: "visible", timeout: 5_000 });
+  const errorGuidance =
+    "No pudimos confirmar la creación de tu cuenta. Intentá registrarte de nuevo o iniciá sesión si ya tenés una cuenta.";
+  assert.equal(
+    await page.getByText(errorGuidance, { exact: true }).count(),
+    0,
+    "A confirmed user response must not show signup error guidance.",
+  );
+  assert.equal(signupAttempts, 1, "The registration form should submit signup once.");
+  assert.equal(
+    profileWrites,
+    1,
+    "A confirmed signup response should save the new user's profile.",
+  );
+  assert.deepEqual(pageErrors, [], "Successful signup should not throw in the browser.");
+});
