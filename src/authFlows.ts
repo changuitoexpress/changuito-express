@@ -362,39 +362,82 @@ export function startAuthSession(
   client: SupabaseAuthClient,
   onSession: (session: AuthAppSession | null) => void,
   onReady: () => void,
+  retryScheduler: {
+    schedule: (callback: () => void, delayMs: number) => unknown;
+    cancel: (timer: unknown) => void;
+  } = {
+    schedule: function (callback, delayMs) {
+      return setTimeout(callback, delayMs);
+    },
+    cancel: function (timer) {
+      clearTimeout(timer as ReturnType<typeof setTimeout>);
+    },
+  },
 ) {
   let mounted = true;
   let latestAuthEvent = 0;
-  const startupAuthEvent = latestAuthEvent;
   let subscription: ReturnType<typeof watchAuthSession> | null = null;
-  try {
-    subscription = watchAuthSession(
-      client,
-      function (session) {
-        if (mounted) onSession(session);
-      },
-      function () {
-        latestAuthEvent += 1;
-      },
-    );
-  } catch (e) {}
+  let retryTimer: unknown = null;
+  let retryPending = false;
+  let retryAttempt = 0;
 
-  const restoredSession = subscription
-    ? restoreAuthSession(client)
-    : Promise.resolve(null);
-  restoredSession
-    .then(function (restored) {
-      if (mounted && startupAuthEvent === latestAuthEvent && restored) {
-        onSession(restored);
-      }
-    })
-    .catch(function () {})
+  function scheduleRetry() {
+    if (!mounted || retryPending) return;
+    const delayMs = Math.min(1000 * 2 ** retryAttempt, 30000);
+    retryAttempt = Math.min(retryAttempt + 1, 5);
+    retryPending = true;
+    retryTimer = retryScheduler.schedule(function () {
+      retryPending = false;
+      retryTimer = null;
+      registerListener(true);
+    }, delayMs);
+  }
+
+  function restoreCurrentSession() {
+    const authEventAtStart = latestAuthEvent;
+    return restoreAuthSession(client)
+      .then(function (restored) {
+        if (mounted && authEventAtStart === latestAuthEvent && restored) {
+          onSession(restored);
+        }
+      })
+      .catch(function () {});
+  }
+
+  function registerListener(isRetry: boolean): boolean {
+    try {
+      subscription = watchAuthSession(
+        client,
+        function (session) {
+          if (mounted) onSession(session);
+        },
+        function () {
+          latestAuthEvent += 1;
+        },
+      );
+      retryAttempt = 0;
+      if (isRetry) void restoreCurrentSession();
+      return true;
+    } catch (e) {
+      scheduleRetry();
+      return false;
+    }
+  }
+
+  const listening = registerListener(false);
+
+  (listening ? restoreCurrentSession() : Promise.resolve())
     .finally(function () {
       if (mounted) onReady();
     });
 
   return function () {
     mounted = false;
+    if (retryPending) {
+      retryPending = false;
+      retryScheduler.cancel(retryTimer);
+      retryTimer = null;
+    }
     if (subscription) subscription.unsubscribe();
   };
 }

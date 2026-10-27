@@ -806,7 +806,7 @@ describe("sesión y cierre de sesión", function () {
       markReady = resolve;
     });
 
-    startAuthSession(
+    const cleanup = startAuthSession(
       client,
       function (session) {
         observed.push(session);
@@ -885,7 +885,7 @@ describe("sesión y cierre de sesión", function () {
       markReady = resolve;
     });
 
-    startAuthSession(
+    const cleanup = startAuthSession(
       client,
       function (session) {
         observed.push(session);
@@ -900,6 +900,96 @@ describe("sesión y cierre de sesión", function () {
     assert.equal(readyCalls, 1);
     assert.equal(getSessionCalls, 0);
     assert.deepEqual(observed, []);
+    cleanup();
+  });
+
+  it("reintenta el listener y restaura un inicio de sesión realizado durante el fallo", async function () {
+    let registrationCalls = 0;
+    let getSessionCalls = 0;
+    let authListener: Function = function () {};
+    const retryTimers: Array<{ callback: () => void; delayMs: number }> = [];
+    const observed: any[] = [];
+    let readyCalls = 0;
+    const { client } = createClientFixture({
+      getSession: async function () {
+        getSessionCalls += 1;
+        return {
+          data: {
+            session:
+              getSessionCalls > 0
+                ? {
+                    user: {
+                      id: "signed-in-during-retry",
+                      email: "retry@example.test",
+                    },
+                  }
+                : null,
+          },
+        };
+      },
+      onAuthStateChange: function (listener: Function) {
+        registrationCalls += 1;
+        if (registrationCalls < 3) {
+          throw new Error("Temporary auth listener registration failure");
+        }
+        authListener = listener;
+        return {
+          data: {
+            subscription: { unsubscribe: function () {} },
+          },
+        };
+      },
+    });
+    const cleanup = startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        readyCalls += 1;
+      },
+      {
+        schedule: function (callback, delayMs) {
+          retryTimers.push({ callback, delayMs });
+          return retryTimers.length;
+        },
+        cancel: function () {},
+      },
+    );
+
+    await new Promise<void>(function (resolve) {
+      setImmediate(resolve);
+    });
+    assert.equal(readyCalls, 1);
+    assert.deepEqual(observed, []);
+    assert.equal(retryTimers[0].delayMs, 1000);
+
+    retryTimers[0].callback();
+    assert.equal(registrationCalls, 2);
+    assert.equal(retryTimers[1].delayMs, 2000);
+
+    retryTimers[1].callback();
+    await new Promise<void>(function (resolve) {
+      setImmediate(resolve);
+    });
+
+    assert.equal(registrationCalls, 3);
+    assert.deepEqual(observed, [
+      {
+        user: {
+          id: "signed-in-during-retry",
+          email: "retry@example.test",
+          nombre: "retry",
+          rol: "cliente",
+        },
+      },
+    ]);
+    assert.equal(readyCalls, 1);
+
+    authListener("SIGNED_IN", {
+      user: { id: "signed-in-during-retry", email: "retry@example.test" },
+    });
+    cleanup();
   });
 
   it("limpia la sesión al recibir el evento de cierre de sesión", async function () {
