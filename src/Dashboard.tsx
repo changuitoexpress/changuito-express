@@ -2402,6 +2402,8 @@ export default function Dashboard(props: DashboardProps) {
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout] = useState(false);
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
   const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
   const [modalLimite, setModalLimite] = useState(false);
   const [changuiAbierto, setChanguiAbierto] = useState(false);
@@ -2413,6 +2415,46 @@ export default function Dashboard(props: DashboardProps) {
   const rol = props.session.user.rol ?? "cliente";
   const puedeNegocio = esAdmin || rol === "negocio" || esMerchantAdmin;
   const puedeRepartidor = esAdmin || rol === "repartidor";
+
+  useEffect(function () {
+    if (!menuAbierto) return;
+
+    const menuPanel = menuPanelRef.current;
+    const closeButton = menuPanel?.querySelector<HTMLButtonElement>("button");
+    closeButton?.focus();
+
+    function handleMenuKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuAbierto(false);
+        menuTriggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !menuPanel) return;
+      const focusableElements = Array.from(
+        menuPanel.querySelectorAll<HTMLButtonElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleMenuKeyDown);
+    return function () {
+      document.removeEventListener("keydown", handleMenuKeyDown);
+    };
+  }, [menuAbierto]);
 
   useEffect(function () {
     async function checkMerchantAdmin() {
@@ -3490,10 +3532,14 @@ export default function Dashboard(props: DashboardProps) {
             }}
           >
             <button
+              ref={menuTriggerRef}
               onClick={function () {
                 setMenuAbierto(true);
               }}
               aria-label="Abrir menú"
+              aria-haspopup="dialog"
+              aria-expanded={menuAbierto}
+              aria-controls="authenticated-navigation-menu"
               style={{
                 flexShrink: 0,
                 width: "40px",
@@ -3740,6 +3786,11 @@ export default function Dashboard(props: DashboardProps) {
             }}
           />
           <div
+            id="authenticated-navigation-menu"
+            ref={menuPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú de navegación"
             className="fade-in"
             style={{
               position: "relative",
@@ -3796,6 +3847,7 @@ export default function Dashboard(props: DashboardProps) {
               <button
                 onClick={function () {
                   setMenuAbierto(false);
+                  menuTriggerRef.current?.focus();
                 }}
                 aria-label="Cerrar menú"
                 style={{

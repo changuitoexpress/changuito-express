@@ -140,6 +140,29 @@ function createFixtureSession(userId: string, email: string) {
   };
 }
 
+async function tabToLocator(
+  page: import("playwright").Page,
+  locator: import("playwright").Locator,
+  maxTabs = 40,
+) {
+  for (let tab = 0; tab < maxTabs; tab += 1) {
+    if (await locator.evaluate(function (element) {
+      return document.activeElement === element;
+    })) {
+      return;
+    }
+    await page.keyboard.press("Tab");
+  }
+
+  assert.equal(
+    await locator.evaluate(function (element) {
+      return document.activeElement === element;
+    }),
+    true,
+    "Keyboard tabbing should reach the requested control.",
+  );
+}
+
 it("renders every authenticated screen and returns to the dashboard", async function (t) {
   const port = await findAvailablePort();
   const appUrl = `http://127.0.0.1:${port}`;
@@ -219,6 +242,49 @@ it("renders every authenticated screen and returns to the dashboard", async func
       timeout: 10_000,
     });
     await page.locator("button").first().click();
+    await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
+      timeout: 10_000,
+    });
+  }
+
+  for (const screen of screens) {
+    await page.evaluate(function () {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+    const menuTrigger = page.getByRole("button", { name: "Abrir menú" });
+    await tabToLocator(page, menuTrigger);
+    await page.keyboard.press("Enter");
+
+    const menu = page.getByRole("dialog", { name: "Menú de navegación" });
+    await menu.waitFor({ state: "visible" });
+    const closeMenuButton = menu.getByRole("button", { name: "Cerrar menú" });
+    assert.equal(
+      await closeMenuButton.evaluate(function (element) {
+        return document.activeElement === element;
+      }),
+      true,
+      "Opening the menu should move keyboard focus into the drawer.",
+    );
+    const targetMenuItem = menu.getByRole("button", {
+      name: new RegExp(screen.menuLabel),
+    });
+    await tabToLocator(page, targetMenuItem);
+    await page.keyboard.press("Enter");
+
+    await page.getByText(screen.marker, { exact: false }).first().waitFor({
+      state: "visible",
+      timeout: 10_000,
+    });
+    const returnButton = page.locator("button").first();
+    await page.evaluate(function () {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+    await tabToLocator(page, returnButton);
+    await page.keyboard.press("Enter");
     await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
       timeout: 10_000,
     });
