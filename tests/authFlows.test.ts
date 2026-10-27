@@ -1077,6 +1077,60 @@ describe("sesión y cierre de sesión", function () {
     ]);
   });
 
+  it("vuelve a consultar el rol del perfil al actualizarse el token", async function () {
+    let authListener: Function = function () {};
+    let currentRole = "cliente";
+    let profileLookups = 0;
+    const { client } = createClientFixture({
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: async function () {
+                  profileLookups += 1;
+                  return { data: { nombre: "Ana", rol: currentRole } };
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    const subscription = watchAuthSession(client, function (session) {
+      observed.push(session);
+    });
+    const session = {
+      user: { id: "fixture-user-id", email: "fixture@example.test" },
+    };
+
+    authListener("SIGNED_IN", session);
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+    currentRole = "admin";
+    authListener("TOKEN_REFRESHED", session);
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+    subscription.unsubscribe();
+
+    assert.equal(profileLookups, 2);
+    assert.deepEqual(
+      observed.map(function (appSession) {
+        return appSession?.user.rol;
+      }),
+      ["cliente", "admin"],
+    );
+  });
+
   it("conserva un inicio de sesión reciente si el perfil guardado termina después durante el inicio", async function () {
     let authListener: Function = function () {};
     let resolveSavedProfileStarted: Function = function () {};
