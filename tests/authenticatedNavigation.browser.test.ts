@@ -451,6 +451,27 @@ it("renders every authenticated screen and returns to the dashboard", async func
     });
   }
 
+  await page.evaluate(function () {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  });
+  const escapeMenuTrigger = page.getByRole("button", { name: "Abrir menú" });
+  await tabToLocator(page, escapeMenuTrigger);
+  await page.keyboard.press("Enter");
+
+  const escapeMenu = page.getByRole("dialog", { name: "Menú de navegación" });
+  await escapeMenu.waitFor({ state: "visible" });
+  await page.keyboard.press("Escape");
+  await escapeMenu.waitFor({ state: "hidden" });
+  assert.equal(
+    await escapeMenuTrigger.evaluate(function (element) {
+      return document.activeElement === element;
+    }),
+    true,
+    "Pressing Escape should close the menu and restore focus to its trigger.",
+  );
+
   await page.setViewportSize({ width: 390, height: 844 });
   for (const screen of screens) {
     await page.getByRole("button", { name: "Abrir menú" }).click();
