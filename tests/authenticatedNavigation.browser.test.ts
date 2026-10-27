@@ -665,6 +665,17 @@ it("recovers an existing account profile and returns to sign-in after retry", as
     if (url.pathname === "/auth/v1/token") {
       if (url.searchParams.get("grant_type") === "password") {
         signInAttempts += 1;
+        if (signInAttempts === 1) {
+          await route.fulfill({
+            status: 400,
+            contentType: "application/json",
+            body: JSON.stringify({
+              code: "invalid_credentials",
+              message: "Invalid login credentials",
+            }),
+          });
+          return;
+        }
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -785,7 +796,20 @@ it("recovers an existing account profile and returns to sign-in after retry", as
     "Contraseña (mín. 6 caracteres)",
   );
   await page.keyboard.type("fixture-password");
-  await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: /Completar Perfil/ }).click();
+  await page.getByText("Invalid login credentials", { exact: true }).waitFor();
+  await page
+    .getByText(
+      "Confirmá tu email y completá estos datos para guardar tu perfil en la cuenta existente.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByPlaceholder("Nombre o Alias").waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Completar Perfil/ }).waitFor();
+  assert.equal(signInAttempts, 1, "Recovery should report the rejected credentials.");
+  assert.equal(signUpAttempts, 0, "Rejected recovery credentials must not create an account.");
+  assert.equal(profileWrites, 0, "Rejected recovery credentials must not write a profile.");
+
   await page.keyboard.press("Tab");
   assert.equal(
     await page.evaluate(function () {
@@ -809,7 +833,7 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   assert.equal(resendAttempts, 1, "Keyboard activation should send one confirmation request.");
   assert.equal(resendPayload?.type, "signup");
   assert.equal(resendPayload?.email, "existing@example.test");
-  assert.equal(signInAttempts, 0, "Resending confirmation must not sign in.");
+  assert.equal(signInAttempts, 1, "Resending confirmation must not add a sign-in attempt.");
   assert.equal(signUpAttempts, 0, "Resending confirmation must not create an account.");
   assert.equal(profileWrites, 0, "Resending confirmation must not complete the profile.");
 
@@ -819,7 +843,11 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   const resultAnnouncement = page.getByRole("status").filter({ hasText: resendResult });
   await resultAnnouncement.waitFor();
   assert.equal(await resultAnnouncement.getAttribute("aria-live"), "polite");
-  assert.equal(signInAttempts, 0, "A successful resend must remain separate from profile completion.");
+  assert.equal(
+    signInAttempts,
+    1,
+    "A successful resend must remain separate from profile completion.",
+  );
   assert.equal(profileWrites, 0, "A successful resend must not write the profile.");
 
   await page.keyboard.press("Shift+Tab");
@@ -853,7 +881,7 @@ it("recovers an existing account profile and returns to sign-in after retry", as
     name: "¿Confirmaste tu email y te falta el perfil? Completalo acá",
   }).waitFor();
 
-  assert.equal(signInAttempts, 2, "Recovery should retry sign-in for the existing account.");
+  assert.equal(signInAttempts, 3, "Recovery should retry sign-in for the existing account.");
   assert.equal(signUpAttempts, 0, "Recovery must not create a second account.");
   assert.equal(profileWrites, 2, "The profile write should be retried after visible failure.");
   assert.deepEqual(pageErrors, [], "Profile recovery should not throw in the browser.");
