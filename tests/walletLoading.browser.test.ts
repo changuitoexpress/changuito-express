@@ -35,13 +35,13 @@ const initializedWallet = {
 let deliveredOrders = Array.from({ length: 1005 }, function () {
   return { total_pagar: 10, estatus: "entregado" };
 });
-const recentOrders = Array.from({ length: 50 }, function (_, index) {
+const orderHistory = Array.from({ length: 125 }, function (_, index) {
   return {
     id: `wallet-fixture-order-${index}`,
-    negocio_nombre: "Fixture Store",
+    negocio_nombre: `Fixture Store ${index}`,
     total_pagar: 10,
     estatus: "entregado",
-    created_at: new Date(Date.UTC(2026, 0, 1, 12, 0, index)).toISOString(),
+    created_at: new Date(Date.UTC(2026, 0, 2, 12, 0, 0) - index * 60_000).toISOString(),
   };
 });
 const freeShippingMilestones = [
@@ -357,10 +357,16 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         });
         return;
       }
+      const from = Number(url.searchParams.get("offset") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 1000);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(recentOrders),
+        headers: {
+          "content-range": `${from}-${Math.min(from + limit - 1, orderHistory.length - 1)}/${orderHistory.length}`,
+          "access-control-expose-headers": "content-range",
+        },
+        body: JSON.stringify(orderHistory.slice(from, from + limit)),
       });
       return;
     }
@@ -428,12 +434,60 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     }),
     "The visible order history should remain limited to the latest 50 orders.",
   );
+  assert.ok(
+    orderQueries.some(function(query) {
+      const params = new URLSearchParams(query);
+      return params.get("limit") === "50"
+        && params.get("order")?.includes("created_at.desc");
+    }),
+    "The first history page should return only the latest 50 orders in descending order.",
+  );
   assert.equal(
     await page.getByRole("alert").count(),
     0,
     "A successful retry should clear the wallet error.",
   );
   assert.deepEqual(pageErrors, [], "Wallet loading and retry should not throw in the browser.");
+
+  await page.getByRole("button", { name: "📦 Pedidos" }).click();
+  await page.getByText("Pedidos 1–50 de 125", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 0", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 49", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByText("Fixture Store 50", { exact: true }).count(),
+    0,
+    "The first history page should stop after the latest 50 orders.",
+  );
+  await page.getByRole("button", { name: "Pedidos anteriores" }).click();
+  await page.getByText("Pedidos 51–100 de 125", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 50", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 99", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByText("Fixture Store 0", { exact: true }).count(),
+    0,
+    "The older page should replace, rather than append to, the current page.",
+  );
+  await page.getByRole("button", { name: "Pedidos anteriores" }).click();
+  await page.getByText("Pedidos 101–125 de 125", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 100", { exact: true }).waitFor();
+  await page.getByText("Fixture Store 124", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Pedidos anteriores" }).isDisabled(),
+    true,
+    "The last history page should disable navigation to a nonexistent next page.",
+  );
+  await page.getByRole("button", { name: "Pedidos más recientes" }).click();
+  await page.getByText("Pedidos 51–100 de 125", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Pedidos más recientes" }).click();
+  await page.getByText("Pedidos 1–50 de 125", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "💰 Saldo" }).click();
+  await page.getByText("$10,050", { exact: true }).waitFor();
+  assert.ok(
+    orderQueries.some(function(query) {
+      return new URLSearchParams(query).get("offset") === "50";
+    }),
+    "Older order history should be requested from the next offset.",
+  );
 
   for (const milestone of freeShippingMilestones) {
     deliveredOrders = Array.from({ length: milestone.delivered }, function () {

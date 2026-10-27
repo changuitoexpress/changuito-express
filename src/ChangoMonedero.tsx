@@ -84,12 +84,18 @@ async function cargarResumenEntregados(uid: string): Promise<{ entregados: numbe
 export default function ChangoMonedero(props: Props) {
   const [monedero, setMonedero]   = useState<MonederoData | null>(null);
   const [pedidos,  setPedidos]    = useState<PedidoResumen[]>([]);
+  const [pedidosHistorial, setPedidosHistorial] = useState<PedidoResumen[]>([]);
+  const [totalPedidos, setTotalPedidos] = useState(0);
+  const [offsetHistorial, setOffsetHistorial] = useState(0);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [errorHistorial, setErrorHistorial] = useState(false);
   const [entregados, setEntregados] = useState(0);
   const [totalGastado, setTotalGastado] = useState(0);
   const [loading,  setLoading]    = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const requestSequence = useRef(0);
+  const historyRequestSequence = useRef(0);
   const [tab,      setTab]        = useState<'resumen' | 'historial' | 'como'>('resumen');
 
   const isDark = props.theme === 'dark';
@@ -101,8 +107,11 @@ export default function ChangoMonedero(props: Props) {
       return requestSequence.current === requestId;
     };
 
+    historyRequestSequence.current += 1;
     setLoading(true);
     setLoadError(false);
+    setCargandoHistorial(false);
+    setErrorHistorial(false);
     try {
       // Cargar o crear monedero
       let { data: mon, error: monError } = await supabase
@@ -127,17 +136,22 @@ export default function ChangoMonedero(props: Props) {
       const [pedidosResult, resumenEntregados] = await Promise.all([
         supabase
           .from('pedidos')
-          .select('id, negocio_nombre, total_pagar, estatus, created_at')
+          .select('id, negocio_nombre, total_pagar, estatus, created_at', { count: 'exact' })
           .eq('cliente_id', uid)
           .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(50),
         cargarResumenEntregados(uid),
       ]);
       if (!isCurrentRequest()) return;
       if (pedidosResult.error) throw pedidosResult.error;
+      if (pedidosResult.count === null) throw new Error('No se pudo contar el historial de pedidos');
 
       setMonedero(mon);
       setPedidos(pedidosResult.data ?? []);
+      setPedidosHistorial(pedidosResult.data ?? []);
+      setTotalPedidos(pedidosResult.count);
+      setOffsetHistorial(0);
       setEntregados(resumenEntregados.entregados);
       setTotalGastado(resumenEntregados.totalGastado);
       setLoadedUserId(uid);
@@ -146,6 +160,9 @@ export default function ChangoMonedero(props: Props) {
       console.error(e);
       setMonedero(null);
       setPedidos([]);
+      setPedidosHistorial([]);
+      setTotalPedidos(0);
+      setOffsetHistorial(0);
       setEntregados(0);
       setTotalGastado(0);
       setLoadError(true);
@@ -153,6 +170,31 @@ export default function ChangoMonedero(props: Props) {
     }
     finally {
       if (isCurrentRequest()) setLoading(false);
+    }
+  }, [uid]);
+
+  const cargarPaginaHistorial = useCallback(async function(offset: number) {
+    const requestId = ++historyRequestSequence.current;
+    setCargandoHistorial(true);
+    setErrorHistorial(false);
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('id, negocio_nombre, total_pagar, estatus, created_at')
+        .eq('cliente_id', uid)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + 49);
+      if (historyRequestSequence.current !== requestId) return;
+      if (error) throw error;
+      setPedidosHistorial(data ?? []);
+      setOffsetHistorial(offset);
+    } catch (e) {
+      if (historyRequestSequence.current !== requestId) return;
+      console.error(e);
+      setErrorHistorial(true);
+    } finally {
+      if (historyRequestSequence.current === requestId) setCargandoHistorial(false);
     }
   }, [uid]);
 
@@ -178,6 +220,7 @@ export default function ChangoMonedero(props: Props) {
     return function() {
       activo = false;
       requestSequence.current += 1;
+      historyRequestSequence.current += 1;
       window.removeEventListener('focus', refrescar);
       document.removeEventListener('visibilitychange', refrescar);
       supabase.removeChannel(channel);
@@ -345,15 +388,24 @@ export default function ChangoMonedero(props: Props) {
         {/* ── TAB HISTORIAL ── */}
         {!loadingCurrentUser && !loadErrorCurrentUser && tab === 'historial' && (
           <div>
-            <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 14px 0' }}>Tus últimos {pedidos.length} pedidos</p>
-            {pedidos.length === 0 && (
+            <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 14px 0' }}>
+              {totalPedidos === 0
+                ? 'Tus pedidos'
+                : `Pedidos ${offsetHistorial + 1}–${offsetHistorial + pedidosHistorial.length} de ${totalPedidos}`}
+            </p>
+            {errorHistorial && (
+              <div role="alert" style={{ padding: '12px 14px', borderRadius: '14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '12px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                No pudimos cargar estos pedidos. Inténtalo de nuevo.
+              </div>
+            )}
+            {pedidosHistorial.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 24px' }}>
                 <p style={{ fontSize: '40px', margin: '0 0 12px 0' }}>📦</p>
                 <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px 0' }}>Sin pedidos aún</p>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>Haz tu primer pedido para acumular ChangoPesos</p>
               </div>
             )}
-            {pedidos.map(function(p) {
+            {pedidosHistorial.map(function(p) {
               const fecha = new Date(p.created_at);
               const label = fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) + ' · ' + fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
               const color = ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)';
@@ -377,6 +429,24 @@ export default function ChangoMonedero(props: Props) {
                 </div>
               );
             })}
+            {totalPedidos > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '16px' }}>
+                <button
+                  onClick={function() { cargarPaginaHistorial(Math.max(0, offsetHistorial - 50)); }}
+                  disabled={cargandoHistorial || offsetHistorial === 0}
+                  style={{ flex: 1, padding: '11px 12px', borderRadius: '12px', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontWeight: 700, cursor: offsetHistorial === 0 || cargandoHistorial ? 'default' : 'pointer', opacity: offsetHistorial === 0 || cargandoHistorial ? 0.5 : 1 }}
+                >
+                  Pedidos más recientes
+                </button>
+                <button
+                  onClick={function() { cargarPaginaHistorial(offsetHistorial + 50); }}
+                  disabled={cargandoHistorial || offsetHistorial + pedidosHistorial.length >= totalPedidos}
+                  style={{ flex: 1, padding: '11px 12px', borderRadius: '12px', border: 'none', background: 'var(--color-yellow)', color: '#020617', fontWeight: 800, cursor: cargandoHistorial || offsetHistorial + pedidosHistorial.length >= totalPedidos ? 'default' : 'pointer', opacity: cargandoHistorial || offsetHistorial + pedidosHistorial.length >= totalPedidos ? 0.5 : 1 }}
+                >
+                  {cargandoHistorial ? 'Cargando…' : 'Pedidos anteriores'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
