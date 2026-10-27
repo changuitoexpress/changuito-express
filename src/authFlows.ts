@@ -131,14 +131,18 @@ export function watchAuthSession(
   client: SupabaseAuthClient,
   onSession: (session: AuthAppSession | null) => void,
 ) {
+  let latestAuthEvent = 0;
   const {
     data: { subscription },
   } = client.auth.onAuthStateChange(function (_event: string, session: SupabaseSession | null) {
+    const authEvent = ++latestAuthEvent;
     if (!session) {
       onSession(null);
       return;
     }
-    createAppSession(client, session).then(onSession);
+    createAppSession(client, session).then(function (appSession) {
+      if (authEvent === latestAuthEvent) onSession(appSession);
+    });
   });
   return subscription;
 }

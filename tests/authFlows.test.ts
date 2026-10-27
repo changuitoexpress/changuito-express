@@ -245,6 +245,49 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(observed, [null]);
   });
 
+  it("ignora una consulta de perfil que termina después del cierre de sesión", async function () {
+    let authListener: Function = function () {};
+    let resolveProfile: Function = function () {};
+    const { client } = createClientFixture({
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: function () {
+                  return new Promise(function (resolve) {
+                    resolveProfile = resolve;
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    watchAuthSession(client, function (session) {
+      observed.push(session);
+    });
+
+    authListener("SIGNED_IN", {
+      user: { id: "fixture-user-id", email: "fixture@example.test" },
+    });
+    authListener("SIGNED_OUT", null);
+    resolveProfile({ data: { nombre: "Ana", rol: "cliente" } });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+
+    assert.deepEqual(observed, [null]);
+  });
+
   it("envía el cierre de sesión al cliente Supabase", async function () {
     let signOutCalls = 0;
     const { client } = createClientFixture({
