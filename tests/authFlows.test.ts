@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   completeProfileSetup,
+  listDeviceAuthSessions,
   resendConfirmationEmail,
+  revokeDeviceAuthSession,
   restoreAuthSession,
   scheduleSessionExpiryWarning,
   signOut,
@@ -487,6 +489,83 @@ describe("acceso y registro Supabase", function () {
 });
 
 describe("sesión y cierre de sesión", function () {
+  it("consulta solo metadatos de sesión mediante el RPC autenticado", async function () {
+    let rpcCall: any;
+    const { client } = createClientFixture();
+    client.rpc = async function (functionName: string, args?: any) {
+      rpcCall = { functionName, args };
+      return {
+        data: [
+          {
+            session_id: "123e4567-e89b-12d3-a456-426614174000",
+            user_agent: "Mozilla/5.0",
+            created_at: "2026-10-27T10:00:00Z",
+            updated_at: "2026-10-27T10:30:00Z",
+            is_current: true,
+          },
+        ],
+        error: null,
+      };
+    };
+
+    const sessions = await listDeviceAuthSessions(client);
+
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].is_current, true);
+    assert.deepEqual(rpcCall, {
+      functionName: "list_my_device_sessions",
+      args: undefined,
+    });
+  });
+
+  it("informa si falla la consulta de sesiones", async function () {
+    const { client } = createClientFixture();
+    client.rpc = async function () {
+      return { data: null, error: new Error("RPC is not configured") };
+    };
+
+    await assert.rejects(
+      listDeviceAuthSessions(client),
+      /RPC is not configured/,
+    );
+  });
+
+  it("revoca solo el identificador de sesión seleccionado", async function () {
+    let rpcCall: any;
+    const { client } = createClientFixture();
+    client.rpc = async function (functionName: string, args?: any) {
+      rpcCall = { functionName, args };
+      return { data: true, error: null };
+    };
+
+    assert.equal(
+      await revokeDeviceAuthSession(
+        client,
+        "123e4567-e89b-12d3-a456-426614174000",
+      ),
+      true,
+    );
+    assert.deepEqual(rpcCall, {
+      functionName: "revoke_my_device_session",
+      args: { p_session_id: "123e4567-e89b-12d3-a456-426614174000" },
+    });
+  });
+
+  it("rechaza identificadores de sesión incorrectos antes de llamar a Supabase", async function () {
+    let rpcCalls = 0;
+    const { client } = createClientFixture();
+    client.rpc = async function () {
+      rpcCalls += 1;
+      return { data: true, error: null };
+    };
+
+    await assert.rejects(
+      revokeDeviceAuthSession(client, "not-a-session-id"),
+      /identificador de sesión no es válido/,
+    );
+    assert.equal(rpcCalls, 0);
+  });
+
   it("restaura una sesión guardada junto con su perfil", async function () {
     const fixture = createClientFixture({
       getSession: async function () {

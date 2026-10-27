@@ -20,6 +20,7 @@ export interface AuthAppSession {
 interface SupabaseAuthClient {
   auth: any;
   from(table: string): any;
+  rpc(functionName: string, args?: Record<string, unknown>): Promise<any>;
 }
 
 interface SupabaseSession {
@@ -28,6 +29,14 @@ interface SupabaseSession {
     id: string;
     email?: string;
   };
+}
+
+export interface DeviceAuthSession {
+  session_id: string;
+  user_agent: string | null;
+  created_at: string;
+  updated_at: string | null;
+  is_current: boolean;
 }
 
 export function scheduleSessionExpiryWarning(
@@ -367,4 +376,52 @@ export function signOutEverywhere(client: SupabaseAuthClient) {
     .then(function (result: { error?: any }) {
       if (result.error) throw result.error;
     });
+}
+
+export async function listDeviceAuthSessions(
+  client: SupabaseAuthClient,
+): Promise<DeviceAuthSession[]> {
+  const { data, error } = await client.rpc("list_my_device_sessions");
+  if (error) throw error;
+  const sessionIdPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (
+    !Array.isArray(data) ||
+    !data.every(function (session) {
+      return (
+        session &&
+        typeof session === "object" &&
+        typeof session.session_id === "string" &&
+        sessionIdPattern.test(session.session_id) &&
+        (session.user_agent === null || typeof session.user_agent === "string") &&
+        typeof session.created_at === "string" &&
+        (session.updated_at === null || typeof session.updated_at === "string") &&
+        typeof session.is_current === "boolean"
+      );
+    })
+  ) {
+    throw new Error("Supabase devolvió una lista de sesiones no válida.");
+  }
+  return data;
+}
+
+export async function revokeDeviceAuthSession(
+  client: SupabaseAuthClient,
+  sessionId: string,
+): Promise<boolean> {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      sessionId,
+    )
+  ) {
+    throw new Error("El identificador de sesión no es válido.");
+  }
+  const { data, error } = await client.rpc("revoke_my_device_session", {
+    p_session_id: sessionId,
+  });
+  if (error) throw error;
+  if (typeof data !== "boolean") {
+    throw new Error("Supabase no pudo confirmar el cierre de esa sesión.");
+  }
+  return data;
 }

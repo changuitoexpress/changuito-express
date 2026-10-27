@@ -65,6 +65,24 @@ async function mockSupabase(
   email = "uliseseven.7@gmail.com",
   requestLog?: string[],
 ) {
+  const deviceSessions = [
+    {
+      session_id: "11111111-1111-4111-8111-111111111111",
+      user_agent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",
+      created_at: "2026-10-26T10:00:00.000Z",
+      updated_at: "2026-10-27T10:00:00.000Z",
+      is_current: true,
+    },
+    {
+      session_id: "22222222-2222-4222-8222-222222222222",
+      user_agent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Firefox/132.0",
+      created_at: "2026-10-25T08:00:00.000Z",
+      updated_at: "2026-10-26T08:00:00.000Z",
+      is_current: false,
+    },
+  ];
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
@@ -119,6 +137,15 @@ async function mockSupabase(
       };
     } else if (url.pathname === "/storage/v1/object/public/changuito-fotos") {
       data = {};
+    } else if (url.pathname === "/rest/v1/rpc/list_my_device_sessions") {
+      data = deviceSessions;
+    } else if (url.pathname === "/rest/v1/rpc/revoke_my_device_session") {
+      const body = request.postDataJSON() as { p_session_id?: string };
+      const sessionIndex = deviceSessions.findIndex(function (session) {
+        return session.session_id === body.p_session_id && !session.is_current;
+      });
+      if (sessionIndex >= 0) deviceSessions.splice(sessionIndex, 1);
+      data = sessionIndex >= 0;
     }
 
     await route.fulfill({
@@ -278,6 +305,25 @@ it("renders every authenticated screen and returns to the dashboard", async func
     "The fixture should provide a renewed session with a later expiry.",
   );
   await expiryWarning.waitFor({ state: "hidden" });
+
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  const deviceMenu = page.getByRole("dialog", { name: "Menú de navegación" });
+  await deviceMenu.getByRole("button", { name: /Dispositivos conectados/ }).click();
+  await page.getByText("Chrome · Windows", { exact: true }).waitFor();
+  await page.getByText("Firefox · Mac", { exact: true }).waitFor();
+  await page.getByText("Última actividad:", { exact: false }).first().waitFor();
+  const remoteDeviceCard = page
+    .getByRole("listitem")
+    .filter({ hasText: "Firefox · Mac" });
+  page.once("dialog", function (dialog) {
+    void dialog.accept();
+  });
+  await remoteDeviceCard.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.getByText("La sesión se revocó.", { exact: false }).waitFor();
+  await page.getByText("Firefox · Mac", { exact: true }).waitFor({
+    state: "detached",
+  });
+  await page.getByRole("button", { name: "Cerrar menú" }).click();
 
   const screens = [
     { menuLabel: "ChangoMonedero", marker: "ChangoMonedero" },

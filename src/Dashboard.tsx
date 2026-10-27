@@ -41,7 +41,13 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
-import { signOut, signOutEverywhere } from "./authFlows";
+import {
+  listDeviceAuthSessions,
+  revokeDeviceAuthSession,
+  signOut,
+  signOutEverywhere,
+} from "./authFlows";
+import type { DeviceAuthSession } from "./authFlows";
 import {
   clearFormDraft,
   clearUserFormDrafts,
@@ -158,6 +164,43 @@ function getCheckoutDraft(userId: string, carrito: CartItem[]): CheckoutDraft | 
     return null;
   }
   return draft;
+}
+
+function deviceDescription(userAgent: string | null): string {
+  if (!userAgent) return "Dispositivo no identificado";
+
+  const platform = /iphone|ipad|ipod/i.test(userAgent)
+    ? "iPhone o iPad"
+    : /android/i.test(userAgent)
+      ? "Android"
+      : /windows/i.test(userAgent)
+        ? "Windows"
+        : /macintosh|mac os/i.test(userAgent)
+          ? "Mac"
+          : /linux/i.test(userAgent)
+            ? "Linux"
+            : "otro dispositivo";
+  const browser = /edg\//i.test(userAgent)
+    ? "Edge"
+    : /firefox\//i.test(userAgent)
+      ? "Firefox"
+      : /chrome\//i.test(userAgent) && !/chromium/i.test(userAgent)
+        ? "Chrome"
+        : /safari\//i.test(userAgent) && !/chrome\//i.test(userAgent)
+          ? "Safari"
+          : "Navegador";
+
+  return `${browser} · ${platform}`;
+}
+
+function deviceActivityDate(value: string | null): string {
+  if (!value) return "Actividad reciente no disponible";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Actividad reciente no disponible";
+  return `Última actividad: ${date.toLocaleString("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })}`;
 }
 
 // ─── Secciones Restaurantes ───────────────────────────────────────────────────
@@ -2501,6 +2544,12 @@ export default function Dashboard(props: DashboardProps) {
   const [changuiAbierto, setChanguiAbierto] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
+  const [deviceSessionsOpen, setDeviceSessionsOpen] = useState(false);
+  const [deviceSessions, setDeviceSessions] = useState<DeviceAuthSession[]>([]);
+  const [loadingDeviceSessions, setLoadingDeviceSessions] = useState(false);
+  const [deviceSessionsError, setDeviceSessionsError] = useState("");
+  const [revokingDeviceSession, setRevokingDeviceSession] = useState("");
+  const [deviceSessionsNotice, setDeviceSessionsNotice] = useState("");
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
@@ -2597,6 +2646,65 @@ export default function Dashboard(props: DashboardProps) {
     } finally {
       setSigningOutEverywhere(false);
     }
+  }
+
+  async function cargarDispositivos() {
+    setLoadingDeviceSessions(true);
+    setDeviceSessionsError("");
+    setDeviceSessionsNotice("");
+    try {
+      setDeviceSessions(await listDeviceAuthSessions(supabase));
+    } catch {
+      setDeviceSessionsError(
+        "No pudimos cargar tus dispositivos. Revisá tu conexión y que las funciones de sesiones estén instaladas en Supabase.",
+      );
+    } finally {
+      setLoadingDeviceSessions(false);
+    }
+  }
+
+  async function revocarDispositivo(session: DeviceAuthSession) {
+    if (session.is_current || revokingDeviceSession) return;
+    const dispositivo = deviceDescription(session.user_agent);
+    if (
+      !window.confirm(
+        `¿Querés cerrar la sesión de ${dispositivo}? Ya no podrá renovarse, aunque el acceso actual podría seguir funcionando hasta que venza. Después deberá iniciar sesión de nuevo.`,
+      )
+    ) {
+      return;
+    }
+
+    setRevokingDeviceSession(session.session_id);
+    setDeviceSessionsError("");
+    setDeviceSessionsNotice("");
+    try {
+      const revoked = await revokeDeviceAuthSession(
+        supabase,
+        session.session_id,
+      );
+      if (revoked) {
+        setDeviceSessionsNotice(
+          "La sesión se revocó. El acceso actual de ese dispositivo podría continuar hasta que venza.",
+        );
+      } else {
+        setDeviceSessionsNotice(
+          "Esa sesión ya no estaba activa. Actualizamos la lista.",
+        );
+      }
+      setDeviceSessions(await listDeviceAuthSessions(supabase));
+    } catch {
+      setDeviceSessionsError(
+        "No pudimos cerrar esa sesión. Puede que ya no esté activa; actualizá la lista e intentá de nuevo.",
+      );
+    } finally {
+      setRevokingDeviceSession("");
+    }
+  }
+
+  function alternarDispositivos() {
+    const abrir = !deviceSessionsOpen;
+    setDeviceSessionsOpen(abrir);
+    if (abrir) void cargarDispositivos();
   }
 
   // FIX PARPADEO: aplicar el tema ANTES del primer paint
@@ -4052,6 +4160,118 @@ export default function Dashboard(props: DashboardProps) {
                   <Shield style={{ width:"18px", height:"18px", flexShrink:0 }} />
                   <span>God Mode</span>
                 </button>
+              )}
+
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
+              <button
+                type="button"
+                onClick={alternarDispositivos}
+                aria-expanded={deviceSessionsOpen}
+                aria-controls="device-sessions-panel"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: deviceSessionsOpen ? "rgba(250,204,21,0.1)" : "transparent",
+                  border: "1px solid var(--border-subtle)",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  textAlign: "left",
+                }}
+              >
+                <Smartphone style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span style={{ flex: 1 }}>Dispositivos conectados</span>
+                {deviceSessionsOpen ? (
+                  <ChevronUp style={{ width: "16px", height: "16px" }} />
+                ) : (
+                  <ChevronDown style={{ width: "16px", height: "16px" }} />
+                )}
+              </button>
+
+              {deviceSessionsOpen && (
+                <section
+                  id="device-sessions-panel"
+                  aria-label="Dispositivos con sesión iniciada"
+                  style={{ padding: "10px 2px 2px" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+                    <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "11px", lineHeight: 1.4 }}>
+                      Revisá la actividad y cerrá sesiones que no reconozcas.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={function () { void cargarDispositivos(); }}
+                      disabled={loadingDeviceSessions}
+                      aria-label="Actualizar dispositivos"
+                      style={{ background: "transparent", border: "none", color: "var(--color-yellow)", cursor: loadingDeviceSessions ? "wait" : "pointer", padding: "5px", lineHeight: 0, flexShrink: 0 }}
+                    >
+                      <RefreshCw style={{ width: "15px", height: "15px", animation: loadingDeviceSessions ? "spin 1s linear infinite" : undefined }} />
+                    </button>
+                  </div>
+                  {deviceSessionsError && (
+                    <p role="alert" style={{ color: "#ef4444", fontSize: "11px", lineHeight: 1.4, margin: "0 0 8px" }}>
+                      {deviceSessionsError}
+                    </p>
+                  )}
+                  {deviceSessionsNotice && (
+                    <p role="status" aria-live="polite" style={{ color: "var(--color-green)", fontSize: "11px", lineHeight: 1.4, margin: "0 0 8px" }}>
+                      {deviceSessionsNotice}
+                    </p>
+                  )}
+                  {loadingDeviceSessions && deviceSessions.length === 0 ? (
+                    <p role="status" aria-live="polite" style={{ color: "var(--text-muted)", fontSize: "12px", padding: "8px 4px" }}>
+                      Cargando dispositivos...
+                    </p>
+                  ) : deviceSessions.length === 0 ? (
+                    deviceSessionsError ? null : (
+                      <p style={{ color: "var(--text-muted)", fontSize: "12px", lineHeight: 1.4, padding: "4px" }}>
+                        No encontramos otras sesiones activas.
+                      </p>
+                    )
+                  ) : (
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "8px" }}>
+                      {deviceSessions.map(function (device) {
+                        const revoking = revokingDeviceSession === device.session_id;
+                        return (
+                          <li
+                            key={device.session_id}
+                            style={{ padding: "10px", borderRadius: "10px", border: "1px solid var(--border-subtle)", background: "var(--bg-card)" }}
+                          >
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "6px" }}>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ margin: "0 0 4px", color: "var(--text-primary)", fontSize: "12px", fontWeight: 800, overflowWrap: "anywhere" }}>
+                                  {deviceDescription(device.user_agent)}
+                                </p>
+                                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "10px", lineHeight: 1.4 }}>
+                                  {deviceActivityDate(device.updated_at ?? device.created_at)}
+                                </p>
+                              </div>
+                              {device.is_current ? (
+                                <span style={{ flexShrink: 0, borderRadius: "20px", padding: "3px 7px", background: "rgba(34,197,94,0.12)", color: "var(--color-green)", fontSize: "9px", fontWeight: 800 }}>
+                                  Este dispositivo
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={function () { void revocarDispositivo(device); }}
+                                  disabled={Boolean(revokingDeviceSession)}
+                                  style={{ flexShrink: 0, borderRadius: "7px", padding: "5px 7px", border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "10px", fontWeight: 800, cursor: revokingDeviceSession ? "wait" : "pointer", opacity: revokingDeviceSession && !revoking ? 0.55 : 1 }}
+                                >
+                                  {revoking ? "Cerrando..." : "Cerrar sesión"}
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
               )}
             </div>
 
