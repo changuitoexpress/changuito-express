@@ -215,6 +215,20 @@ it("renders every authenticated screen and returns to the dashboard", async func
     });
   }
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const screen of screens) {
+    await page.getByRole("button", { name: "Abrir menú" }).click();
+    await page.getByRole("button", { name: new RegExp(screen.menuLabel) }).click();
+    await page.getByText(screen.marker, { exact: false }).first().waitFor({
+      state: "visible",
+      timeout: 10_000,
+    });
+    await page.locator("button").first().click();
+    await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
+      timeout: 10_000,
+    });
+  }
+
   const customerId = "browser-fixture-customer";
   const customerEmail = "customer@example.test";
   const customerContext = await browser.newContext();
