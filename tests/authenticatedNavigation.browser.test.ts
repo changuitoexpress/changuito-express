@@ -74,7 +74,15 @@ async function mockSupabase(
     );
     let data: unknown = [];
 
-    if (url.pathname === "/auth/v1/user") {
+    if (
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "refresh_token"
+    ) {
+      data = {
+        ...createFixtureSession(userId, email),
+        access_token: "browser-fixture-refreshed-access-token",
+      };
+    } else if (url.pathname === "/auth/v1/user") {
       data = {
         id: userId,
         email,
@@ -121,12 +129,16 @@ async function mockSupabase(
   });
 }
 
-function createFixtureSession(userId: string, email: string) {
+function createFixtureSession(
+  userId: string,
+  email: string,
+  expiresInSeconds = 3600,
+) {
   return {
     access_token: "browser-fixture-access-token",
     token_type: "bearer",
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    expires_in: expiresInSeconds,
+    expires_at: Math.floor(Date.now() / 1000) + expiresInSeconds,
     refresh_token: "browser-fixture-refresh-token",
     user: {
       id: userId,
@@ -226,7 +238,11 @@ it("renders every authenticated screen and returns to the dashboard", async func
   });
 
   const context = await browser.newContext();
-  const session = createFixtureSession(fixtureUserId, "uliseseven.7@gmail.com");
+  const session = createFixtureSession(
+    fixtureUserId,
+    "uliseseven.7@gmail.com",
+    4 * 60,
+  );
   await context.addInitScript(
     function (storedSession) {
       localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
@@ -243,6 +259,25 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await page.goto(appUrl);
 
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  const expiryWarning = page.getByRole("alert");
+  await expiryWarning.waitFor({ state: "visible" });
+  assert.equal(
+    await expiryWarning.innerText(),
+    "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
+    "The signed-in session expiry warning should clearly explain the upcoming expiry.",
+  );
+
+  const refreshedExpiry = await page.evaluate(async function () {
+    const app = await import("/src/App.tsx");
+    const { data, error } = await app.supabase.auth.refreshSession();
+    if (error) throw error;
+    return data.session?.expires_at;
+  });
+  assert.ok(
+    typeof refreshedExpiry === "number" && refreshedExpiry > session.expires_at,
+    "The fixture should provide a renewed session with a later expiry.",
+  );
+  await expiryWarning.waitFor({ state: "hidden" });
 
   const screens = [
     { menuLabel: "ChangoMonedero", marker: "ChangoMonedero" },
