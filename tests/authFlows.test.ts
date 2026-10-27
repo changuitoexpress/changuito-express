@@ -419,4 +419,17 @@ describe("sesión y cierre de sesión", function () {
 
     assert.equal(signOutCalls, 1);
   });
+
+  it("informa cuando Supabase devuelve un error al cerrar sesión", async function () {
+    const signOutError = new Error("network unavailable");
+    const { client } = createClientFixture({
+      signOut: async function () {
+        return { error: signOutError };
+      },
+    });
+
+    await assert.rejects(signOut(client), function (error) {
+      return error === signOutError;
+    });
+  });
 });

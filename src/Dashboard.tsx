@@ -2405,6 +2405,7 @@ export default function Dashboard(props: DashboardProps) {
   const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
   const [modalLimite, setModalLimite] = useState(false);
   const [changuiAbierto, setChanguiAbierto] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
@@ -2429,7 +2430,14 @@ export default function Dashboard(props: DashboardProps) {
   }, []);
 
   async function cerrarSesion() {
-    await signOut(supabase);
+    setSignOutError("");
+    try {
+      await signOut(supabase);
+    } catch {
+      setSignOutError(
+        "No pudimos cerrar sesión. Tu sesión sigue activa. Intentá de nuevo.",
+      );
+    }
   }
 
   // FIX PARPADEO: aplicar el tema ANTES del primer paint
@@ -3884,6 +3892,23 @@ export default function Dashboard(props: DashboardProps) {
                 borderTop: "1px solid var(--border-subtle)",
               }}
             >
+              {signOutError && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: "10px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    background: "rgba(239,68,68,0.12)",
+                    border: "1px solid rgba(239,68,68,0.4)",
+                    color: "#ef4444",
+                    fontSize: "12px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {signOutError}
+                </div>
+              )}
               <button
                 onClick={cerrarSesion}
                 style={{

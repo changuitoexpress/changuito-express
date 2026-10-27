@@ -198,5 +198,7 @@ export function startAuthSession(
 }
 
 export function signOut(client: SupabaseAuthClient) {
-  return client.auth.signOut();
+  return client.auth.signOut().then(function (result: { error?: any }) {
+    if (result.error) throw result.error;
+  });
 }
