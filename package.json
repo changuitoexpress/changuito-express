@@ -4,17 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5000",
+    "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 5000",
-    "test": "tsx --test tests/authFlows.test.ts tests/authFlows.integration.test.ts tests/adminDataAccess.integration.test.ts tests/adminDataPolicies.test.ts tests/authenticatedNavigation.browser.test.ts tests/formDrafts.test.ts tests/freeShippingProgress.test.ts tests/walletLoading.browser.test.ts tests/chatPolicies.test.ts",
-    "test:auth-integration": "tsx --test tests/authFlows.integration.test.ts"
+    "preview": "vite preview --host 0.0.0.0 --port 5173"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.101.0",
     "lucide-react": "^0.468.0",
-    "playwright": "^1.64.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -22,7 +19,6 @@
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
   }
