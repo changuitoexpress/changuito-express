@@ -42,6 +42,12 @@ import {
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
 import { signOut, signOutEverywhere } from "./authFlows";
+import {
+  clearFormDraft,
+  clearUserFormDrafts,
+  readFormDraft,
+  writeFormDraft,
+} from "./formDrafts";
 import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguitoAI";
 import Monedero from "./Monedero";
@@ -117,6 +123,42 @@ const FORMAS_PAGO = [
   { id: "transferencia", label: "Transferencia", emoji: "📲" },
   { id: "en_linea", label: "Pago en línea", emoji: "🌐" },
 ];
+
+type CheckoutDraft = {
+  cartSignature: string;
+  paso: "carrito" | "direccion" | "pago" | "resumen";
+  dirSeleccionadaId: string | null;
+  formaNueva: boolean;
+  alias: string;
+  calle: string;
+  numero: string;
+  referencias: string;
+  preferencias: string;
+  formaPago: string;
+  fraccionamientoId: string | null;
+  fracSearch: string;
+};
+
+const CHECKOUT_DRAFT_ID = "customer-checkout";
+
+function checkoutCartSignature(carrito: CartItem[]): string {
+  return carrito
+    .map(function (item) {
+      return item.id + ":" + item.cantidad;
+    })
+    .sort()
+    .join("|");
+}
+
+function getCheckoutDraft(userId: string, carrito: CartItem[]): CheckoutDraft | null {
+  if (!carrito.length) return null;
+  const draft = readFormDraft<CheckoutDraft>(userId, CHECKOUT_DRAFT_ID);
+  if (!draft || draft.cartSignature !== checkoutCartSignature(carrito)) {
+    if (draft) clearFormDraft(userId, CHECKOUT_DRAFT_ID);
+    return null;
+  }
+  return draft;
+}
 
 // ─── Secciones Restaurantes ───────────────────────────────────────────────────
 const SECCIONES_REST = [
@@ -907,18 +949,21 @@ function ModalCheckout(props: {
   onRemoveItem: (id: string) => void;
   onUpdateCantidad: (id: string, delta: number) => void;
 }) {
+  const [draft] = useState<CheckoutDraft | null>(function () {
+    return getCheckoutDraft(props.clienteId, props.carrito);
+  });
   const [paso, setPaso] = useState<
     "carrito" | "direccion" | "pago" | "resumen"
-  >("carrito");
+  >(draft?.paso ?? "carrito");
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [dirSeleccionada, setDirSel] = useState<Direccion | null>(null);
-  const [formaNueva, setFormaNueva] = useState(false);
-  const [alias, setAlias] = useState("Casa");
-  const [calle, setCalle] = useState("");
-  const [numero, setNumero] = useState("");
-  const [referencias, setReferencias] = useState("");
-  const [preferencias, setPreferencias] = useState("");
-  const [formaPago, setFormaPago] = useState("efectivo");
+  const [formaNueva, setFormaNueva] = useState(draft?.formaNueva ?? false);
+  const [alias, setAlias] = useState(draft?.alias ?? "Casa");
+  const [calle, setCalle] = useState(draft?.calle ?? "");
+  const [numero, setNumero] = useState(draft?.numero ?? "");
+  const [referencias, setReferencias] = useState(draft?.referencias ?? "");
+  const [preferencias, setPreferencias] = useState(draft?.preferencias ?? "");
+  const [formaPago, setFormaPago] = useState(draft?.formaPago ?? "efectivo");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [fraccionamientos, setFraccionamientos] = useState<Fraccionamiento[]>(
@@ -926,7 +971,7 @@ function ModalCheckout(props: {
   );
   const [fraccionamientoSel, setFraccionamientoSel] =
     useState<Fraccionamiento | null>(null);
-  const [fracSearch, setFracSearch] = useState("");
+  const [fracSearch, setFracSearch] = useState(draft?.fracSearch ?? "");
   const [costoEnvio, setCostoEnvio] = useState(50);
 
   const subtotal = props.carrito.reduce(function (a, i) {
@@ -952,6 +997,9 @@ function ModalCheckout(props: {
           setDirecciones(r.data as Direccion[]);
           setDirSel(
             r.data.find(function (d: Direccion) {
+              return d.id === draft?.dirSeleccionadaId;
+            }) ??
+              r.data.find(function (d: Direccion) {
               return d.es_principal;
             }) ?? r.data[0],
           );
@@ -968,9 +1016,50 @@ function ModalCheckout(props: {
       .select("id,nombre,costo_envio")
       .order("nombre", { ascending: true })
       .then(function (r) {
-        if (r.data) setFraccionamientos(r.data as Fraccionamiento[]);
+        if (r.data) {
+          setFraccionamientos(r.data as Fraccionamiento[]);
+          const restored = (r.data as Fraccionamiento[]).find(function (item) {
+            return item.id === draft?.fraccionamientoId;
+          });
+          if (restored) setFraccionamientoSel(restored);
+        }
       });
   }, []);
+
+  useEffect(
+    function () {
+      writeFormDraft<CheckoutDraft>(props.clienteId, CHECKOUT_DRAFT_ID, {
+        cartSignature: checkoutCartSignature(props.carrito),
+        paso,
+        dirSeleccionadaId: dirSeleccionada?.id ?? draft?.dirSeleccionadaId ?? null,
+        formaNueva,
+        alias,
+        calle,
+        numero,
+        referencias,
+        preferencias,
+        formaPago,
+        fraccionamientoId:
+          fraccionamientoSel?.id ?? draft?.fraccionamientoId ?? null,
+        fracSearch,
+      });
+    },
+    [
+      props.clienteId,
+      props.carrito,
+      paso,
+      dirSeleccionada,
+      formaNueva,
+      alias,
+      calle,
+      numero,
+      referencias,
+      preferencias,
+      formaPago,
+      fraccionamientoSel,
+      fracSearch,
+    ],
+  );
 
   async function guardarDireccionNueva(): Promise<Direccion | null> {
     if (!calle || !numero) {
@@ -1118,6 +1207,7 @@ function ModalCheckout(props: {
         "https://wa.me/" + PHONE_OPERATIVO + "?text=" + encodeURIComponent(msg),
         "_blank",
       );
+      clearFormDraft(props.clienteId, CHECKOUT_DRAFT_ID);
       props.onPedidoOk();
     } catch (err: any) {
       setError(err.message ?? "Error al procesar el pedido.");
@@ -2400,7 +2490,9 @@ export default function Dashboard(props: DashboardProps) {
   );
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
-  const [modalCheckout, setModalCheckout] = useState(false);
+  const [modalCheckout, setModalCheckout] = useState<boolean>(function () {
+    return Boolean(getCheckoutDraft(props.session.user.id, props.carritoGlobal));
+  });
   const [menuAbierto, setMenuAbierto] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2476,6 +2568,7 @@ export default function Dashboard(props: DashboardProps) {
     setSignOutError("");
     try {
       await signOut(supabase);
+      clearUserFormDrafts(props.session.user.id);
     } catch {
       setSignOutError(
         "No pudimos cerrar sesión. Tu sesión sigue activa. Intentá de nuevo.",
@@ -2493,6 +2586,7 @@ export default function Dashboard(props: DashboardProps) {
     setSigningOutEverywhere(true);
     try {
       await signOutEverywhere(supabase);
+      clearUserFormDrafts(props.session.user.id);
       window.alert(
         "Se cerró tu sesión en este dispositivo y se revocaron las sesiones de los demás.",
       );

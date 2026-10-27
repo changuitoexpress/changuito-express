@@ -384,6 +384,73 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await customerPage.goto(appUrl);
   await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await merchantAdminLookup;
+
+  const checkoutCart = [
+    {
+      id: "checkout-fixture-product",
+      nombre: "Fixture meal",
+      precio: 125,
+      cantidad: 1,
+      negocio: "Browser Fixture Store",
+      negocio_id: fixtureMerchant.id,
+      phone_number: fixtureMerchant.phone_number,
+      tipo: "producto",
+    },
+  ];
+  await customerPage.evaluate(
+    function (fixture) {
+      localStorage.setItem("changuito-cart", JSON.stringify(fixture.cart));
+      localStorage.setItem(
+        fixture.draftKey,
+        JSON.stringify({
+          savedAt: Date.now(),
+          values: {
+            cartSignature: "checkout-fixture-product:1",
+            paso: "direccion",
+            dirSeleccionadaId: null,
+            formaNueva: true,
+            alias: "Saved home",
+            calle: "Fixture Avenue",
+            numero: "42",
+            referencias: "Blue gate",
+            preferencias: "Call on arrival",
+            formaPago: "tarjeta",
+            fraccionamientoId: null,
+            fracSearch: "",
+          },
+        }),
+      );
+    },
+    {
+      cart: checkoutCart,
+      draftKey:
+        "changuito-form-draft:" +
+        encodeURIComponent(customerId) +
+        ":customer-checkout",
+    },
+  );
+  await customerPage.reload();
+  await customerPage.getByRole("heading", { name: "¿Dónde entregamos?" }).waitFor();
+  assert.equal(
+    await customerPage.getByPlaceholder("Casa, Trabajo").inputValue(),
+    "Saved home",
+    "Reauthenticated checkout should restore the saved delivery alias.",
+  );
+  assert.equal(
+    await customerPage.getByPlaceholder("Av. Principal").inputValue(),
+    "Fixture Avenue",
+    "Reauthenticated checkout should restore the saved address.",
+  );
+  assert.equal(
+    await customerPage.getByPlaceholder("#123, Depto #123").inputValue(),
+    "42",
+  );
+  await customerPage.evaluate(function (draftKey) {
+    localStorage.removeItem("changuito-cart");
+    localStorage.removeItem(draftKey);
+  }, "changuito-form-draft:" + encodeURIComponent(customerId) + ":customer-checkout");
+  await customerPage.reload();
+  await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await customerPage.getByRole("button", { name: "Abrir menú" }).click();
 
   for (const restrictedMenuLabel of [
