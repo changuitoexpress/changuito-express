@@ -922,6 +922,52 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(observed, [null]);
   });
 
+  it("permite cancelar varias veces sin repetir la limpieza de Supabase", function () {
+    let unsubscribeCalls = 0;
+    const { client } = createClientFixture({
+      onAuthStateChange: function () {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: function () {
+                unsubscribeCalls += 1;
+              },
+            },
+          },
+        };
+      },
+    });
+    const subscription = watchAuthSession(client, function () {});
+
+    subscription.unsubscribe();
+    subscription.unsubscribe();
+
+    assert.equal(unsubscribeCalls, 1);
+  });
+
+  it("permite repetir la limpieza de pantalla sin repetir la limpieza de Supabase", function () {
+    let unsubscribeCalls = 0;
+    const { client } = createClientFixture({
+      onAuthStateChange: function () {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: function () {
+                unsubscribeCalls += 1;
+              },
+            },
+          },
+        };
+      },
+    });
+    const cleanup = startAuthSession(client, function () {}, function () {});
+
+    cleanup();
+    cleanup();
+
+    assert.equal(unsubscribeCalls, 1);
+  });
+
   it("ignora el resultado de perfil si se cancela la observación antes de que termine", async function () {
     let authListener: Function = function () {};
     let resolveProfile: Function = function () {};

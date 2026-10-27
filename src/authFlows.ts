@@ -331,6 +331,7 @@ export function watchAuthSession(
   onAuthEvent?: () => void,
 ) {
   let listening = true;
+  let unsubscribed = false;
   let latestAuthEvent = 0;
   const {
     data: { subscription },
@@ -349,6 +350,8 @@ export function watchAuthSession(
   return {
     ...subscription,
     unsubscribe: function () {
+      if (unsubscribed) return;
+      unsubscribed = true;
       listening = false;
       subscription.unsubscribe();
     },
