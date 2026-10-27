@@ -20,7 +20,7 @@ export interface AuthAppSession {
 interface SupabaseAuthClient {
   auth: any;
   from(table: string): any;
-  rpc(functionName: string, args?: Record<string, unknown>): Promise<any>;
+  rpc(functionName: string, args?: Record<string, unknown>): PromiseLike<any>;
 }
 
 interface SupabaseSession {
