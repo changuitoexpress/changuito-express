@@ -38,7 +38,6 @@ interface Metricas {
   pedidosPendientes: number;
 }
 
-const RESTAURANTES_CASHBACK = ['cubiertos', 'atomica', 'tripoli'];
 const COMISION_PCT = 0.15;
 
 function estaAbiertoAhora(m: any): boolean {
@@ -224,6 +223,10 @@ export default function AdminGodMode(props: AdminProps) {
       .rpc('cambiar_estatus_pedido', { p_id: pedidoId, p_estatus: nuevoEstatus });
 
     if (rpcErr || !rpcData?.ok) {
+      if (nuevoEstatus === 'entregado') {
+        alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\nEjecuta la versión actualizada de supabase_setup.sql en el SQL Editor de Supabase para habilitar el crédito seguro.\n\n' + (rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.'));
+        return;
+      }
       // Fallback: actualización directa
       const { error: err, data: upData } = await supabase
         .from('pedidos')
@@ -233,24 +236,6 @@ export default function AdminGodMode(props: AdminProps) {
       if (err || !upData?.length) {
         alert('⚠️ No se pudo cambiar el estatus.\n\nEjecuta supabase_setup.sql en el SQL Editor de Supabase para habilitar los permisos.\n\n' + (err?.message ?? 'Sin filas afectadas.'));
         return;
-      }
-    }
-
-    // Si se marca entregado → acreditar cashback ChangoMonedero (Los Cubiertos / La Atómica / Tacos Trípoli)
-    if (nuevoEstatus === 'entregado') {
-      const pedido = pedidos.find(function(p) { return p.id === pedidoId; });
-      if (pedido && pedido.cliente_id) {
-        const negNombre = (pedido.negocio_nombre ?? '').toLowerCase();
-        const aplica = RESTAURANTES_CASHBACK.some(function(r) { return negNombre.includes(r); });
-        if (aplica) {
-          const cashback = Math.round((pedido.total_pagar ?? 0) * 0.05 * 100) / 100;
-          const { data: mon } = await supabase
-            .from('monedero_cliente').select('saldo_cashback')
-            .eq('user_id', pedido.cliente_id).maybeSingle();
-          const nuevoSaldo = (mon?.saldo_cashback ?? 0) + cashback;
-          await supabase.from('monedero_cliente')
-            .upsert({ user_id: pedido.cliente_id, saldo_cashback: nuevoSaldo }, { onConflict: 'user_id' });
-        }
       }
     }
 

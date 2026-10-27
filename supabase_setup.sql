@@ -187,6 +187,31 @@ CREATE POLICY pedidos_admin_delete_guard ON public.pedidos
 REVOKE UPDATE ON public.pedidos FROM PUBLIC, anon, authenticated;
 GRANT UPDATE (estatus, repartidor_id) ON public.pedidos TO authenticated;
 
+-- Keep one durable cashback record per order so changing an order away from
+-- delivered and back cannot credit the same order twice.
+CREATE TABLE IF NOT EXISTS public.cashback_pedidos (
+  pedido_id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  monto numeric NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.cashback_pedidos ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.cashback_pedidos FROM PUBLIC, anon, authenticated;
+
+-- Orders already delivered by the previous admin flow were credited before
+-- this ledger existed. Record them without changing wallet balances.
+INSERT INTO public.cashback_pedidos (pedido_id, user_id, monto)
+SELECT p.id, p.cliente_id, round(COALESCE(p.total_pagar, 0)::numeric * 0.05, 2)
+FROM public.pedidos p
+WHERE p.estatus = 'entregado'
+  AND p.cliente_id IS NOT NULL
+  AND (
+    translate(lower(COALESCE(p.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%cubiertos%'
+    OR translate(lower(COALESCE(p.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%atomica%'
+    OR translate(lower(COALESCE(p.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%tripoli%'
+  )
+ON CONFLICT (pedido_id) DO NOTHING;
+
 -- ─── 1. RPC: Cambiar estatus (admin-only; SECURITY DEFINER bypasses RLS) ────
 CREATE OR REPLACE FUNCTION cambiar_estatus_pedido(p_id uuid, p_estatus text)
 RETURNS json
@@ -196,6 +221,8 @@ SET search_path = public
 AS $$
 DECLARE
   v_actualizados integer;
+  v_pedido public.pedidos%ROWTYPE;
+  v_cashback numeric;
 BEGIN
   IF NOT public.is_changuito_admin() THEN
     RETURN json_build_object('error', 'Sin permisos.');
@@ -204,9 +231,37 @@ BEGIN
     RETURN json_build_object('error', 'Estatus no válido.');
   END IF;
 
+  SELECT * INTO v_pedido
+  FROM public.pedidos
+  WHERE id = p_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN json_build_object('error', 'Pedido no encontrado.');
+  END IF;
+
   UPDATE public.pedidos SET estatus = p_estatus WHERE id = p_id;
   GET DIAGNOSTICS v_actualizados = ROW_COUNT;
   IF v_actualizados > 0 THEN
+    IF p_estatus = 'entregado'
+       AND v_pedido.cliente_id IS NOT NULL
+       AND (
+         translate(lower(COALESCE(v_pedido.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%cubiertos%'
+         OR translate(lower(COALESCE(v_pedido.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%atomica%'
+         OR translate(lower(COALESCE(v_pedido.negocio_nombre, '')), 'áéíóúüñ', 'aeiouun') LIKE '%tripoli%'
+       ) THEN
+      v_cashback := round(COALESCE(v_pedido.total_pagar, 0)::numeric * 0.05, 2);
+
+      INSERT INTO public.cashback_pedidos (pedido_id, user_id, monto)
+      VALUES (p_id, v_pedido.cliente_id, v_cashback)
+      ON CONFLICT (pedido_id) DO NOTHING;
+
+      IF FOUND THEN
+        INSERT INTO public.monedero_cliente AS wallet (user_id, saldo_cashback)
+        VALUES (v_pedido.cliente_id, v_cashback)
+        ON CONFLICT (user_id) DO UPDATE
+          SET saldo_cashback = COALESCE(wallet.saldo_cashback, 0) + EXCLUDED.saldo_cashback;
+      END IF;
+    END IF;
     RETURN json_build_object('ok', true, 'estatus', p_estatus);
   END IF;
   RETURN json_build_object('error', 'Pedido no encontrado.');
