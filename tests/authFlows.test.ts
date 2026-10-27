@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   restoreAuthSession,
   signOut,
+  startAuthSession,
   submitAuthForm,
   validateAuthForm,
   watchAuthSession,
@@ -338,6 +339,69 @@ describe("sesión y cierre de sesión", function () {
     await new Promise(function (resolve) {
       setTimeout(resolve, 0);
     });
+
+    assert.deepEqual(observed, [null]);
+  });
+
+  it("no restaura la sesión inicial si se cierra sesión mientras carga el perfil", async function () {
+    let authListener: Function = function () {};
+    let resolveProfile: Function = function () {};
+    let profileLookupStarted: Function = function () {};
+    let ready: Function = function () {};
+    const profileStarted = new Promise<void>(function (resolve) {
+      profileLookupStarted = resolve;
+    });
+    const startupReady = new Promise<void>(function (resolve) {
+      ready = resolve;
+    });
+    const { client } = createClientFixture({
+      getSession: async function () {
+        return {
+          data: {
+            session: {
+              user: { id: "fixture-user-id", email: "fixture@example.test" },
+            },
+          },
+        };
+      },
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: function () {
+                  profileLookupStarted();
+                  return new Promise(function (resolve) {
+                    resolveProfile = resolve;
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        ready();
+      },
+    );
+
+    await profileStarted;
+    authListener("SIGNED_OUT", null);
+    resolveProfile({ data: { nombre: "Ana", rol: "cliente" } });
+    await startupReady;
 
     assert.deepEqual(observed, [null]);
   });

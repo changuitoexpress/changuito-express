@@ -143,12 +143,14 @@ export async function restoreAuthSession(
 export function watchAuthSession(
   client: SupabaseAuthClient,
   onSession: (session: AuthAppSession | null) => void,
+  onAuthEvent?: () => void,
 ) {
   let latestAuthEvent = 0;
   const {
     data: { subscription },
   } = client.auth.onAuthStateChange(function (_event: string, session: SupabaseSession | null) {
     const authEvent = ++latestAuthEvent;
+    if (onAuthEvent) onAuthEvent();
     if (!session) {
       onSession(null);
       return;
@@ -158,6 +160,41 @@ export function watchAuthSession(
     });
   });
   return subscription;
+}
+
+export function startAuthSession(
+  client: SupabaseAuthClient,
+  onSession: (session: AuthAppSession | null) => void,
+  onReady: () => void,
+) {
+  let mounted = true;
+  let latestAuthEvent = 0;
+  const startupAuthEvent = latestAuthEvent;
+  const subscription = watchAuthSession(
+    client,
+    function (session) {
+      if (mounted) onSession(session);
+    },
+    function () {
+      latestAuthEvent += 1;
+    },
+  );
+
+  restoreAuthSession(client)
+    .then(function (restored) {
+      if (mounted && startupAuthEvent === latestAuthEvent && restored) {
+        onSession(restored);
+      }
+    })
+    .catch(function () {})
+    .finally(function () {
+      if (mounted) onReady();
+    });
+
+  return function () {
+    mounted = false;
+    subscription.unsubscribe();
+  };
 }
 
 export function signOut(client: SupabaseAuthClient) {

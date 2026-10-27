@@ -50,10 +50,9 @@ const ChangoMonedero = lazy(function () {
   return import("./ChangoMonedero");
 });
 import {
-  restoreAuthSession,
+  startAuthSession,
   submitAuthForm,
   validateAuthForm,
-  watchAuthSession,
 } from "./authFlows";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
@@ -770,25 +769,15 @@ export default function App() {
   }, [pantalla]);
 
   useEffect(function () {
-    let mounted = true;
-    async function init() {
-      try {
-        const restored = await restoreAuthSession(supabase);
-        if (mounted && restored) setSession(restored);
-      } catch {
-      } finally {
-        if (mounted) setBooting(false);
-      }
-    }
-    init();
-    const subscription = watchAuthSession(supabase, function (s) {
-      if (!mounted) return;
-      setSession(s);
-    });
-    return function () {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return startAuthSession(
+      supabase,
+      function (s) {
+        setSession(s);
+      },
+      function () {
+        setBooting(false);
+      },
+    );
   }, []);
 
   if (booting) {
