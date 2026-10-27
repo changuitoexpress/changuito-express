@@ -593,6 +593,70 @@ describe("sesión y cierre de sesión", function () {
     assert.equal(await restoreAuthSession(client), null);
   });
 
+  it("restaura la sesión guardada con perfil alternativo si falla la consulta del perfil", async function () {
+    const { client } = createClientFixture({
+      getSession: async function () {
+        return {
+          data: {
+            session: {
+              user: { id: "saved-account", email: "saved@example.test" },
+            },
+          },
+        };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: async function () {
+                  throw new Error("Saved profile lookup failed");
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+
+    const observed: any[] = [];
+    const startupEvents: string[] = [];
+    let readyCalls = 0;
+    let markReady: Function = function () {};
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+        startupEvents.push("session");
+      },
+      function () {
+        readyCalls += 1;
+        startupEvents.push("ready");
+        markReady();
+      },
+    );
+    await startupReady;
+
+    assert.equal(readyCalls, 1);
+    assert.deepEqual(observed, [
+      {
+        user: {
+          id: "saved-account",
+          email: "saved@example.test",
+          nombre: "saved",
+          rol: "cliente",
+        },
+      },
+    ]);
+    assert.deepEqual(startupEvents, ["session", "ready"]);
+  });
+
   it("termina el inicio público si falla la consulta de sesión guardada", async function () {
     const { client } = createClientFixture({
       getSession: async function () {
