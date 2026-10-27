@@ -386,17 +386,103 @@ CREATE TABLE IF NOT EXISTS public.mensajes_chat (
 
 ALTER TABLE public.mensajes_chat ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='mensajes_chat' AND policyname='mensajes_select') THEN
-    EXECUTE $pol$ CREATE POLICY mensajes_select ON public.mensajes_chat FOR SELECT TO authenticated USING (true); $pol$;
-  END IF;
-END $$;
+-- Chat history follows the order's customer/courier relationship; being signed
+-- in or owning the order's merchant is not enough to read private messages.
+DROP POLICY IF EXISTS mensajes_select ON public.mensajes_chat;
+CREATE POLICY mensajes_select ON public.mensajes_chat
+  FOR SELECT TO authenticated
+  USING (
+    public.is_changuito_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.pedidos p
+      WHERE p.id = mensajes_chat.pedido_id
+        AND (
+          p.cliente_id = auth.uid()
+          OR (
+            p.repartidor_id = auth.uid()
+            AND EXISTS (
+              SELECT 1 FROM public.perfiles perfil
+              WHERE perfil.id = auth.uid() AND perfil.rol = 'repartidor'
+            )
+          )
+        )
+    )
+  );
+DROP POLICY IF EXISTS mensajes_select_scope_guard ON public.mensajes_chat;
+CREATE POLICY mensajes_select_scope_guard ON public.mensajes_chat
+  AS RESTRICTIVE FOR SELECT TO public
+  USING (
+    auth.uid() IS NOT NULL
+    AND (
+      public.is_changuito_admin()
+      OR EXISTS (
+        SELECT 1
+        FROM public.pedidos p
+        WHERE p.id = mensajes_chat.pedido_id
+          AND (
+            p.cliente_id = auth.uid()
+            OR (
+              p.repartidor_id = auth.uid()
+              AND EXISTS (
+                SELECT 1 FROM public.perfiles perfil
+                WHERE perfil.id = auth.uid() AND perfil.rol = 'repartidor'
+              )
+            )
+          )
+      )
+    )
+  );
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='mensajes_chat' AND policyname='mensajes_insert') THEN
-    EXECUTE $pol$ CREATE POLICY mensajes_insert ON public.mensajes_chat FOR INSERT TO authenticated WITH CHECK (autor_id = auth.uid()); $pol$;
-  END IF;
-END $$;
+-- Keep chat sending available to the customer, assigned courier, and
+-- designated admin only; authors cannot impersonate another role.
+DROP POLICY IF EXISTS mensajes_insert ON public.mensajes_chat;
+CREATE POLICY mensajes_insert ON public.mensajes_chat
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    autor_id = auth.uid()
+    AND EXISTS (
+      SELECT 1
+      FROM public.pedidos p
+      WHERE p.id = mensajes_chat.pedido_id
+        AND (
+          (p.cliente_id = auth.uid() AND autor_rol = 'cliente')
+          OR (
+            p.repartidor_id = auth.uid()
+            AND autor_rol = 'repartidor'
+            AND EXISTS (
+              SELECT 1 FROM public.perfiles perfil
+              WHERE perfil.id = auth.uid() AND perfil.rol = 'repartidor'
+            )
+          )
+          OR (public.is_changuito_admin() AND autor_rol = 'admin')
+        )
+    )
+  );
+DROP POLICY IF EXISTS mensajes_insert_scope_guard ON public.mensajes_chat;
+CREATE POLICY mensajes_insert_scope_guard ON public.mensajes_chat
+  AS RESTRICTIVE FOR INSERT TO public
+  WITH CHECK (
+    auth.uid() IS NOT NULL
+    AND autor_id = auth.uid()
+    AND EXISTS (
+      SELECT 1
+      FROM public.pedidos p
+      WHERE p.id = mensajes_chat.pedido_id
+        AND (
+          (p.cliente_id = auth.uid() AND autor_rol = 'cliente')
+          OR (
+            p.repartidor_id = auth.uid()
+            AND autor_rol = 'repartidor'
+            AND EXISTS (
+              SELECT 1 FROM public.perfiles perfil
+              WHERE perfil.id = auth.uid() AND perfil.rol = 'repartidor'
+            )
+          )
+          OR (public.is_changuito_admin() AND autor_rol = 'admin')
+        )
+    )
+  );
 
 -- ─── 4. Tabla solicitudes_rol ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.solicitudes_rol (
