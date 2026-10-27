@@ -163,6 +163,28 @@ async function tabToLocator(
   );
 }
 
+async function assertWithinViewport(locator: import("playwright").Locator) {
+  const bounds = await locator.evaluate(function (element) {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  assert.ok(
+    bounds.left >= 0 &&
+      bounds.right <= bounds.viewportWidth &&
+      bounds.top >= 0 &&
+      bounds.bottom <= bounds.viewportHeight,
+    "The dashboard tab control should fit within the phone viewport.",
+  );
+}
+
 it("renders every authenticated screen and returns to the dashboard", async function (t) {
   const port = await findAvailablePort();
   const appUrl = `http://127.0.0.1:${port}`;
@@ -302,6 +324,36 @@ it("renders every authenticated screen and returns to the dashboard", async func
     await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
       timeout: 10_000,
     });
+  }
+
+  await page.evaluate(function () {
+    window.scrollTo(0, 0);
+  });
+  const dashboardTabs = [
+    {
+      label: /🍽️ Restaurantes/,
+      content: page.getByRole("heading", { name: "Restaurantes", exact: true }),
+    },
+    {
+      label: /🛵 Mandaditos/,
+      content: page.getByRole("heading", { name: "🛵 Mandaditos", exact: true }),
+    },
+    {
+      label: /🛒 Tiendita/,
+      content: page.getByRole("heading", { name: /Tiendita Changuito/ }),
+    },
+    {
+      label: /🍽️ Restaurantes/,
+      content: page.getByRole("heading", { name: "Restaurantes", exact: true }),
+    },
+  ];
+
+  for (const tab of dashboardTabs) {
+    const tabButton = page.getByRole("button", { name: tab.label }).first();
+    await tabButton.waitFor({ state: "visible" });
+    await assertWithinViewport(tabButton);
+    await tabButton.click();
+    await tab.content.waitFor({ state: "visible", timeout: 10_000 });
   }
 
   const customerId = "browser-fixture-customer";
