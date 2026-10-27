@@ -1,5 +1,12 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Sun,
@@ -12,16 +19,36 @@ import {
   User,
   X,
 } from "lucide-react";
-import Dashboard from "./Dashboard";
-import BazarVecinal from "./BazarVecinal";
-import Servicios from "./Servicios";
-import AdminGodMode from "./AdminGodMode";
-import ChanguiShopping from "./ChanguiShopping";
-import DashboardNegocio from "./DashboardNegocio"; // Agregado: Import del Dashboard de Negocio
-import RepasDashboard from "./RepasDashboard";
-import BienesRaices from "./BienesRaices";
-import VentaAutos from "./VentaAutos";
-import ChangoMonedero from "./ChangoMonedero";
+const Dashboard = lazy(function () {
+  return import("./Dashboard");
+});
+const BazarVecinal = lazy(function () {
+  return import("./BazarVecinal");
+});
+const Servicios = lazy(function () {
+  return import("./Servicios");
+});
+const AdminGodMode = lazy(function () {
+  return import("./AdminGodMode");
+});
+const ChanguiShopping = lazy(function () {
+  return import("./ChanguiShopping");
+});
+const DashboardNegocio = lazy(function () {
+  return import("./DashboardNegocio");
+});
+const RepasDashboard = lazy(function () {
+  return import("./RepasDashboard");
+});
+const BienesRaices = lazy(function () {
+  return import("./BienesRaices");
+});
+const VentaAutos = lazy(function () {
+  return import("./VentaAutos");
+});
+const ChangoMonedero = lazy(function () {
+  return import("./ChangoMonedero");
+});
 import {
   restoreAuthSession,
   submitAuthForm,
@@ -830,6 +857,29 @@ export default function App() {
         <PWABanner onInstalar={pwa.instalar} onDescartar={pwa.descartar} />
       )}
 
+      <Suspense
+        fallback={
+          <div
+            style={{
+              minHeight: "100vh",
+              background: "var(--bg-base)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              className="spinner"
+              style={{
+                borderColor: "var(--border-subtle)",
+                borderTopColor: "#facc15",
+                width: "22px",
+                height: "22px",
+              }}
+            />
+          </div>
+        }
+      >
       {pantalla === "dashboard" && (
         <Dashboard
           session={session}
@@ -1007,6 +1057,7 @@ export default function App() {
           }}
         />
       )}
+      </Suspense>
     </>
   );
 }
