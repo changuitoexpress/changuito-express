@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Wallet } from 'lucide-react';
 import { supabase } from './App';
 import type { AppSession, Theme } from './App';
+import { getFreeShippingProgress } from './freeShippingProgress';
 
 interface Props {
   session: AppSession;
@@ -93,9 +94,9 @@ export default function Monedero(props: Props) {
 
   if (loading || !monedero) return null;
 
-  const modulo = pedidosEntregados === null ? 0 : pedidosEntregados % 10;
-  const pedidosFalta = modulo === 0 ? 10 : 10 - modulo;
-  const progreso = Math.round((modulo / 10) * 100);
+  const envioGratis = pedidosEntregados === null
+    ? null
+    : getFreeShippingProgress(pedidosEntregados);
 
   return (
     <div style={{
@@ -140,10 +141,10 @@ export default function Monedero(props: Props) {
             🚚 Envío gratis
           </p>
           <p style={{ fontSize:'14px', fontWeight:800, color:'#22C55E', margin:'0 0 2px 0', lineHeight:1.2 }}>
-            {pedidosEntregados === null ? 'No disponible' : modulo === 0 && pedidosEntregados > 0 ? '¡Disponible!' : pedidosFalta + ' pedidos'}
+            {envioGratis === null ? 'No disponible' : envioGratis.remainingOrders === 0 ? '¡Disponible!' : envioGratis.remainingOrders + ' pedido' + (envioGratis.remainingOrders === 1 ? '' : 's')}
           </p>
           <p style={{ fontSize:'10px', color:'var(--text-muted)', margin:0 }}>
-            {pedidosEntregados === null ? '—' : modulo === 0 && pedidosEntregados > 0 ? 10 : modulo} de cada 10
+            {envioGratis === null ? '—' : envioGratis.cycleCount} de cada 10
           </p>
         </div>
       </div>
@@ -154,12 +155,12 @@ export default function Monedero(props: Props) {
           <span style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:600 }}>
             Progreso al próximo envío gratis
           </span>
-          <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{pedidosEntregados === null ? '—' : progreso + '%'}</span>
+          <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{envioGratis === null ? '—' : envioGratis.progressPercent + '%'}</span>
         </div>
         <div style={{ height:'5px', borderRadius:'3px', background:'var(--border-subtle)', overflow:'hidden' }}>
           <div style={{
             height:'100%',
-            width: (pedidosEntregados === null ? 0 : progreso) + '%',
+            width: (envioGratis === null ? 0 : envioGratis.progressPercent) + '%',
             borderRadius:'3px',
             background:'linear-gradient(90deg,#22c55e,#16a34a)',
             transition:'width 0.6s ease',

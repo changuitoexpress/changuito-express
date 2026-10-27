@@ -29,6 +29,40 @@ const recentOrders = Array.from({ length: 50 }, function (_, index) {
     created_at: new Date(Date.UTC(2026, 0, 1, 12, 0, index)).toISOString(),
   };
 });
+const freeShippingMilestones = [
+  {
+    delivered: 0,
+    percent: "0%",
+    compactCycle: "0 de cada 10",
+    dedicatedCycle: "0/10 pedidos",
+    compactRemaining: "10 pedidos",
+    dedicatedRemaining: "10 pedidos más",
+  },
+  {
+    delivered: 9,
+    percent: "90%",
+    compactCycle: "9 de cada 10",
+    dedicatedCycle: "9/10 pedidos",
+    compactRemaining: "1 pedido",
+    dedicatedRemaining: "1 pedido más",
+  },
+  {
+    delivered: 10,
+    percent: "100%",
+    compactCycle: "10 de cada 10",
+    dedicatedCycle: "10/10 pedidos",
+    compactRemaining: "¡Disponible!",
+    dedicatedRemaining: "¡Ya tienes envío gratis disponible!",
+  },
+  {
+    delivered: 11,
+    percent: "10%",
+    compactCycle: "1 de cada 10",
+    dedicatedCycle: "1/10 pedidos",
+    compactRemaining: "9 pedidos",
+    dedicatedRemaining: "9 pedidos más",
+  },
+];
 
 async function findAvailablePort(): Promise<number> {
   return new Promise(function (resolve, reject) {
@@ -329,6 +363,21 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   );
   assert.deepEqual(pageErrors, [], "Wallet loading and retry should not throw in the browser.");
 
+  for (const milestone of freeShippingMilestones) {
+    deliveredOrders = Array.from({ length: milestone.delivered }, function () {
+      return { total_pagar: 10, estatus: "entregado" };
+    });
+    await page.evaluate(function () {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await page.getByText(milestone.dedicatedCycle, { exact: true }).waitFor();
+    await page.getByText(milestone.percent, { exact: true }).waitFor();
+    await page.getByText(milestone.dedicatedRemaining, { exact: true }).waitFor();
+  }
+  deliveredOrders = Array.from({ length: 1005 }, function () {
+    return { total_pagar: 10, estatus: "entregado" };
+  });
+
   await page.locator("button").first().click();
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await page.getByRole("button", { name: "🍽️ Restaurantes" }).first().click();
@@ -350,6 +399,18 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   });
   await page.getByText("6 de cada 10", { exact: true }).waitFor();
   await page.getByText("60%", { exact: true }).waitFor();
+
+  for (const milestone of freeShippingMilestones) {
+    deliveredOrders = Array.from({ length: milestone.delivered }, function () {
+      return { total_pagar: 10, estatus: "entregado" };
+    });
+    await page.evaluate(function () {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await page.getByText(milestone.compactCycle, { exact: true }).waitFor();
+    await page.getByText(milestone.percent, { exact: true }).waitFor();
+    await page.getByText(milestone.compactRemaining, { exact: true }).waitFor();
+  }
 
   await context.close();
 });
