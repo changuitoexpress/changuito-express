@@ -22,6 +22,12 @@ import RepasDashboard from "./RepasDashboard";
 import BienesRaices from "./BienesRaices";
 import VentaAutos from "./VentaAutos";
 import ChangoMonedero from "./ChangoMonedero";
+import {
+  restoreAuthSession,
+  submitAuthForm,
+  validateAuthForm,
+  watchAuthSession,
+} from "./authFlows";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
@@ -349,46 +355,20 @@ function AuthScreen(props: {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) {
-      props.onToast("Completá todos los campos.", "error");
-      return;
-    }
-    if (mode === "register" && nombre.trim().length < 2) {
-      props.onToast("Ingresá tu nombre completo.", "error");
-      return;
-    }
-    if (password.length < 6) {
-      props.onToast("Mínimo 6 caracteres.", "error");
+    const values = { mode, email, password, nombre };
+    const validationError = validateAuthForm(values);
+    if (validationError) {
+      props.onToast(validationError, "error");
       return;
     }
     setLoading(true);
     try {
-      if (mode === "register") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.user) {
-          try {
-            await supabase.from("perfiles").upsert(
-              {
-                id: data.user.id,
-                nombre: nombre.trim(),
-                email,
-                rol: "cliente",
-              },
-              { onConflict: "id" },
-            );
-          } catch (e) {}
-        }
-        props.onToast("Revisá tu email para confirmar.", "success");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+      const result = await submitAuthForm(supabase, values);
+      if (result.status === "error") {
+        props.onToast(result.message ?? "Error inesperado.", "error");
+      } else if (result.status === "registered") {
+        props.onToast(result.message ?? "Revisá tu email para confirmar.", "success");
       }
-    } catch (err: any) {
-      props.onToast(err.message ?? "Error inesperado.", "error");
     } finally {
       setLoading(false);
     }
@@ -762,67 +742,21 @@ export default function App() {
     return function () { window.removeEventListener('popstate', handlePop); };
   }, [pantalla]);
 
-  async function cargarPerfil(userId: string, email: string | undefined) {
-    try {
-      const { data } = await supabase
-        .from("perfiles")
-        .select("nombre,rol")
-        .eq("id", userId)
-        .maybeSingle();
-      const nombre = data?.nombre ?? (email ? email.split("@")[0] : "usuario");
-      const rol =
-        data?.rol ?? (email === "uliseseven.7@gmail.com" ? "admin" : "cliente");
-      return { nombre, rol };
-    } catch (e) {
-      return {
-        nombre: email ? email.split("@")[0] : "usuario",
-        rol: "cliente",
-      };
-    }
-  }
-
   useEffect(function () {
     let mounted = true;
     async function init() {
       try {
-        const {
-          data: { session: s },
-        } = await supabase.auth.getSession();
-        if (mounted && s) {
-          const p = await cargarPerfil(s.user.id, s.user.email);
-          if (mounted)
-            setSession({
-              user: {
-                id: s.user.id,
-                email: s.user.email,
-                nombre: p.nombre,
-                rol: p.rol,
-              },
-            });
-        }
+        const restored = await restoreAuthSession(supabase);
+        if (mounted && restored) setSession(restored);
       } catch {
       } finally {
         if (mounted) setBooting(false);
       }
     }
     init();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(function (_ev, s) {
+    const subscription = watchAuthSession(supabase, function (s) {
       if (!mounted) return;
-      if (s) {
-        cargarPerfil(s.user.id, s.user.email).then(function (p) {
-          if (mounted)
-            setSession({
-              user: {
-                id: s.user.id,
-                email: s.user.email,
-                nombre: p.nombre,
-                rol: p.rol,
-              },
-            });
-        });
-      } else setSession(null);
+      setSession(s);
     });
     return function () {
       mounted = false;

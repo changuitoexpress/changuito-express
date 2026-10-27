@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
+import { signOut } from "./authFlows";
 import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguitoAI";
 import Monedero from "./Monedero";
@@ -2428,7 +2429,7 @@ export default function Dashboard(props: DashboardProps) {
   }, []);
 
   async function cerrarSesion() {
-    await supabase.auth.signOut();
+    await signOut(supabase);
   }
 
   // FIX PARPADEO: aplicar el tema ANTES del primer paint
