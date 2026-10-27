@@ -17,15 +17,18 @@ const wallet = {
   pedidos_realizados: 7,
   envios_gratis_usados: 1,
 };
-const orders = [
-  {
-    id: "wallet-fixture-order",
+const deliveredOrders = Array.from({ length: 1005 }, function () {
+  return { total_pagar: 10, estatus: "entregado" };
+});
+const recentOrders = Array.from({ length: 50 }, function (_, index) {
+  return {
+    id: `wallet-fixture-order-${index}`,
     negocio_nombre: "Fixture Store",
-    total_pagar: 125,
+    total_pagar: 10,
     estatus: "entregado",
-    created_at: "2026-01-01T12:00:00.000Z",
-  },
-];
+    created_at: new Date(Date.UTC(2026, 0, 1, 12, 0, index)).toISOString(),
+  };
+});
 
 async function findAvailablePort(): Promise<number> {
   return new Promise(function (resolve, reject) {
@@ -138,6 +141,7 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
 
   let failure: "wallet" | "creation" | "orders" | null = "wallet";
   const requests = { wallet: 0, creation: 0, orders: 0 };
+  const orderQueries: string[] = [];
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
@@ -209,6 +213,7 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       return;
     }
     if (url.pathname === "/rest/v1/pedidos") {
+      orderQueries.push(url.search);
       if (failure === "orders") {
         requests.orders += 1;
         await route.fulfill({
@@ -218,10 +223,26 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         });
         return;
       }
+
+      if (url.searchParams.get("select") === "total_pagar") {
+        const from = Number(url.searchParams.get("offset") ?? 0);
+        const to = from + Number(url.searchParams.get("limit") ?? 1000) - 1;
+        const rows = deliveredOrders.slice(from, to + 1);
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          headers: {
+            "content-range": `${from}-${from + rows.length - 1}/${deliveredOrders.length}`,
+            "access-control-expose-headers": "content-range",
+          },
+          body: JSON.stringify(rows),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(orders),
+        body: JSON.stringify(recentOrders),
       });
       return;
     }
@@ -261,12 +282,34 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   }
 
   failure = null;
+  orderQueries.length = 0;
   await page.getByRole("button", { name: "Reintentar" }).click();
   await page.getByText("Saldo disponible", { exact: true }).waitFor({
     state: "visible",
     timeout: 10_000,
   });
   await page.getByText("$42.75", { exact: true }).waitFor();
+  await page.getByText("$10,050", { exact: true }).waitFor();
+  await page.getByText("50%", { exact: true }).waitFor();
+  assert.equal(
+    orderQueries.filter(function(query) {
+      return new URLSearchParams(query).get("select") === "total_pagar";
+    }).length,
+    2,
+    "Loyalty totals should continue across all 1005 delivered orders.",
+  );
+  assert.ok(
+    orderQueries.some(function(query) {
+      return new URLSearchParams(query).get("offset") === "1000";
+    }),
+    "The delivered-order summary should request the next page when needed.",
+  );
+  assert.ok(
+    orderQueries.some(function(query) {
+      return new URLSearchParams(query).get("limit") === "50";
+    }),
+    "The visible order history should remain limited to the latest 50 orders.",
+  );
   assert.equal(
     await page.getByRole("alert").count(),
     0,

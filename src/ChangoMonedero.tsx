@@ -41,9 +41,51 @@ const ESTATUS_LABEL: Record<string, string> = {
   cancelado:  'Cancelado',
 };
 
+async function cargarResumenEntregados(uid: string): Promise<{ entregados: number; totalGastado: number }> {
+  const pageSize = 1000;
+  const orderQuery = function(from: number, includeCount: boolean) {
+    return supabase
+      .from('pedidos')
+      .select('total_pagar', includeCount ? { count: 'exact' } : undefined)
+      .eq('cliente_id', uid)
+      .eq('estatus', 'entregado')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+  };
+
+  const { data, error, count } = await orderQuery(0, true);
+  if (error) throw error;
+  if (count === null) throw new Error('No se pudo contar el historial de pedidos entregados');
+
+  let entregados = 0;
+  let totalGastado = 0;
+  let offset = 0;
+  let page = data ?? [];
+
+  while (true) {
+    page.forEach(function(p) {
+      entregados += 1;
+      totalGastado += p.total_pagar ?? 0;
+    });
+    offset += page.length;
+
+    if (offset >= count) break;
+    if (page.length === 0) throw new Error('El historial de pedidos entregados está incompleto');
+
+    const { data: nextPage, error: nextError } = await orderQuery(offset, false);
+    if (nextError) throw nextError;
+    page = nextPage ?? [];
+  }
+
+  return { entregados, totalGastado };
+}
+
 export default function ChangoMonedero(props: Props) {
   const [monedero, setMonedero]   = useState<MonederoData | null>(null);
   const [pedidos,  setPedidos]    = useState<PedidoResumen[]>([]);
+  const [entregados, setEntregados] = useState(0);
+  const [totalGastado, setTotalGastado] = useState(0);
   const [loading,  setLoading]    = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [tab,      setTab]        = useState<'resumen' | 'historial' | 'como'>('resumen');
@@ -72,21 +114,28 @@ export default function ChangoMonedero(props: Props) {
         mon = nuevo;
       }
 
-      // Cargar historial de pedidos (todos, para contar entregados reales)
-      const { data: peds, error: pedidosError } = await supabase
-        .from('pedidos')
-        .select('id, negocio_nombre, total_pagar, estatus, created_at')
-        .eq('cliente_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (pedidosError) throw pedidosError;
+      // Mantener acotado el historial visible y calcular los totales con todo el historial entregado.
+      const [pedidosResult, resumenEntregados] = await Promise.all([
+        supabase
+          .from('pedidos')
+          .select('id, negocio_nombre, total_pagar, estatus, created_at')
+          .eq('cliente_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        cargarResumenEntregados(uid),
+      ]);
+      if (pedidosResult.error) throw pedidosResult.error;
 
       setMonedero(mon);
-      setPedidos(peds ?? []);
+      setPedidos(pedidosResult.data ?? []);
+      setEntregados(resumenEntregados.entregados);
+      setTotalGastado(resumenEntregados.totalGastado);
     } catch(e) {
       console.error(e);
       setMonedero(null);
       setPedidos([]);
+      setEntregados(0);
+      setTotalGastado(0);
       setLoadError(true);
     }
     finally { setLoading(false); }
@@ -94,11 +143,8 @@ export default function ChangoMonedero(props: Props) {
 
   useEffect(function() { cargar(); }, [cargar]);
 
-  const entregados   = pedidos.filter(function(p){ return p.estatus === 'entregado'; }).length;
   const envioGratis  = getFreeShippingProgress(entregados);
   const cashback     = monedero?.saldo_cashback ?? 0;
-  const totalGastado = pedidos.filter(function(p){ return p.estatus === 'entregado'; })
-    .reduce(function(a, p){ return a + (p.total_pagar ?? 0); }, 0);
 
   const tabStyle = function(t: string): React.CSSProperties {
     const activo = tab === t;
