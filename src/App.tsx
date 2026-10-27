@@ -173,6 +173,9 @@ function ToastRack(props: { toasts: Toast[] }) {
   };
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       style={{
         position: "fixed",
         top: "16px",
@@ -793,26 +796,34 @@ function AuthScreen(props: {
             </button>
           </form>
           {mode === "recover-profile" && (
-            <button
-              type="button"
-              disabled={loading || resendingConfirmation}
-              onClick={handleResendConfirmation}
-              style={{
-                display: "block",
-                margin: "12px auto 0",
-                padding: "4px",
-                background: "transparent",
-                color: "var(--text-muted)",
-                fontSize: "12px",
-                textDecoration: "underline",
-                cursor:
-                  loading || resendingConfirmation ? "not-allowed" : "pointer",
-              }}
-            >
-              {resendingConfirmation
-                ? "Reenviando email..."
-                : "Reenviar email de confirmación"}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={loading || resendingConfirmation}
+                aria-busy={resendingConfirmation}
+                onClick={handleResendConfirmation}
+                style={{
+                  display: "block",
+                  margin: "12px auto 0",
+                  padding: "4px",
+                  background: "transparent",
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  textDecoration: "underline",
+                  cursor:
+                    loading || resendingConfirmation ? "not-allowed" : "pointer",
+                }}
+              >
+                {resendingConfirmation
+                  ? "Reenviando email..."
+                  : "Reenviar email de confirmación"}
+              </button>
+              {resendingConfirmation && (
+                <p role="status" aria-live="polite" aria-atomic="true">
+                  Reenviando email de confirmación...
+                </p>
+              )}
+            </>
           )}
           {isLogin && (
             <button

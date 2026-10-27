@@ -641,9 +641,26 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   let signInAttempts = 0;
   let signUpAttempts = 0;
   let profileWrites = 0;
+  let resendAttempts = 0;
+  let finishResend: (() => void) | undefined;
+  let resendPayload: { type?: string; email?: string } | undefined;
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
+
+    if (url.pathname === "/auth/v1/resend") {
+      resendAttempts += 1;
+      resendPayload = request.postDataJSON();
+      await new Promise<void>(function (resolve) {
+        finishResend = resolve;
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({}),
+      });
+      return;
+    }
 
     if (url.pathname === "/auth/v1/token") {
       if (url.searchParams.get("grant_type") === "password") {
@@ -721,18 +738,102 @@ it("recovers an existing account profile and returns to sign-in after retry", as
     name: "¿Confirmaste tu email y te falta el perfil? Completalo acá",
   });
   await recoveryAction.waitFor({ state: "visible" });
-  await recoveryAction.click();
+  let recoveryActionFocused = false;
+  for (let tab = 0; tab < 12; tab += 1) {
+    const focusedText = await page.evaluate(function () {
+      return document.activeElement?.textContent?.trim() ?? "";
+    });
+    if (focusedText === "¿Confirmaste tu email y te falta el perfil? Completalo acá") {
+      recoveryActionFocused = true;
+      break;
+    }
+    await page.keyboard.press("Tab");
+  }
+  assert.equal(
+    recoveryActionFocused,
+    true,
+    "Keyboard navigation should reach the profile recovery action.",
+  );
+  await page.keyboard.press("Enter");
 
   await page.getByText(
     "Confirmá tu email y completá estos datos para guardar tu perfil en la cuenta existente.",
   ).waitFor();
-  await page.getByRole("button", { name: /Completar Perfil/ }).click();
-  await page.getByText("Completá todos los campos.", { exact: true }).waitFor();
+  let nameFieldFocused = false;
+  for (let tab = 0; tab < 16; tab += 1) {
+    nameFieldFocused = await page.evaluate(function () {
+      return document.activeElement?.getAttribute("placeholder") === "Nombre o Alias";
+    });
+    if (nameFieldFocused) break;
+    await page.keyboard.press("Tab");
+  }
+  assert.equal(nameFieldFocused, true, "Keyboard navigation should reach profile fields.");
+  await page.keyboard.type("Ana Browser");
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await page.evaluate(function () {
+      return document.activeElement?.getAttribute("placeholder");
+    }),
+    "tu@email.com",
+  );
+  await page.keyboard.type("existing@example.test");
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await page.evaluate(function () {
+      return document.activeElement?.getAttribute("placeholder");
+    }),
+    "Contraseña (mín. 6 caracteres)",
+  );
+  await page.keyboard.type("fixture-password");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  assert.equal(
+    await page.evaluate(function () {
+      return document.activeElement?.textContent?.trim();
+    }),
+    "Reenviar email de confirmación",
+    "The resend action should be reachable after the profile form by keyboard.",
+  );
+  await page.keyboard.press("Enter");
 
-  await page.getByPlaceholder("Nombre o Alias").fill("Ana Browser");
-  await page.getByPlaceholder("tu@email.com").fill("existing@example.test");
-  await page.getByPlaceholder("Contraseña (mín. 6 caracteres)").fill("fixture-password");
-  await page.getByRole("button", { name: /Completar Perfil/ }).click();
+  const pendingAnnouncement = page
+    .getByRole("status")
+    .filter({ hasText: "Reenviando email de confirmación..." });
+  await pendingAnnouncement.waitFor();
+  assert.equal(await pendingAnnouncement.getAttribute("aria-live"), "polite");
+  assert.equal(
+    await page.getByRole("button", { name: "Reenviando email..." }).isDisabled(),
+    true,
+    "The resend action should prevent duplicate requests while pending.",
+  );
+  assert.equal(resendAttempts, 1, "Keyboard activation should send one confirmation request.");
+  assert.equal(resendPayload?.type, "signup");
+  assert.equal(resendPayload?.email, "existing@example.test");
+  assert.equal(signInAttempts, 0, "Resending confirmation must not sign in.");
+  assert.equal(signUpAttempts, 0, "Resending confirmation must not create an account.");
+  assert.equal(profileWrites, 0, "Resending confirmation must not complete the profile.");
+
+  assert.ok(finishResend, "The mocked confirmation request should be pending.");
+  finishResend();
+  const resendResult = "Te reenviamos el email de confirmación. Revisá tu bandeja de entrada.";
+  const resultAnnouncement = page.getByRole("status").filter({ hasText: resendResult });
+  await resultAnnouncement.waitFor();
+  assert.equal(await resultAnnouncement.getAttribute("aria-live"), "polite");
+  assert.equal(signInAttempts, 0, "A successful resend must remain separate from profile completion.");
+  assert.equal(profileWrites, 0, "A successful resend must not write the profile.");
+
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(
+    await page.evaluate(function () {
+      return (
+        document.activeElement instanceof HTMLButtonElement &&
+        document.activeElement.type === "submit"
+      );
+    }),
+    true,
+    "Profile submission should remain a separate keyboard action.",
+  );
+  await page.keyboard.press("Enter");
   await page
     .getByText(
       "No pudimos guardar tu perfil. Tu cuenta sigue intacta; revisá tu conexión e intentá de nuevo.",
