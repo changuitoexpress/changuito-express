@@ -136,6 +136,38 @@ export async function submitAuthForm(
   }
 }
 
+export async function resendConfirmationEmail(
+  client: SupabaseAuthClient,
+  email: string,
+): Promise<{ status: "sent" | "error"; message: string }> {
+  const normalizedEmail = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return {
+      status: "error",
+      message: "Ingresá un email válido para reenviar la confirmación.",
+    };
+  }
+
+  try {
+    const { error } = await client.auth.resend({
+      type: "signup",
+      email: normalizedEmail,
+    });
+    if (error) throw error;
+    return {
+      status: "sent",
+      message: "Te reenviamos el email de confirmación. Revisá tu bandeja de entrada.",
+    };
+  } catch (err: any) {
+    return {
+      status: "error",
+      message:
+        err.message ??
+        "No pudimos reenviar el email de confirmación. Intentá de nuevo.",
+    };
+  }
+}
+
 export async function completeProfileSetup(
   client: SupabaseAuthClient,
   values: Pick<AuthFormValues, "email" | "password" | "nombre">,

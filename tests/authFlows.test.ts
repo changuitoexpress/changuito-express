@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   completeProfileSetup,
+  resendConfirmationEmail,
   restoreAuthSession,
   scheduleSessionExpiryWarning,
   signOut,
@@ -23,6 +24,9 @@ function createClientFixture(overrides: Record<string, any> = {}) {
   const auth = {
     signUp: async function (_credentials?: any) {
       return { data: { user: null }, error: null };
+    },
+    resend: async function (_credentials?: any) {
+      return { error: null };
     },
     signInWithPassword: async function (_credentials?: any) {
       return { error: null };
@@ -112,6 +116,78 @@ describe("validación de acceso", function () {
 });
 
 describe("acceso y registro Supabase", function () {
+  it("reenvía la confirmación al email indicado sin crear ni modificar cuentas", async function () {
+    let resendOptions: any;
+    let signupCalls = 0;
+    let profileWrites = 0;
+    const fixture = createClientFixture({
+      resend: async function (options: any) {
+        resendOptions = options;
+        return { error: null };
+      },
+      signUp: async function () {
+        signupCalls += 1;
+        return { data: { user: null }, error: null };
+      },
+    });
+    fixture.client.from = function () {
+      return {
+        upsert: async function () {
+          profileWrites += 1;
+          return { error: null };
+        },
+      };
+    };
+
+    const result = await resendConfirmationEmail(
+      fixture.client,
+      " fixture@example.test ",
+    );
+
+    assert.deepEqual(result, {
+      status: "sent",
+      message:
+        "Te reenviamos el email de confirmación. Revisá tu bandeja de entrada.",
+    });
+    assert.deepEqual(resendOptions, {
+      type: "signup",
+      email: "fixture@example.test",
+    });
+    assert.equal(signupCalls, 0);
+    assert.equal(profileWrites, 0);
+  });
+
+  it("informa si falla el reenvío de confirmación", async function () {
+    const { client } = createClientFixture({
+      resend: async function () {
+        return { error: new Error("Email rate limit exceeded") };
+      },
+    });
+
+    assert.deepEqual(
+      await resendConfirmationEmail(client, validLogin.email),
+      { status: "error", message: "Email rate limit exceeded" },
+    );
+  });
+
+  it("no solicita reenvío si el email no es válido", async function () {
+    let resendCalls = 0;
+    const { client } = createClientFixture({
+      resend: async function () {
+        resendCalls += 1;
+        return { error: null };
+      },
+    });
+
+    const result = await resendConfirmationEmail(client, "invalid-email");
+
+    assert.deepEqual(result, {
+      status: "error",
+      message: "Ingresá un email válido para reenviar la confirmación.",
+    });
+    assert.equal(resendCalls, 0);
+  });
+
   it("devuelve el error del inicio de sesión fallido", async function () {
     let loginCredentials: any;
     const { client } = createClientFixture({

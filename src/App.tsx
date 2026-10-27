@@ -51,6 +51,7 @@ const ChangoMonedero = lazy(function () {
 });
 import {
   completeProfileSetup,
+  resendConfirmationEmail,
   startAuthSession,
   scheduleSessionExpiryWarning,
   submitAuthForm,
@@ -388,9 +389,24 @@ function AuthScreen(props: {
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [focused, setFocused] = useState("");
   const isDark = props.theme === "dark";
   const isLogin = mode === "login";
+
+  async function handleResendConfirmation() {
+    if (loading || resendingConfirmation) return;
+    setResendingConfirmation(true);
+    try {
+      const result = await resendConfirmationEmail(profileRecoveryClient, email);
+      props.onToast(
+        result.message,
+        result.status === "sent" ? "success" : "error",
+      );
+    } finally {
+      setResendingConfirmation(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -720,10 +736,13 @@ function AuthScreen(props: {
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || resendingConfirmation}
               style={{
                 width: "100%",
-                background: loading ? "rgba(250,204,21,0.5)" : "#facc15",
+                background:
+                  loading || resendingConfirmation
+                    ? "rgba(250,204,21,0.5)"
+                    : "#facc15",
                 color: "#020617",
                 fontWeight: 900,
                 fontSize: "13px",
@@ -735,11 +754,12 @@ function AuthScreen(props: {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                boxShadow: loading
+                boxShadow: loading || resendingConfirmation
                   ? "none"
                   : "0 6px 20px rgba(250,204,21,0.35)",
                 marginTop: "4px",
-                cursor: loading ? "not-allowed" : "pointer",
+                cursor:
+                  loading || resendingConfirmation ? "not-allowed" : "pointer",
               }}
             >
               {loading ? (
@@ -772,6 +792,28 @@ function AuthScreen(props: {
               )}
             </button>
           </form>
+          {mode === "recover-profile" && (
+            <button
+              type="button"
+              disabled={loading || resendingConfirmation}
+              onClick={handleResendConfirmation}
+              style={{
+                display: "block",
+                margin: "12px auto 0",
+                padding: "4px",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                textDecoration: "underline",
+                cursor:
+                  loading || resendingConfirmation ? "not-allowed" : "pointer",
+              }}
+            >
+              {resendingConfirmation
+                ? "Reenviando email..."
+                : "Reenviar email de confirmación"}
+            </button>
+          )}
           {isLogin && (
             <button
               type="button"
