@@ -63,10 +63,12 @@ async function mockSupabase(
   role: "admin" | "cliente" = "admin",
   userId = fixtureUserId,
   email = "uliseseven.7@gmail.com",
+  requestLog?: string[],
 ) {
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
+    requestLog?.push(url.pathname);
     const acceptsObject = request.headers().accept?.includes(
       "application/vnd.pgrst.object+json",
     );
@@ -91,7 +93,14 @@ async function mockSupabase(
     ) {
       data = { merchant_id: fixtureMerchant.id };
     } else if (url.pathname === "/rest/v1/merchants") {
-      data = acceptsObject ? fixtureMerchant : [fixtureMerchant];
+      data =
+        role === "cliente"
+          ? acceptsObject
+            ? null
+            : []
+          : acceptsObject
+            ? fixtureMerchant
+            : [fixtureMerchant];
     } else if (url.pathname === "/rest/v1/monedero_cliente" && acceptsObject) {
       data = {
         id: "browser-fixture-wallet",
@@ -246,7 +255,14 @@ it("renders every authenticated screen and returns to the dashboard", async func
   const merchantAdminLookup = customerPage.waitForResponse(function (response) {
     return response.url().includes("/rest/v1/merchant_admins");
   });
-  await mockSupabase(customerPage, "cliente", customerId, customerEmail);
+  const customerBackendRequests: string[] = [];
+  await mockSupabase(
+    customerPage,
+    "cliente",
+    customerId,
+    customerEmail,
+    customerBackendRequests,
+  );
   await customerPage.goto(appUrl);
   await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await merchantAdminLookup;
@@ -277,6 +293,34 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await adminAccessFixture.getByText("Acceso restringido", { exact: true }).waitFor();
   await adminAccessFixture.getByRole("button", { name: "Volver" }).click();
   await adminAccessFixture.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+
+  for (const panel of ["negocio", "repartidor"] as const) {
+    const panelRequestsStart = customerBackendRequests.length;
+    await customerPage.evaluate(async function (panelName) {
+      const fixture = await import("/tests/fixtures/adminAccessHarness.tsx");
+      const container = document.createElement("div");
+      container.id = `restricted-${panelName}-fixture`;
+      document.body.append(container);
+      fixture.mountRestrictedPanelHarness(container, panelName);
+    }, panel);
+
+    const panelFixture = customerPage.locator(`#restricted-${panel}-fixture`);
+    await panelFixture.getByText("Acceso restringido", { exact: true }).waitFor();
+    await panelFixture.getByRole("button", { name: "Volver" }).click();
+    await panelFixture.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+    await panelFixture.evaluate(function (element) {
+      element.remove();
+    });
+
+    const newPanelRequests = customerBackendRequests.slice(panelRequestsStart);
+    assert.equal(
+      newPanelRequests.some(function (requestPath) {
+        return requestPath === "/rest/v1/products" || requestPath === "/rest/v1/pedidos";
+      }),
+      false,
+      `A regular customer must not load business or delivery data from the ${panel} panel.`,
+    );
+  }
 
   await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");

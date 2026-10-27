@@ -45,6 +45,7 @@ export default function DashboardNegocio(props: Props) {
   const [productos, setProductos]     = useState<Producto[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
+  const [accessDenied, setAccessDenied] = useState(false);
   const [tab, setTab]                 = useState<'info'|'menu'|'stats'>('info');
   const [editandoInfo, setEditInfo]   = useState(false);
   const [modalProducto, setModalProd] = useState<Partial<Producto> | null>(null);
@@ -85,7 +86,7 @@ export default function DashboardNegocio(props: Props) {
       }
 
       if (!merchantId) {
-        setError('Tu cuenta no está vinculada a ningún negocio. Contacta a Changuito Express.');
+        setAccessDenied(true);
         setLoading(false);
         return;
       }
@@ -223,6 +224,23 @@ export default function DashboardNegocio(props: Props) {
           <span className="spinner" style={{ borderColor:'var(--border-subtle)', borderTopColor:'var(--color-yellow)', width:'28px', height:'28px' }} />
           <p style={{ fontSize:'13px', color:'var(--text-muted)' }}>Cargando tu negocio...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px', textAlign:'center' }}>
+        <WifiOff style={{ width:'40px', height:'40px', color:'var(--text-muted)', marginBottom:'16px' }} />
+        <p style={{ fontSize:'15px', fontWeight:800, margin:'0 0 8px 0' }}>Acceso restringido</p>
+        <p style={{ fontSize:'13px', color:'var(--text-muted)', margin:'0 0 20px 0', maxWidth:'300px' }}>Tu cuenta no está vinculada a ningún negocio.</p>
+        <a href="https://wa.me/522223339999?text=Quiero%20acceso%20al%20dashboard%20de%20mi%20negocio"
+          style={{ padding:'12px 24px', borderRadius:'14px', background:'#25D366', color:'white', fontWeight:800, fontSize:'13px', textDecoration:'none' }}>
+          💬 Contactar Changuito
+        </a>
+        <button onClick={props.onVolver} style={{ padding:'10px 20px', borderRadius:'12px', background:'var(--border-subtle)', border:'none', color:'var(--text-muted)', fontSize:'13px', cursor:'pointer' }}>
+          Volver
+        </button>
       </div>
     );
   }

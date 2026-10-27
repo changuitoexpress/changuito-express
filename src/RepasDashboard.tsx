@@ -131,6 +131,10 @@ export default function RepasDashboard(props: Props) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isDark = props.theme === "dark";
   const miId = props.session.user.id;
+  const puedeAcceder =
+    props.session.user.rol === "admin" ||
+    props.session.user.rol === "repartidor" ||
+    props.session.user.email === "uliseseven.7@gmail.com";
 
   const fetchPedidos = useCallback(async function () {
     setLoading(true);
@@ -150,9 +154,10 @@ export default function RepasDashboard(props: Props) {
 
   useEffect(
     function () {
+      if (!puedeAcceder) return;
       fetchPedidos();
     },
-    [fetchPedidos],
+    [fetchPedidos, puedeAcceder],
   );
 
   // Auto-scroll chat
@@ -300,6 +305,60 @@ export default function RepasDashboard(props: Props) {
       color: activo ? "#020617" : "var(--text-muted)",
     };
   };
+
+  if (!puedeAcceder) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg-base)",
+          color: "var(--text-primary)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          textAlign: "center",
+        }}
+      >
+        <AlertCircle
+          style={{
+            width: "40px",
+            height: "40px",
+            color: "var(--text-muted)",
+            marginBottom: "16px",
+          }}
+        />
+        <p style={{ fontSize: "15px", fontWeight: 800, margin: "0 0 8px 0" }}>
+          Acceso restringido
+        </p>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--text-muted)",
+            margin: "0 0 20px 0",
+            maxWidth: "300px",
+          }}
+        >
+          Esta sección está disponible únicamente para repartidores autorizados.
+        </p>
+        <button
+          onClick={props.onVolver}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "12px",
+            background: "var(--border-subtle)",
+            border: "none",
+            color: "var(--text-muted)",
+            fontSize: "13px",
+            cursor: "pointer",
+          }}
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
 
   // ── PANTALLA CHAT ──────────────────────────────────────────────────────────
   if (tab === "chat" && chatPedido) {
