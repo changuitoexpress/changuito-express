@@ -16,7 +16,7 @@ const wallet = {
   user_id: fixtureUserId,
   saldo_cashback: 42.75,
   pedidos_realizados: 7,
-  envios_gratis_usados: 1,
+  envios_gratis_usados: 100,
 };
 const secondWallet = {
   id: "wallet-fixture-account-b-wallet",
@@ -47,6 +47,7 @@ const orderHistory = Array.from({ length: 125 }, function (_, index) {
 const freeShippingMilestones = [
   {
     delivered: 0,
+    used: 0,
     percent: "0%",
     compactCycle: "0 de cada 10",
     dedicatedCycle: "0/10 pedidos",
@@ -55,6 +56,7 @@ const freeShippingMilestones = [
   },
   {
     delivered: 9,
+    used: 0,
     percent: "90%",
     compactCycle: "9 de cada 10",
     dedicatedCycle: "9/10 pedidos",
@@ -63,6 +65,7 @@ const freeShippingMilestones = [
   },
   {
     delivered: 10,
+    used: 0,
     percent: "100%",
     compactCycle: "10 de cada 10",
     dedicatedCycle: "10/10 pedidos",
@@ -71,6 +74,7 @@ const freeShippingMilestones = [
   },
   {
     delivered: 11,
+    used: 1,
     percent: "10%",
     compactCycle: "1 de cada 10",
     dedicatedCycle: "1/10 pedidos",
@@ -532,6 +536,7 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   );
 
   for (const milestone of freeShippingMilestones) {
+    wallet.envios_gratis_usados = milestone.used;
     deliveredOrders = Array.from({ length: milestone.delivered }, function () {
       return { total_pagar: 10, estatus: "entregado" };
     });
@@ -610,6 +615,17 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   );
   failure = null;
 
+  deliveredOrders = [
+    ...Array.from({ length: 5 }, function () {
+      return { total_pagar: 10, estatus: "entregado" };
+    }),
+    ...Array.from({ length: 4 }, function () {
+      return { total_pagar: 10, estatus: "pendiente" };
+    }),
+    ...Array.from({ length: 3 }, function () {
+      return { total_pagar: 10, estatus: "cancelado" };
+    }),
+  ];
   await page.locator("button").first().click();
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await page.getByRole("button", { name: "🍽️ Restaurantes" }).first().click();
@@ -633,6 +649,7 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   await page.getByText("60%", { exact: true }).waitFor();
 
   for (const milestone of freeShippingMilestones) {
+    wallet.envios_gratis_usados = milestone.used;
     deliveredOrders = Array.from({ length: milestone.delivered }, function () {
       return { total_pagar: 10, estatus: "entregado" };
     });

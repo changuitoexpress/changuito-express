@@ -96,7 +96,10 @@ export default function Monedero(props: Props) {
 
   const envioGratis = pedidosEntregados === null
     ? null
-    : getFreeShippingProgress(pedidosEntregados);
+    : getFreeShippingProgress(
+      pedidosEntregados,
+      monedero.envios_gratis_usados ?? 0,
+    );
 
   return (
     <div style={{
@@ -141,7 +144,7 @@ export default function Monedero(props: Props) {
             🚚 Envío gratis
           </p>
           <p style={{ fontSize:'14px', fontWeight:800, color:'#22C55E', margin:'0 0 2px 0', lineHeight:1.2 }}>
-            {envioGratis === null ? 'No disponible' : envioGratis.remainingOrders === 0 ? '¡Disponible!' : envioGratis.remainingOrders + ' pedido' + (envioGratis.remainingOrders === 1 ? '' : 's')}
+            {envioGratis === null ? 'No disponible' : envioGratis.available ? '¡Disponible!' : envioGratis.remainingOrders + ' pedido' + (envioGratis.remainingOrders === 1 ? '' : 's')}
           </p>
           <p style={{ fontSize:'10px', color:'var(--text-muted)', margin:0 }}>
             {envioGratis === null ? '—' : envioGratis.cycleCount} de cada 10
@@ -153,7 +156,7 @@ export default function Monedero(props: Props) {
       <div style={{ marginBottom:'8px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
           <span style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:600 }}>
-            Progreso al próximo envío gratis
+            {envioGratis?.available ? 'Envío gratis disponible' : 'Progreso al próximo envío gratis'}
           </span>
           <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{envioGratis === null ? '—' : envioGratis.progressPercent + '%'}</span>
         </div>

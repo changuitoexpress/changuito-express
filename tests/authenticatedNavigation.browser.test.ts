@@ -91,6 +91,7 @@ async function mockSupabase(
       "application/vnd.pgrst.object+json",
     );
     let data: unknown = [];
+    let responseHeaders: Record<string, string> = {};
 
     if (
       url.pathname === "/auth/v1/token" &&
@@ -127,6 +128,16 @@ async function mockSupabase(
           : acceptsObject
             ? fixtureMerchant
             : [fixtureMerchant];
+    } else if (
+      url.pathname === "/rest/v1/pedidos" &&
+      request.method() === "HEAD" &&
+      url.searchParams.get("estatus") === "eq.entregado"
+    ) {
+      data = null;
+      responseHeaders = {
+        "content-range": "*/10",
+        "access-control-expose-headers": "content-range",
+      };
     } else if (url.pathname === "/rest/v1/monedero_cliente" && acceptsObject) {
       data = {
         id: "browser-fixture-wallet",
@@ -151,6 +162,7 @@ async function mockSupabase(
     await route.fulfill({
       status: 200,
       contentType: "application/json",
+      headers: responseHeaders,
       body: JSON.stringify(data),
     });
   });
@@ -526,10 +538,42 @@ it("renders every authenticated screen and returns to the dashboard", async func
     await customerPage.getByPlaceholder("#123, Depto #123").inputValue(),
     "42",
   );
+  const checkoutDraftKey =
+    "changuito-form-draft:" +
+    encodeURIComponent(customerId) +
+    ":customer-checkout";
+  await customerPage.evaluate(function (draftKey) {
+    const stored = localStorage.getItem(draftKey);
+    if (!stored) throw new Error("The saved checkout draft was not found.");
+    const draft = JSON.parse(stored);
+    draft.values.paso = "resumen";
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+  }, checkoutDraftKey);
+  await customerPage.reload();
+  await customerPage.getByRole("heading", { name: "Resumen del pedido" }).waitFor();
+  const freeShippingOption = customerPage.getByRole("checkbox", {
+    name: /Tu envío gratis está disponible/,
+  });
+  await freeShippingOption.waitFor();
+  assert.equal(
+    await freeShippingOption.isChecked(),
+    true,
+    "Checkout should automatically select a reward earned through 10 delivered orders.",
+  );
+  await customerPage.getByText("−$50.00", { exact: true }).waitFor();
+  await customerPage
+    .getByText("Envío", { exact: true })
+    .locator("..")
+    .getByText("$0.00", { exact: true })
+    .waitFor();
+  await freeShippingOption.uncheck();
+  await customerPage.getByText("$50.00", { exact: true }).waitFor();
+  await customerPage.getByText("$175.00", { exact: true }).waitFor();
+
   await customerPage.evaluate(function (draftKey) {
     localStorage.removeItem("changuito-cart");
     localStorage.removeItem(draftKey);
-  }, "changuito-form-draft:" + encodeURIComponent(customerId) + ":customer-checkout");
+  }, checkoutDraftKey);
   await customerPage.reload();
   await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await customerPage.getByRole("button", { name: "Abrir menú" }).click();

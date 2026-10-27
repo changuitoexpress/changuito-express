@@ -57,6 +57,7 @@ import {
 import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguitoAI";
 import Monedero from "./Monedero";
+import { getFreeShippingProgress, getShippingCharge } from "./freeShippingProgress";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface Merchant {
@@ -1016,6 +1017,67 @@ function ModalCheckout(props: {
     useState<Fraccionamiento | null>(null);
   const [fracSearch, setFracSearch] = useState(draft?.fracSearch ?? "");
   const [costoEnvio, setCostoEnvio] = useState(50);
+  const [aplicarEnvioGratis, setAplicarEnvioGratis] = useState(false);
+  const [envioGratis, setEnvioGratis] = useState<{
+    status: "loading" | "available" | "unavailable" | "error";
+    remainingOrders: number | null;
+  }>({ status: "loading", remainingOrders: null });
+
+  useEffect(function () {
+    let activo = true;
+    let solicitud = 0;
+    const cargarDisponibilidad = async function () {
+      const solicitudActual = ++solicitud;
+      setEnvioGratis({ status: "loading", remainingOrders: null });
+      try {
+        const [walletResult, deliveredResult] = await Promise.all([
+          supabase
+            .from("monedero_cliente")
+            .select("envios_gratis_usados")
+            .eq("user_id", props.clienteId)
+            .maybeSingle(),
+          supabase
+            .from("pedidos")
+            .select("id", { count: "exact", head: true })
+            .eq("cliente_id", props.clienteId)
+            .eq("estatus", "entregado"),
+        ]);
+        if (walletResult.error) throw walletResult.error;
+        if (deliveredResult.error) throw deliveredResult.error;
+        if (deliveredResult.count === null) {
+          throw new Error("No se pudo verificar el historial de pedidos.");
+        }
+        if (!activo || solicitudActual !== solicitud) return;
+        const progress = getFreeShippingProgress(
+          deliveredResult.count,
+          walletResult.data?.envios_gratis_usados ?? 0,
+        );
+        setAplicarEnvioGratis(progress.available);
+        setEnvioGratis({
+          status: progress.available ? "available" : "unavailable",
+          remainingOrders: progress.remainingOrders,
+        });
+      } catch (error) {
+        console.error("[Changuito] No se pudo verificar el envío gratis:", error);
+        if (activo && solicitudActual === solicitud) {
+          setEnvioGratis({ status: "error", remainingOrders: null });
+        }
+      }
+    };
+    const refrescarDisponibilidad = function () {
+      if (document.visibilityState === "visible") cargarDisponibilidad();
+    };
+
+    cargarDisponibilidad();
+    window.addEventListener("focus", refrescarDisponibilidad);
+    document.addEventListener("visibilitychange", refrescarDisponibilidad);
+    return function () {
+      activo = false;
+      solicitud += 1;
+      window.removeEventListener("focus", refrescarDisponibilidad);
+      document.removeEventListener("visibilitychange", refrescarDisponibilidad);
+    };
+  }, [props.clienteId]);
 
   const subtotal = props.carrito.reduce(function (a, i) {
     return a + i.precio * i.cantidad;
@@ -1025,7 +1087,12 @@ function ModalCheckout(props: {
       return i.negocio_id;
     }),
   ).size;
-  const totalEnvio = costoEnvio + Math.max(0, negociosCount - 1) * 15;
+  const cargoEnvio = getShippingCharge(
+    costoEnvio,
+    Math.max(0, negociosCount - 1) * 15,
+    envioGratis.status === "available" && aplicarEnvioGratis,
+  );
+  const totalEnvio = cargoEnvio.total;
   const total = subtotal + totalEnvio;
 
   // Cargar direcciones guardadas
@@ -1130,6 +1197,8 @@ function ModalCheckout(props: {
   }
 
   async function confirmarPedido() {
+    const usarEnvioGratis =
+      envioGratis.status === "available" && aplicarEnvioGratis;
     setEnviando(true);
     setError("");
     try {
@@ -1152,30 +1221,55 @@ function ModalCheckout(props: {
       // Un solo pedido para todo el carrito
       const negocioNombres = Array.from(new Set(props.carrito.map(function(i) { return i.negocio; }))).join(', ');
       const primerNegocioId = props.carrito[0]?.negocio_id ?? '';
-      const { error: errPedido } = await supabase.from("pedidos").insert({
-        cliente_id: props.clienteId,
-        negocio_id: primerNegocioId,
-        negocio_nombre: negocioNombres,
-        total_pagar: total,
-        estatus: "pendiente",
-        canal: "webapp",
-        cliente_email: props.clienteEmail,
-        forma_pago: formaPago,
-        direccion: dir ? dir.calle + " " + dir.numero_casa : "",
-      });
-      if (errPedido) {
-        console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
-        throw new Error("Error al guardar pedido: " + errPedido.message);
+      if (usarEnvioGratis) {
+        const { data, error: errorPedido } = await supabase.rpc(
+          "crear_pedido_con_envio_gratis",
+          {
+            p_negocio_id: primerNegocioId,
+            p_negocio_nombre: negocioNombres,
+            p_total_pagar: total,
+            p_cliente_email: props.clienteEmail,
+            p_forma_pago: formaPago,
+            p_direccion: dir ? dir.calle + " " + dir.numero_casa : "",
+          },
+        );
+        if (errorPedido) {
+          console.error("[Changuito] Error aplicando el envío gratis:", errorPedido);
+          throw new Error(
+            "No pudimos aplicar tu envío gratis y no se creó el pedido. Intenta de nuevo o desactiva la recompensa para pagar el envío normal.",
+          );
+        }
+        if (!data?.ok) {
+          throw new Error(
+            data?.error ??
+              "Tu envío gratis ya no está disponible. No se creó el pedido; vuelve a revisar el total.",
+          );
+        }
+      } else {
+        const { error: errPedido } = await supabase.from("pedidos").insert({
+          cliente_id: props.clienteId,
+          negocio_id: primerNegocioId,
+          negocio_nombre: negocioNombres,
+          total_pagar: total,
+          estatus: "pendiente",
+          canal: "webapp",
+          cliente_email: props.clienteEmail,
+          forma_pago: formaPago,
+          direccion: dir ? dir.calle + " " + dir.numero_casa : "",
+        });
+        if (errPedido) {
+          console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
+          throw new Error("Error al guardar pedido: " + errPedido.message);
+        }
       }
 
       // Actualizar monedero: +1 pedido
-      try {
-        const userId = props.session?.user?.id;
-        if (userId) {
+      if (!usarEnvioGratis) {
+        try {
           const { data: mon } = await supabase
             .from("monedero_cliente")
             .select("id, pedidos_realizados")
-            .eq("user_id", userId)
+            .eq("user_id", props.clienteId)
             .single();
           if (mon) {
             await supabase
@@ -1188,11 +1282,11 @@ function ModalCheckout(props: {
           } else {
             await supabase
               .from("monedero_cliente")
-              .insert([{ user_id: userId, pedidos_realizados: 1 }]);
+              .insert([{ user_id: props.clienteId, pedidos_realizados: 1 }]);
           }
+        } catch (_) {
+          /* silencioso */
         }
-      } catch (_) {
-        /* silencioso */
       }
 
       // Mensaje WhatsApp estructurado
@@ -1239,6 +1333,9 @@ function ModalCheckout(props: {
       });
 
       msg += "\n🚚 *Envío:* $" + totalEnvio.toFixed(2);
+      if (cargoEnvio.discount > 0) {
+        msg += "\n🎁 *Envío gratis aplicado:* -$" + cargoEnvio.discount.toFixed(2);
+      }
       if (fraccionamientoSel) msg += " (" + fraccionamientoSel.nombre + ")";
       if (negociosCount > 1)
         msg +=
@@ -2362,6 +2459,96 @@ function ModalCheckout(props: {
               })}
             </div>
 
+            {envioGratis.status === "available" && (
+              <div
+                role="status"
+                style={{
+                  padding: "11px 13px",
+                  borderRadius: "12px",
+                  background: "rgba(34,197,94,0.1)",
+                  border: "1px solid rgba(34,197,94,0.35)",
+                  color: textPrim,
+                  fontSize: "12px",
+                  lineHeight: 1.45,
+                  marginBottom: "10px",
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "9px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={aplicarEnvioGratis}
+                    onChange={function (event) {
+                      setAplicarEnvioGratis(event.target.checked);
+                    }}
+                    style={{ marginTop: "2px" }}
+                  />
+                  <span>
+                    <strong style={{ color: "var(--color-green)" }}>
+                      🎁 Tu envío gratis está disponible.
+                    </strong>{" "}
+                    {aplicarEnvioGratis
+                      ? "Se descuentan $" +
+                        cargoEnvio.discount.toFixed(2) +
+                        " de la tarifa de entrega."
+                      : "Activa esta opción para descontar $" +
+                        costoEnvio.toFixed(2) +
+                        " de la tarifa de entrega."}
+                    {cargoEnvio.multiBusinessCharge > 0 && aplicarEnvioGratis
+                      ? " El recargo por varios negocios se mantiene."
+                      : ""}
+                  </span>
+                </label>
+              </div>
+            )}
+            {envioGratis.status === "unavailable" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                Envío gratis no disponible.{" "}
+                {envioGratis.remainingOrders === 1
+                  ? "Te falta 1 pedido entregado para ganarlo."
+                  : "Te faltan " +
+                    envioGratis.remainingOrders +
+                    " pedidos entregados para ganarlo."}
+              </p>
+            )}
+            {envioGratis.status === "loading" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                Verificando si tienes envío gratis disponible…
+              </p>
+            )}
+            {envioGratis.status === "error" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                No pudimos verificar tu recompensa; se muestra el envío normal.
+              </p>
+            )}
+
             {/* Total */}
             <div
               style={{
@@ -2388,6 +2575,28 @@ function ModalCheckout(props: {
                   ${subtotal.toFixed(2)}
                 </span>
               </div>
+              {cargoEnvio.discount > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span style={{ fontSize: "13px", color: "var(--color-green)" }}>
+                    🎁 Envío gratis aplicado
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "var(--color-green)",
+                    }}
+                  >
+                    −${cargoEnvio.discount.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",

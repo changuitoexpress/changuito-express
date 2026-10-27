@@ -6,3 +6,4 @@
 - [Browser fixture response shapes](browser-fixture-response-shapes.md) — authenticated browser mocks must match the data shapes the destination screen consumes.
 - [Supabase session management](supabase-session-management.md) — per-device operations must stay JWT-scoped; revoked access tokens can work until expiry.
 - [Supabase cross-tab auth tests](supabase-cross-tab-auth-tests.md) — simulate sign-ins through the auth BroadcastChannel; changing local storage alone does not notify the app listener.
+- [Free-shipping redemption](free-shipping-redemption.md) — calculate rewards from delivered orders minus uses; create a discounted order and record redemption atomically through a protected RPC.

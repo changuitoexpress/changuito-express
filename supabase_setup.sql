@@ -198,6 +198,82 @@ CREATE TABLE IF NOT EXISTS public.cashback_pedidos (
 ALTER TABLE public.cashback_pedidos ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.cashback_pedidos FROM PUBLIC, anon, authenticated;
 
+-- Redeem an earned free-shipping reward in the same transaction that creates
+-- the order, so concurrent checkouts cannot spend the same reward twice.
+CREATE OR REPLACE FUNCTION public.crear_pedido_con_envio_gratis(
+  p_negocio_id uuid,
+  p_negocio_nombre text,
+  p_total_pagar numeric,
+  p_cliente_email text,
+  p_forma_pago text,
+  p_direccion text
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_usados integer;
+  v_entregados bigint;
+  v_pedido_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Inicia sesión para usar el envío gratis.');
+  END IF;
+  IF p_total_pagar IS NULL OR p_total_pagar < 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'El total del pedido no es válido.');
+  END IF;
+
+  INSERT INTO public.monedero_cliente (
+    user_id, saldo_cashback, pedidos_realizados, envios_gratis_usados
+  )
+  VALUES (auth.uid(), 0, 0, 0)
+  ON CONFLICT (user_id) DO NOTHING;
+
+  SELECT COALESCE(envios_gratis_usados, 0)
+  INTO v_usados
+  FROM public.monedero_cliente
+  WHERE user_id = auth.uid()
+  FOR UPDATE;
+
+  SELECT count(*)
+  INTO v_entregados
+  FROM public.pedidos
+  WHERE cliente_id = auth.uid()
+    AND estatus = 'entregado';
+
+  IF floor(v_entregados / 10.0)::integer <= v_usados THEN
+    RETURN json_build_object(
+      'ok', false,
+      'error', 'Tu envío gratis ya no está disponible. Revisa el total antes de volver a intentar.'
+    );
+  END IF;
+
+  INSERT INTO public.pedidos (
+    cliente_id, negocio_id, negocio_nombre, total_pagar, estatus, canal,
+    cliente_email, forma_pago, direccion
+  )
+  VALUES (
+    auth.uid(), p_negocio_id, p_negocio_nombre, p_total_pagar, 'pendiente',
+    'webapp', p_cliente_email, p_forma_pago, p_direccion
+  )
+  RETURNING id INTO v_pedido_id;
+
+  UPDATE public.monedero_cliente
+  SET envios_gratis_usados = COALESCE(envios_gratis_usados, 0) + 1,
+      pedidos_realizados = COALESCE(pedidos_realizados, 0) + 1,
+      updated_at = now()
+  WHERE user_id = auth.uid();
+
+  RETURN json_build_object('ok', true, 'pedido_id', v_pedido_id);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.crear_pedido_con_envio_gratis(uuid, text, numeric, text, text, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.crear_pedido_con_envio_gratis(uuid, text, numeric, text, text, text)
+  TO authenticated;
+
 -- Orders already delivered by the previous admin flow were credited before
 -- this ledger existed. Record them without changing wallet balances.
 INSERT INTO public.cashback_pedidos (pedido_id, user_id, monto)
