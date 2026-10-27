@@ -430,6 +430,35 @@ describe("sesión y cierre de sesión", function () {
     assert.equal(await restoreAuthSession(client), null);
   });
 
+  it("termina el inicio público si falla la consulta de sesión guardada", async function () {
+    const { client } = createClientFixture({
+      getSession: async function () {
+        throw new Error("Saved session lookup failed");
+      },
+    });
+    const observed: any[] = [];
+    let readyCalls = 0;
+    let markReady: Function = function () {};
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        readyCalls += 1;
+        markReady();
+      },
+    );
+    await startupReady;
+
+    assert.equal(readyCalls, 1);
+    assert.deepEqual(observed, []);
+  });
+
   it("limpia la sesión al recibir el evento de cierre de sesión", async function () {
     let authListener: Function = function () {};
     const subscription = { unsubscribe: function () {} };
