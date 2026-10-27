@@ -493,6 +493,65 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(observed, [null]);
   });
 
+  it("conserva la sesión del inicio de sesión más reciente si las consultas se cruzan", async function () {
+    let authListener: Function = function () {};
+    const profileResolvers: Function[] = [];
+    const { client } = createClientFixture({
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: function () {
+                  return new Promise(function (resolve) {
+                    profileResolvers.push(resolve);
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    watchAuthSession(client, function (session) {
+      observed.push(session);
+    });
+
+    authListener("SIGNED_IN", {
+      user: { id: "first-account", email: "first@example.test" },
+    });
+    authListener("SIGNED_IN", {
+      user: { id: "second-account", email: "second@example.test" },
+    });
+
+    profileResolvers[1]({ data: { nombre: "Second", rol: "cliente" } });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+    profileResolvers[0]({ data: { nombre: "First", rol: "admin" } });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+
+    assert.deepEqual(observed, [
+      {
+        user: {
+          id: "second-account",
+          email: "second@example.test",
+          nombre: "Second",
+          rol: "cliente",
+        },
+      },
+    ]);
+  });
+
   it("no restaura la sesión inicial si se cierra sesión mientras carga el perfil", async function () {
     let authListener: Function = function () {};
     let resolveProfile: Function = function () {};
