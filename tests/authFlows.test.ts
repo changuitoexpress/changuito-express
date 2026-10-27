@@ -638,8 +638,61 @@ describe("sesión y cierre de sesión", function () {
 
     authListener("SIGNED_OUT", null);
 
-    assert.equal(returnedSubscription, subscription);
+    assert.notEqual(returnedSubscription, subscription);
     assert.deepEqual(observed, [null]);
+  });
+
+  it("ignora el resultado de perfil si se cancela la observación antes de que termine", async function () {
+    let authListener: Function = function () {};
+    let resolveProfile: Function = function () {};
+    let unsubscribeCalls = 0;
+    const { client } = createClientFixture({
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return {
+          data: {
+            subscription: {
+              unsubscribe: function () {
+                unsubscribeCalls += 1;
+              },
+            },
+          },
+        };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: function () {
+                  return new Promise(function (resolve) {
+                    resolveProfile = resolve;
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    const subscription = watchAuthSession(client, function (session) {
+      observed.push(session);
+    });
+
+    authListener("SIGNED_IN", {
+      user: { id: "fixture-user-id", email: "fixture@example.test" },
+    });
+    subscription.unsubscribe();
+    resolveProfile({ data: { nombre: "Ana", rol: "cliente" } });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+
+    assert.equal(unsubscribeCalls, 1);
+    assert.deepEqual(observed, []);
   });
 
   it("ignora una consulta de perfil que termina después del cierre de sesión", async function () {

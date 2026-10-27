@@ -289,10 +289,12 @@ export function watchAuthSession(
   onSession: (session: AuthAppSession | null) => void,
   onAuthEvent?: () => void,
 ) {
+  let listening = true;
   let latestAuthEvent = 0;
   const {
     data: { subscription },
   } = client.auth.onAuthStateChange(function (_event: string, session: SupabaseSession | null) {
+    if (!listening) return;
     const authEvent = ++latestAuthEvent;
     if (onAuthEvent) onAuthEvent();
     if (!session) {
@@ -300,10 +302,16 @@ export function watchAuthSession(
       return;
     }
     createAppSession(client, session).then(function (appSession) {
-      if (authEvent === latestAuthEvent) onSession(appSession);
+      if (listening && authEvent === latestAuthEvent) onSession(appSession);
     });
   });
-  return subscription;
+  return {
+    ...subscription,
+    unsubscribe: function () {
+      listening = false;
+      subscription.unsubscribe();
+    },
+  };
 }
 
 export function startAuthSession(
