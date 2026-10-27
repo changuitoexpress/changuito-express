@@ -1,5 +1,5 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Wallet, Gift, Star, TrendingUp, Package, RefreshCw, ChevronRight } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
@@ -88,12 +88,19 @@ export default function ChangoMonedero(props: Props) {
   const [totalGastado, setTotalGastado] = useState(0);
   const [loading,  setLoading]    = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+  const requestSequence = useRef(0);
   const [tab,      setTab]        = useState<'resumen' | 'historial' | 'como'>('resumen');
 
   const isDark = props.theme === 'dark';
   const uid    = props.session.user.id;
 
   const cargar = useCallback(async function() {
+    const requestId = ++requestSequence.current;
+    const isCurrentRequest = function() {
+      return requestSequence.current === requestId;
+    };
+
     setLoading(true);
     setLoadError(false);
     try {
@@ -103,6 +110,7 @@ export default function ChangoMonedero(props: Props) {
         .select('*')
         .eq('user_id', uid)
         .maybeSingle();
+      if (!isCurrentRequest()) return;
       if (monError) throw monError;
       if (!mon) {
         const { data: nuevo, error: nuevoError } = await supabase
@@ -110,6 +118,7 @@ export default function ChangoMonedero(props: Props) {
           .insert([{ user_id: uid, saldo_cashback: 0, pedidos_realizados: 0 }])
           .select()
           .single();
+        if (!isCurrentRequest()) return;
         if (nuevoError || !nuevo) throw nuevoError ?? new Error('No se pudo crear el monedero');
         mon = nuevo;
       }
@@ -124,21 +133,27 @@ export default function ChangoMonedero(props: Props) {
           .limit(50),
         cargarResumenEntregados(uid),
       ]);
+      if (!isCurrentRequest()) return;
       if (pedidosResult.error) throw pedidosResult.error;
 
       setMonedero(mon);
       setPedidos(pedidosResult.data ?? []);
       setEntregados(resumenEntregados.entregados);
       setTotalGastado(resumenEntregados.totalGastado);
+      setLoadedUserId(uid);
     } catch(e) {
+      if (!isCurrentRequest()) return;
       console.error(e);
       setMonedero(null);
       setPedidos([]);
       setEntregados(0);
       setTotalGastado(0);
       setLoadError(true);
+      setLoadedUserId(uid);
     }
-    finally { setLoading(false); }
+    finally {
+      if (isCurrentRequest()) setLoading(false);
+    }
   }, [uid]);
 
   useEffect(function() {
@@ -162,12 +177,15 @@ export default function ChangoMonedero(props: Props) {
 
     return function() {
       activo = false;
+      requestSequence.current += 1;
       window.removeEventListener('focus', refrescar);
       document.removeEventListener('visibilitychange', refrescar);
       supabase.removeChannel(channel);
     };
   }, [cargar, uid]);
 
+  const loadingCurrentUser = loading || loadedUserId !== uid;
+  const loadErrorCurrentUser = loadedUserId === uid && loadError;
   const envioGratis  = getFreeShippingProgress(entregados);
   const cashback     = monedero?.saldo_cashback ?? 0;
 
@@ -210,7 +228,7 @@ export default function ChangoMonedero(props: Props) {
 
       <div style={{ padding: '16px', paddingBottom: '50px' }}>
 
-        {loading && (
+        {loadingCurrentUser && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[1,2,3].map(function(i) {
               return <div key={i} className="skeleton" style={{ height: '80px', borderRadius: '18px' }} />;
@@ -218,7 +236,7 @@ export default function ChangoMonedero(props: Props) {
           </div>
         )}
 
-        {!loading && loadError && (
+        {!loadingCurrentUser && loadErrorCurrentUser && (
           <div role="alert" style={{ padding: '24px', borderRadius: '18px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
             <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>No pudimos cargar tu monedero</p>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Revisa tu conexión e inténtalo de nuevo.</p>
@@ -230,7 +248,7 @@ export default function ChangoMonedero(props: Props) {
         )}
 
         {/* ── TAB RESUMEN ── */}
-        {!loading && !loadError && tab === 'resumen' && (
+        {!loadingCurrentUser && !loadErrorCurrentUser && tab === 'resumen' && (
           <div>
             {/* Tarjeta principal ChangoPesos */}
             <div style={{ padding: '24px', borderRadius: '22px', background: 'linear-gradient(135deg,#facc15,#f59e0b)', marginBottom: '16px', position: 'relative', overflow: 'hidden' }}>
@@ -325,7 +343,7 @@ export default function ChangoMonedero(props: Props) {
         )}
 
         {/* ── TAB HISTORIAL ── */}
-        {!loading && !loadError && tab === 'historial' && (
+        {!loadingCurrentUser && !loadErrorCurrentUser && tab === 'historial' && (
           <div>
             <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 14px 0' }}>Tus últimos {pedidos.length} pedidos</p>
             {pedidos.length === 0 && (
@@ -363,7 +381,7 @@ export default function ChangoMonedero(props: Props) {
         )}
 
         {/* ── TAB CÓMO FUNCIONA ── */}
-        {!loading && !loadError && tab === 'como' && (
+        {!loadingCurrentUser && !loadErrorCurrentUser && tab === 'como' && (
           <div>
             {/* Hero */}
             <div style={{ padding: '22px', borderRadius: '20px', background: 'linear-gradient(135deg,#1a1a2e,#facc15)', marginBottom: '20px', textAlign: 'center' }}>

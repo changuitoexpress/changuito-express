@@ -10,12 +10,20 @@ import { chromium } from "playwright";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const supabaseUrl = "https://wallet-fixture.supabase.co";
 const fixtureUserId = "wallet-fixture-user";
+const secondFixtureUserId = "wallet-fixture-account-b";
 const wallet = {
   id: "wallet-fixture-wallet",
   user_id: fixtureUserId,
   saldo_cashback: 42.75,
   pedidos_realizados: 7,
   envios_gratis_usados: 1,
+};
+const secondWallet = {
+  id: "wallet-fixture-account-b-wallet",
+  user_id: secondFixtureUserId,
+  saldo_cashback: 8.25,
+  pedidos_realizados: 2,
+  envios_gratis_usados: 0,
 };
 const initializedWallet = {
   id: "wallet-fixture-new-wallet",
@@ -107,18 +115,21 @@ async function waitForServer(url: string, server: ReturnType<typeof spawn>) {
   throw new Error("Vite did not become ready within 30 seconds.");
 }
 
-function createFixtureSession() {
+function createFixtureSession(userId = fixtureUserId) {
+  const isSecondAccount = userId === secondFixtureUserId;
   return {
-    access_token: "wallet-fixture-access-token",
+    access_token: isSecondAccount
+      ? "wallet-fixture-account-b-access-token"
+      : "wallet-fixture-access-token",
     token_type: "bearer",
     expires_in: 3600,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     refresh_token: "wallet-fixture-refresh-token",
     user: {
-      id: fixtureUserId,
+      id: userId,
       aud: "authenticated",
       role: "authenticated",
-      email: "wallet@example.test",
+      email: isSecondAccount ? "second-wallet@example.test" : "wallet@example.test",
       app_metadata: { provider: "email", providers: ["email"] },
       user_metadata: {},
       created_at: new Date().toISOString(),
@@ -190,9 +201,22 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   };
   let creationPayload: unknown;
   const orderQueries: string[] = [];
+  let holdAccountAWalletResponse = false;
+  let markAccountAWalletReadStarted!: () => void;
+  const accountAWalletReadStarted = new Promise<void>(function (resolve) {
+    markAccountAWalletReadStarted = resolve;
+  });
+  let releaseAccountAWalletResponse!: () => void;
+  const accountAWalletResponseGate = new Promise<void>(function (resolve) {
+    releaseAccountAWalletResponse = resolve;
+  });
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
     const url = new URL(request.url());
+    const authorization = request.headers().authorization ?? "";
+    const requestUserId = authorization.includes("wallet-fixture-account-b-access-token")
+      ? secondFixtureUserId
+      : fixtureUserId;
     const acceptsObject = request.headers().accept?.includes(
       "application/vnd.pgrst.object+json",
     );
@@ -202,8 +226,10 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: fixtureUserId,
-          email: "wallet@example.test",
+          id: requestUserId,
+          email: requestUserId === secondFixtureUserId
+            ? "second-wallet@example.test"
+            : "wallet@example.test",
           user_metadata: {},
           app_metadata: { provider: "email", providers: ["email"] },
         }),
@@ -214,7 +240,12 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ nombre: "Wallet Fixture Customer", rol: "cliente" }),
+        body: JSON.stringify({
+          nombre: requestUserId === secondFixtureUserId
+            ? "Second Wallet Customer"
+            : "Wallet Fixture Customer",
+          rol: "cliente",
+        }),
       });
       return;
     }
@@ -224,6 +255,12 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     }
     if (url.pathname === "/rest/v1/monedero_cliente") {
       if (request.method() === "GET") {
+        const walletUserId = url.searchParams.get("user_id")?.replace(/^eq\./, "");
+        if (holdAccountAWalletResponse && walletUserId === fixtureUserId) {
+          holdAccountAWalletResponse = false;
+          markAccountAWalletReadStarted();
+          await accountAWalletResponseGate;
+        }
         if (failure === "wallet") {
           requests.wallet += 1;
           await route.fulfill({
@@ -245,7 +282,13 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(acceptsObject ? wallet : [wallet]),
+          body: JSON.stringify(
+            acceptsObject
+              ? walletUserId === secondFixtureUserId
+                ? secondWallet
+                : wallet
+              : [walletUserId === secondFixtureUserId ? secondWallet : wallet],
+          ),
         });
         return;
       }
@@ -479,6 +522,48 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     await page.getByText(milestone.percent, { exact: true }).waitFor();
     await page.getByText(milestone.compactRemaining, { exact: true }).waitFor();
   }
+
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /ChangoMonedero/ }).click();
+  holdAccountAWalletResponse = true;
+  // Reload while account A is active and pause its wallet response.
+  await page.getByRole("button", { name: "Recargar monedero" }).click();
+  await accountAWalletReadStarted;
+
+  const sessionSwitchPage = await context.newPage();
+  await sessionSwitchPage.goto(appUrl);
+  await sessionSwitchPage.evaluate(function (nextSession) {
+    const key = "sb-wallet-fixture-auth-token";
+    localStorage.setItem(key, JSON.stringify(nextSession));
+    const authUpdates = new BroadcastChannel(key);
+    authUpdates.postMessage({ event: "SIGNED_IN", session: nextSession });
+    authUpdates.close();
+  }, createFixtureSession(secondFixtureUserId));
+
+  await page.getByText("$8.25", { exact: true }).waitFor({
+    state: "visible",
+    timeout: 10_000,
+  });
+  await sessionSwitchPage.close();
+  assert.equal(
+    await page.getByText("$42.75", { exact: true }).count(),
+    0,
+    "The previous account's balance must not be shown after switching accounts.",
+  );
+
+  releaseAccountAWalletResponse();
+  await page.waitForTimeout(500);
+  assert.equal(
+    await page.getByText("$8.25", { exact: true }).count(),
+    1,
+    "A late response for account A must not replace account B's wallet.",
+  );
+  assert.equal(
+    await page.getByText("$42.75", { exact: true }).count(),
+    0,
+    "The previous account's balance must remain hidden after its response completes.",
+  );
+  assert.deepEqual(pageErrors, [], "Switching accounts during wallet loading should not throw.");
 
   await context.close();
 });
