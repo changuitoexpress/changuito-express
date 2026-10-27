@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Wallet, Gift, Star, TrendingUp, Package, RefreshCw, ChevronRight } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
+import { getFreeShippingProgress } from './freeShippingProgress';
 
 interface Props {
   session:       AppSession;
@@ -94,9 +95,7 @@ export default function ChangoMonedero(props: Props) {
   useEffect(function() { cargar(); }, [cargar]);
 
   const entregados   = pedidos.filter(function(p){ return p.estatus === 'entregado'; }).length;
-  const modulo       = entregados % 10 || (entregados > 0 ? 10 : 0);
-  const progreso     = Math.round((modulo / 10) * 100);
-  const pedidosFalta = 10 - modulo;
+  const envioGratis  = getFreeShippingProgress(entregados);
   const cashback     = monedero?.saldo_cashback ?? 0;
   const totalGastado = pedidos.filter(function(p){ return p.estatus === 'entregado'; })
     .reduce(function(a, p){ return a + (p.total_pagar ?? 0); }, 0);
@@ -203,18 +202,18 @@ export default function ChangoMonedero(props: Props) {
                 <div>
                   <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>🚚 Próximo envío gratis</p>
                   <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                    {pedidosFalta === 0 ? '¡Ya tienes envío gratis disponible!' : pedidosFalta + ' pedido' + (pedidosFalta !== 1 ? 's' : '') + ' más'}
+                    {envioGratis.remainingOrders === 0 ? '¡Ya tienes envío gratis disponible!' : envioGratis.remainingOrders + ' pedido' + (envioGratis.remainingOrders !== 1 ? 's' : '') + ' más'}
                   </p>
                 </div>
-                <span style={{ fontSize: '20px', fontWeight: 900, color: pedidosFalta === 0 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
-                  {progreso}%
+                <span style={{ fontSize: '20px', fontWeight: 900, color: envioGratis.remainingOrders === 0 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
+                  {envioGratis.progressPercent}%
                 </span>
               </div>
               <div style={{ height: '10px', borderRadius: '5px', background: 'var(--border-subtle)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: Math.min(progreso, 100) + '%', borderRadius: '5px', background: pedidosFalta === 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : 'linear-gradient(90deg,#facc15,#f59e0b)', transition: 'width 0.8s ease' }} />
+                <div style={{ height: '100%', width: Math.min(envioGratis.progressPercent, 100) + '%', borderRadius: '5px', background: envioGratis.remainingOrders === 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : 'linear-gradient(90deg,#facc15,#f59e0b)', transition: 'width 0.8s ease' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>{modulo}/10 pedidos</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>{envioGratis.cycleCount}/10 pedidos</span>
                 <span style={{ fontSize: '10px', color: 'var(--color-green)', fontWeight: 700 }}>¡Cada 10 pedidos!</span>
               </div>
             </div>
