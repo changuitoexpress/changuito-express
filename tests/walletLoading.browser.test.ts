@@ -332,10 +332,15 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       }
 
       if (request.method() === "HEAD" && url.searchParams.get("select") === "id") {
+        const countedOrders = url.searchParams.get("estatus") === "eq.entregado"
+          ? deliveredOrders.filter(function (order) {
+              return order.estatus === "entregado";
+            })
+          : deliveredOrders;
         await route.fulfill({
           status: 200,
           headers: {
-            "content-range": `*/${deliveredOrders.length}`,
+            "content-range": `*/${countedOrders.length}`,
             "access-control-expose-headers": "content-range",
           },
           body: "",
@@ -344,6 +349,9 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       }
 
       if (url.searchParams.get("select") === "total_pagar") {
+        const countedOrders = deliveredOrders.filter(function (order) {
+          return order.estatus === "entregado";
+        });
         const from = Number(url.searchParams.get("offset") ?? 0);
         const to = from + Number(url.searchParams.get("limit") ?? 1000) - 1;
         if (failure === "laterOrderPage" && from > 0) {
@@ -355,12 +363,12 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
           });
           return;
         }
-        const rows = deliveredOrders.slice(from, to + 1);
+        const rows = countedOrders.slice(from, to + 1);
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           headers: {
-            "content-range": `${from}-${from + rows.length - 1}/${deliveredOrders.length}`,
+            "content-range": `${from}-${from + rows.length - 1}/${countedOrders.length}`,
             "access-control-expose-headers": "content-range",
           },
           body: JSON.stringify(rows),
@@ -534,6 +542,31 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     await page.getByText(milestone.percent, { exact: true }).waitFor();
     await page.getByText(milestone.dedicatedRemaining, { exact: true }).waitFor();
   }
+  deliveredOrders = [
+    ...Array.from({ length: 5 }, function () {
+      return { total_pagar: 10, estatus: "entregado" };
+    }),
+    ...Array.from({ length: 4 }, function () {
+      return { total_pagar: 10, estatus: "pendiente" };
+    }),
+    ...Array.from({ length: 3 }, function () {
+      return { total_pagar: 10, estatus: "cancelado" };
+    }),
+  ];
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("5/10 pedidos", { exact: true }).waitFor();
+  await page.getByText("50%", { exact: true }).waitFor();
+  await page.getByText("5 pedidos más", { exact: true }).waitFor();
+  deliveredOrders[5].estatus = "entregado";
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("6/10 pedidos", { exact: true }).waitFor();
+  await page.getByText("60%", { exact: true }).waitFor();
+  await page.getByText("4 pedidos más", { exact: true }).waitFor();
+
   deliveredOrders = Array.from({ length: 1005 }, function () {
     return { total_pagar: 10, estatus: "entregado" };
   });
@@ -610,6 +643,33 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     await page.getByText(milestone.percent, { exact: true }).waitFor();
     await page.getByText(milestone.compactRemaining, { exact: true }).waitFor();
   }
+  deliveredOrders = [
+    ...Array.from({ length: 4 }, function () {
+      return { total_pagar: 10, estatus: "entregado" };
+    }),
+    ...Array.from({ length: 3 }, function () {
+      return { total_pagar: 10, estatus: "pendiente" };
+    }),
+    ...Array.from({ length: 2 }, function () {
+      return { total_pagar: 10, estatus: "cancelado" };
+    }),
+  ];
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("4 de cada 10", { exact: true }).waitFor();
+  await page.getByText("40%", { exact: true }).waitFor();
+  await page.getByText("6 pedidos", { exact: true }).waitFor();
+  deliveredOrders[7].estatus = "entregado";
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("5 de cada 10", { exact: true }).waitFor();
+  await page.getByText("50%", { exact: true }).waitFor();
+  await page.getByText("5 pedidos", { exact: true }).waitFor();
+  deliveredOrders = Array.from({ length: 11 }, function () {
+    return { total_pagar: 10, estatus: "entregado" };
+  });
 
   await page.getByRole("button", { name: "Abrir menú" }).click();
   await page.getByRole("button", { name: /ChangoMonedero/ }).click();
