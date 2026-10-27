@@ -639,6 +639,7 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   });
 
   let signInAttempts = 0;
+  const passwordGrantPayloads: Array<{ email?: string; password?: string }> = [];
   let signUpAttempts = 0;
   let profileWrites = 0;
   let resendAttempts = 0;
@@ -665,6 +666,7 @@ it("recovers an existing account profile and returns to sign-in after retry", as
     if (url.pathname === "/auth/v1/token") {
       if (url.searchParams.get("grant_type") === "password") {
         signInAttempts += 1;
+        passwordGrantPayloads.push(request.postDataJSON());
         if (signInAttempts === 1) {
           await route.fulfill({
             status: 400,
@@ -714,6 +716,15 @@ it("recovers an existing account profile and returns to sign-in after retry", as
       return;
     }
 
+    if (url.pathname === "/rest/v1/merchants" && request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+      return;
+    }
+
     if (url.pathname === "/rest/v1/perfiles" && request.method() === "GET") {
       await route.fulfill({
         status: 200,
@@ -745,6 +756,16 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   });
 
   await page.goto(appUrl);
+  const appAuthStorageKeys = await page.evaluate(function () {
+    return Object.keys(localStorage).filter(function (key) {
+      return key.includes("auth-token");
+    });
+  });
+  assert.deepEqual(
+    appAuthStorageKeys,
+    [],
+    "The browser should begin without a preloaded authenticated session.",
+  );
   const recoveryAction = page.getByRole("button", {
     name: "¿Confirmaste tu email y te falta el perfil? Completalo acá",
   });
@@ -884,6 +905,33 @@ it("recovers an existing account profile and returns to sign-in after retry", as
   assert.equal(signInAttempts, 3, "Recovery should retry sign-in for the existing account.");
   assert.equal(signUpAttempts, 0, "Recovery must not create a second account.");
   assert.equal(profileWrites, 2, "The profile write should be retried after visible failure.");
+  assert.deepEqual(
+    await page.evaluate(function () {
+      return Object.keys(localStorage).filter(function (key) {
+        return key.includes("auth-token");
+      });
+    }),
+    [],
+    "Successful profile recovery should return to sign-in without an active app session.",
+  );
+
+  await page.getByPlaceholder("tu@email.com").fill("existing@example.test");
+  await page
+    .getByPlaceholder("Contraseña (mín. 6 caracteres)")
+    .fill("fixture-password");
+  await page.getByRole("button", { name: "Entrar a la App" }).click();
+  await page.getByText("¿Qué se te antoja?", { exact: true }).waitFor();
+  assert.equal(signInAttempts, 4, "The returned sign-in form should authenticate normally.");
+  assert.equal(passwordGrantPayloads[3]?.email, "existing@example.test");
+  assert.equal(passwordGrantPayloads[3]?.password, "fixture-password");
+  assert.ok(
+    await page.evaluate(function () {
+      return Object.keys(localStorage).some(function (key) {
+        return key.includes("auth-token");
+      });
+    }),
+    "The successful normal sign-in should establish the app session.",
+  );
   assert.deepEqual(pageErrors, [], "Profile recovery should not throw in the browser.");
 });
 

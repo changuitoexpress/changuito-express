@@ -3,4 +3,5 @@
 - [Isolated auth recovery](isolated-auth-recovery.md) — password verification for recovery flows must not mutate the app’s active session or trigger its auth listener.
 - [Signup confirmation responses](signup-confirmation-responses.md) — require a real Supabase user ID; the SDK may normalize a missing user into a truthy response object.
 - [Supabase count pagination fixtures](supabase-count-pagination.md) — browser mocks must expose `content-range` for Supabase exact counts to be visible to the client.
+- [Browser fixture response shapes](browser-fixture-response-shapes.md) — authenticated browser mocks must match the data shapes the destination screen consumes.
 - [Supabase session management](supabase-session-management.md) — per-device operations must stay JWT-scoped; revoked access tokens can work until expiry.
