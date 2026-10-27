@@ -1,4 +1,4 @@
-export type AuthMode = "login" | "register";
+export type AuthMode = "login" | "register" | "recover-profile";
 
 export interface AuthFormValues {
   mode: AuthMode;
@@ -32,7 +32,7 @@ export function validateAuthForm(values: AuthFormValues): string | null {
   if (!values.email || !values.password) {
     return "Completá todos los campos.";
   }
-  if (values.mode === "register" && values.nombre.trim().length < 2) {
+  if (values.mode !== "login" && values.nombre.trim().length < 2) {
     return "Ingresá tu nombre completo.";
   }
   if (values.password.length < 6) {
@@ -44,8 +44,14 @@ export function validateAuthForm(values: AuthFormValues): string | null {
 export async function submitAuthForm(
   client: SupabaseAuthClient,
   values: AuthFormValues,
-): Promise<{ status: "signed-in" | "registered" | "error"; message?: string }> {
+): Promise<{
+  status: "signed-in" | "registered" | "profile-incomplete" | "error";
+  message?: string;
+}> {
   try {
+    if (values.mode === "recover-profile") {
+      return { status: "error", message: "Usá la opción para completar tu perfil." };
+    }
     if (values.mode === "register") {
       const { data, error } = await client.auth.signUp({
         email: values.email,
@@ -65,16 +71,16 @@ export async function submitAuthForm(
           );
           if (profileError) {
             return {
-              status: "error",
+              status: "profile-incomplete",
               message:
-                "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+                "Tu cuenta se creó, pero no pudimos guardar tu perfil. Confirmá tu email y luego elegí “Completar perfil” para reintentarlo con tu cuenta existente.",
             };
           }
         } catch (e) {
           return {
-            status: "error",
+            status: "profile-incomplete",
             message:
-              "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+              "Tu cuenta se creó, pero no pudimos guardar tu perfil. Confirmá tu email y luego elegí “Completar perfil” para reintentarlo con tu cuenta existente.",
           };
         }
       }
@@ -92,6 +98,71 @@ export async function submitAuthForm(
       status: "error",
       message: err.message ?? "Error inesperado.",
     };
+  }
+}
+
+export async function completeProfileSetup(
+  client: SupabaseAuthClient,
+  values: Pick<AuthFormValues, "email" | "password" | "nombre">,
+): Promise<{ status: "profile-completed" | "error"; message?: string }> {
+  let signedIn = false;
+  try {
+    const { data, error } = await client.auth.signInWithPassword({
+      email: values.email,
+      password: values.password,
+    });
+    if (error) throw error;
+    if (!data?.user?.id) {
+      return {
+        status: "error",
+        message: "No pudimos verificar tu cuenta. Revisá tus datos e intentá de nuevo.",
+      };
+    }
+    signedIn = true;
+
+    try {
+      const { data: existingProfile, error: lookupError } = await client
+        .from("perfiles")
+        .select("rol")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+
+      const { error: profileError } = await client.from("perfiles").upsert(
+        {
+          id: data.user.id,
+          nombre: values.nombre.trim(),
+          email: values.email,
+          rol: existingProfile?.rol ?? "cliente",
+        },
+        { onConflict: "id" },
+      );
+      if (profileError) throw profileError;
+    } catch (e) {
+      return {
+        status: "error",
+        message:
+          "No pudimos guardar tu perfil. Tu cuenta sigue intacta; revisá tu conexión e intentá de nuevo.",
+      };
+    }
+
+    return {
+      status: "profile-completed",
+      message: "Tu perfil quedó configurado. Ya podés iniciar sesión.",
+    };
+  } catch (err: any) {
+    return {
+      status: "error",
+      message:
+        err.message ??
+        "No pudimos completar tu perfil. Revisá tus datos e intentá de nuevo.",
+    };
+  } finally {
+    if (signedIn) {
+      try {
+        await client.auth.signOut();
+      } catch (e) {}
+    }
   }
 }
 

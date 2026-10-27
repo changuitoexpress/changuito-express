@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  completeProfileSetup,
   restoreAuthSession,
   signOut,
   startAuthSession,
@@ -97,6 +98,14 @@ describe("validación de acceso", function () {
       }),
       null,
     );
+    assert.equal(
+      validateAuthForm({
+        ...validLogin,
+        mode: "recover-profile",
+        nombre: "Ana",
+      }),
+      null,
+    );
   });
 });
 
@@ -186,9 +195,9 @@ describe("acceso y registro Supabase", function () {
     });
 
     assert.deepEqual(result, {
-      status: "error",
+      status: "profile-incomplete",
       message:
-        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Confirmá tu email y luego elegí “Completar perfil” para reintentarlo con tu cuenta existente.",
     });
   });
 
@@ -213,9 +222,9 @@ describe("acceso y registro Supabase", function () {
     });
 
     assert.deepEqual(result, {
-      status: "error",
+      status: "profile-incomplete",
       message:
-        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Confirmá tu email y luego elegí “Completar perfil” para reintentarlo con tu cuenta existente.",
     });
   });
 
@@ -234,6 +243,126 @@ describe("acceso y registro Supabase", function () {
 
     assert.deepEqual(result, { status: "error", message: "Signup disabled" });
     assert.equal(getUpsertCalls(), 0);
+  });
+
+  it("completa el perfil en la cuenta existente sin volver a registrarla", async function () {
+    let signupCalls = 0;
+    let loginCredentials: any;
+    let savedProfile: any;
+    const fixture = createClientFixture({
+      signUp: async function () {
+        signupCalls += 1;
+        return { data: { user: { id: "new-account" } }, error: null };
+      },
+      signInWithPassword: async function (credentials: any) {
+        loginCredentials = credentials;
+        return {
+          data: { user: { id: "existing-account" } },
+          error: null,
+        };
+      },
+    });
+    fixture.client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: async function () {
+                  return { data: null, error: null };
+                },
+              };
+            },
+          };
+        },
+        upsert: async function (values: any, options: any) {
+          savedProfile = { values, options };
+          return { error: null };
+        },
+      };
+    };
+
+    const result = await completeProfileSetup(fixture.client, {
+      email: validLogin.email,
+      password: validLogin.password,
+      nombre: "  Ana Test  ",
+    });
+
+    assert.deepEqual(result, {
+      status: "profile-completed",
+      message: "Tu perfil quedó configurado. Ya podés iniciar sesión.",
+    });
+    assert.equal(signupCalls, 0);
+    assert.deepEqual(loginCredentials, {
+      email: validLogin.email,
+      password: validLogin.password,
+    });
+    assert.deepEqual(savedProfile, {
+      values: {
+        id: "existing-account",
+        nombre: "Ana Test",
+        email: "fixture@example.test",
+        rol: "cliente",
+      },
+      options: { onConflict: "id" },
+    });
+  });
+
+  it("explica un fallo del perfil y permite reintentar con la misma cuenta", async function () {
+    let upsertCalls = 0;
+    let signOutCalls = 0;
+    let savedRole = "";
+    const fixture = createClientFixture({
+      signInWithPassword: async function () {
+        return {
+          data: { user: { id: "existing-account" } },
+          error: null,
+        };
+      },
+      signOut: async function () {
+        signOutCalls += 1;
+        return { error: null };
+      },
+    });
+    fixture.client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: async function () {
+                  return { data: { rol: "admin" }, error: null };
+                },
+              };
+            },
+          };
+        },
+        upsert: async function (values: any) {
+          upsertCalls += 1;
+          savedRole = values.rol;
+          if (upsertCalls === 1) throw new Error("Profile write failed");
+          return { error: null };
+        },
+      };
+    };
+    const credentials = {
+      email: validLogin.email,
+      password: validLogin.password,
+      nombre: "Ana",
+    };
+
+    const failed = await completeProfileSetup(fixture.client, credentials);
+    const retried = await completeProfileSetup(fixture.client, credentials);
+
+    assert.deepEqual(failed, {
+      status: "error",
+      message:
+        "No pudimos guardar tu perfil. Tu cuenta sigue intacta; revisá tu conexión e intentá de nuevo.",
+    });
+    assert.equal(retried.status, "profile-completed");
+    assert.equal(upsertCalls, 2);
+    assert.equal(signOutCalls, 2);
+    assert.equal(savedRole, "admin");
   });
 });
 

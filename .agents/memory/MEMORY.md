@@ -1,2 +1,3 @@
 - [ChanguitoAI integration](changuitoai-integration.md) — keep controlled abierto/onCerrar props; cart items must match CartItem shape (negocio/negocio_id/phone_number) or checkout crashes.
 - [Project rules](project-rules.md) — preserve the user's coding conventions and manual GitHub → Vercel publishing process.
+- [Isolated auth recovery](isolated-auth-recovery.md) — password verification for recovery flows must not mutate the app’s active session or trigger its auth listener.

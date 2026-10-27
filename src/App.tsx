@@ -50,6 +50,7 @@ const ChangoMonedero = lazy(function () {
   return import("./ChangoMonedero");
 });
 import {
+  completeProfileSetup,
   startAuthSession,
   submitAuthForm,
   validateAuthForm,
@@ -59,6 +60,14 @@ import {
 const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const profileRecoveryClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+    storageKey: "changuito-profile-recovery-session",
+  },
+});
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Theme = "light" | "dark";
@@ -370,7 +379,9 @@ function AuthScreen(props: {
   onThemeToggle: () => void;
   onToast: (t: string, k: Toast["kind"]) => void;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "recover-profile">(
+    "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
@@ -389,9 +400,21 @@ function AuthScreen(props: {
     }
     setLoading(true);
     try {
-      const result = await submitAuthForm(supabase, values);
+      const result =
+        mode === "recover-profile"
+          ? await completeProfileSetup(profileRecoveryClient, values)
+          : await submitAuthForm(supabase, values);
       if (result.status === "error") {
         props.onToast(result.message ?? "Error inesperado.", "error");
+      } else if (result.status === "profile-incomplete") {
+        props.onToast(result.message ?? "No pudimos guardar tu perfil.", "error");
+        setMode("recover-profile");
+      } else if (result.status === "profile-completed") {
+        props.onToast(
+          result.message ?? "Tu perfil quedó configurado. Ya podés iniciar sesión.",
+          "success",
+        );
+        setMode("login");
       } else if (result.status === "registered") {
         props.onToast(result.message ?? "Revisá tu email para confirmar.", "success");
       }
@@ -557,6 +580,19 @@ function AuthScreen(props: {
             onSubmit={handleSubmit}
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
+            {mode === "recover-profile" && (
+              <p
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                  margin: "0 0 4px",
+                }}
+              >
+                Confirmá tu email y completá estos datos para guardar tu perfil
+                en la cuenta existente.
+              </p>
+            )}
             {!isLogin && (
               <div style={{ position: "relative" }}>
                 <User
@@ -656,7 +692,7 @@ function AuthScreen(props: {
               <input
                 type="password"
                 placeholder="Contraseña (mín. 6 caracteres)"
-                autoComplete={isLogin ? "current-password" : "new-password"}
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
                 value={password}
                 onChange={function (e) {
                   setPassword(e.target.value);
@@ -719,12 +755,59 @@ function AuthScreen(props: {
                 </>
               ) : (
                 <>
-                  <UserPlus style={{ width: "15px", height: "15px" }} /> Crear
-                  Cuenta
+                  {mode === "recover-profile" ? (
+                    <>
+                      <User style={{ width: "15px", height: "15px" }} /> Completar
+                      Perfil
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus style={{ width: "15px", height: "15px" }} /> Crear
+                      Cuenta
+                    </>
+                  )}
                 </>
               )}
             </button>
           </form>
+          {isLogin && (
+            <button
+              type="button"
+              onClick={function () {
+                setMode("recover-profile");
+              }}
+              style={{
+                display: "block",
+                margin: "16px auto 0",
+                padding: "4px",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              ¿Confirmaste tu email y te falta el perfil? Completalo acá
+            </button>
+          )}
+          {mode === "recover-profile" && (
+            <button
+              type="button"
+              onClick={function () {
+                setMode("login");
+              }}
+              style={{
+                display: "block",
+                margin: "12px auto 0",
+                padding: "4px",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              Volver a iniciar sesión
+            </button>
+          )}
         </div>
       </div>
     </div>
