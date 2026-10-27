@@ -83,8 +83,9 @@ export default function ChangoMonedero(props: Props) {
   useEffect(function() { cargar(); }, [cargar]);
 
   const entregados   = pedidos.filter(function(p){ return p.estatus === 'entregado'; }).length;
-  const progreso     = Math.min(Math.round((entregados / 7) * 100), 100);
-  const pedidosFalta = entregados >= 7 ? 0 : 7 - entregados;
+  const modulo       = entregados % 10 || (entregados > 0 ? 10 : 0);
+  const progreso     = Math.round((modulo / 10) * 100);
+  const pedidosFalta = 10 - modulo;
   const cashback     = monedero?.saldo_cashback ?? 0;
   const totalGastado = pedidos.filter(function(p){ return p.estatus === 'entregado'; })
     .reduce(function(a, p){ return a + (p.total_pagar ?? 0); }, 0);
