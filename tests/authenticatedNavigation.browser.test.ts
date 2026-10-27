@@ -543,6 +543,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await page.evaluate(function () {
     window.scrollTo(0, 0);
   });
+  await page.setViewportSize({ width: 320, height: 700 });
   const dashboardTabs = [
     {
       label: /🍽️ Restaurantes/,
@@ -566,6 +567,17 @@ it("renders every authenticated screen and returns to the dashboard", async func
     const tabButton = page.getByRole("button", { name: tab.label }).first();
     await tabButton.waitFor({ state: "visible" });
     await assertWithinViewport(tabButton);
+    const tabRow = tabButton.locator("..");
+    const rowDimensions = await tabRow.evaluate(function (element) {
+      return {
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      };
+    });
+    assert.ok(
+      rowDimensions.scrollWidth <= rowDimensions.clientWidth,
+      "All dashboard tabs should fit without horizontal overflow at 320px.",
+    );
     await tabButton.click();
     await tab.content.waitFor({ state: "visible", timeout: 10_000 });
   }
