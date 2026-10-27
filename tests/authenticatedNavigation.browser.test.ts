@@ -281,3 +281,169 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");
 });
+
+it("recovers an existing account profile and returns to sign-in after retry", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  const page = await browser.newPage();
+  const pageErrors: string[] = [];
+  page.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+
+  let signInAttempts = 0;
+  let signUpAttempts = 0;
+  let profileWrites = 0;
+  await page.route(`${supabaseUrl}/**`, async function (route) {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === "/auth/v1/token") {
+      if (url.searchParams.get("grant_type") === "password") {
+        signInAttempts += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            access_token: "isolated-recovery-access-token",
+            token_type: "bearer",
+            expires_in: 3600,
+            refresh_token: "isolated-recovery-refresh-token",
+            user: {
+              id: "existing-browser-account",
+              aud: "authenticated",
+              role: "authenticated",
+              email: "existing@example.test",
+              app_metadata: { provider: "email", providers: ["email"] },
+              user_metadata: {},
+              created_at: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+    }
+
+    if (url.pathname === "/auth/v1/signup") {
+      signUpAttempts += 1;
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Signup should not be used for recovery." }),
+      });
+      return;
+    }
+
+    if (url.pathname === "/auth/v1/logout") {
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/perfiles" && request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ rol: "cliente" }),
+      });
+      return;
+    }
+
+    if (url.pathname === "/rest/v1/perfiles" && request.method() === "POST") {
+      profileWrites += 1;
+      if (profileWrites === 1) {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Fixture profile write failure." }),
+        });
+        return;
+      }
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({}),
+    });
+  });
+
+  await page.goto(appUrl);
+  const recoveryAction = page.getByRole("button", {
+    name: "¿Confirmaste tu email y te falta el perfil? Completalo acá",
+  });
+  await recoveryAction.waitFor({ state: "visible" });
+  await recoveryAction.click();
+
+  await page.getByText(
+    "Confirmá tu email y completá estos datos para guardar tu perfil en la cuenta existente.",
+  ).waitFor();
+  await page.getByRole("button", { name: /Completar Perfil/ }).click();
+  await page.getByText("Completá todos los campos.", { exact: true }).waitFor();
+
+  await page.getByPlaceholder("Nombre o Alias").fill("Ana Browser");
+  await page.getByPlaceholder("tu@email.com").fill("existing@example.test");
+  await page.getByPlaceholder("Contraseña (mín. 6 caracteres)").fill("fixture-password");
+  await page.getByRole("button", { name: /Completar Perfil/ }).click();
+  await page
+    .getByText(
+      "No pudimos guardar tu perfil. Tu cuenta sigue intacta; revisá tu conexión e intentá de nuevo.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByRole("button", { name: /Completar Perfil/ }).waitFor();
+
+  await page.getByRole("button", { name: /Completar Perfil/ }).click();
+  await page
+    .getByText("Tu perfil quedó configurado. Ya podés iniciar sesión.", {
+      exact: true,
+    })
+    .waitFor();
+  await page.getByRole("button", { name: "Entrar a la App" }).waitFor();
+  await page.getByRole("button", {
+    name: "¿Confirmaste tu email y te falta el perfil? Completalo acá",
+  }).waitFor();
+
+  assert.equal(signInAttempts, 2, "Recovery should retry sign-in for the existing account.");
+  assert.equal(signUpAttempts, 0, "Recovery must not create a second account.");
+  assert.equal(profileWrites, 2, "The profile write should be retried after visible failure.");
+  assert.deepEqual(pageErrors, [], "Profile recovery should not throw in the browser.");
+});
