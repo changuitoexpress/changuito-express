@@ -407,6 +407,7 @@ function AuthScreen(props: {
   const [loading, setLoading] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [focused, setFocused] = useState("");
+  const [anonSoon, setAnonSoon] = useState(false);
   const isDark = props.theme === "dark";
   const isLogin = mode === "login";
 
@@ -808,6 +809,32 @@ function AuthScreen(props: {
               )}
             </button>
           </form>
+          <button
+            type="button"
+            onClick={function () {
+              setAnonSoon(true);
+            }}
+            style={{
+              display: "block",
+              width: "100%",
+              margin: "14px 0 0",
+              padding: "12px",
+              borderRadius: "12px",
+              border: "1px solid var(--border-subtle)",
+              background: "transparent",
+              color: "var(--text-primary)",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Entrar sin registro
+          </button>
+          {anonSoon && (
+            <p role="status" style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", margin: "8px 0 0" }}>
+              Próximamente
+            </p>
+          )}
           {mode === "recover-profile" && (
             <>
               <button
