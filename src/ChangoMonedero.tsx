@@ -44,6 +44,7 @@ export default function ChangoMonedero(props: Props) {
   const [monedero, setMonedero]   = useState<MonederoData | null>(null);
   const [pedidos,  setPedidos]    = useState<PedidoResumen[]>([]);
   const [loading,  setLoading]    = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [tab,      setTab]        = useState<'resumen' | 'historial' | 'como'>('resumen');
 
   const isDark = props.theme === 'dark';
@@ -51,32 +52,42 @@ export default function ChangoMonedero(props: Props) {
 
   const cargar = useCallback(async function() {
     setLoading(true);
+    setLoadError(false);
     try {
       // Cargar o crear monedero
-      let { data: mon } = await supabase
+      let { data: mon, error: monError } = await supabase
         .from('monedero_cliente')
         .select('*')
         .eq('user_id', uid)
         .maybeSingle();
+      if (monError) throw monError;
       if (!mon) {
-        const { data: nuevo } = await supabase
+        const { data: nuevo, error: nuevoError } = await supabase
           .from('monedero_cliente')
           .insert([{ user_id: uid, saldo_cashback: 0, pedidos_realizados: 0 }])
           .select()
           .single();
+        if (nuevoError || !nuevo) throw nuevoError ?? new Error('No se pudo crear el monedero');
         mon = nuevo;
       }
-      setMonedero(mon);
 
       // Cargar historial de pedidos (todos, para contar entregados reales)
-      const { data: peds } = await supabase
+      const { data: peds, error: pedidosError } = await supabase
         .from('pedidos')
         .select('id, negocio_nombre, total_pagar, estatus, created_at')
         .eq('cliente_id', uid)
         .order('created_at', { ascending: false })
         .limit(50);
+      if (pedidosError) throw pedidosError;
+
+      setMonedero(mon);
       setPedidos(peds ?? []);
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      setMonedero(null);
+      setPedidos([]);
+      setLoadError(true);
+    }
     finally { setLoading(false); }
   }, [uid]);
 
@@ -112,7 +123,7 @@ export default function ChangoMonedero(props: Props) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button onClick={cargar}
+            <button onClick={cargar} aria-label="Recargar monedero" title="Recargar monedero"
               style={{ width: '36px', height: '36px', borderRadius: '12px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <RefreshCw style={{ width: '16px', height: '16px', color: 'var(--text-muted)' }} />
             </button>
@@ -137,8 +148,19 @@ export default function ChangoMonedero(props: Props) {
           </div>
         )}
 
+        {!loading && loadError && (
+          <div role="alert" style={{ padding: '24px', borderRadius: '18px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+            <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>No pudimos cargar tu monedero</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Revisa tu conexión e inténtalo de nuevo.</p>
+            <button onClick={cargar}
+              style={{ padding: '10px 16px', border: 'none', borderRadius: '12px', background: 'var(--color-yellow)', color: '#020617', fontWeight: 800, cursor: 'pointer' }}>
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* ── TAB RESUMEN ── */}
-        {!loading && tab === 'resumen' && (
+        {!loading && !loadError && tab === 'resumen' && (
           <div>
             {/* Tarjeta principal ChangoPesos */}
             <div style={{ padding: '24px', borderRadius: '22px', background: 'linear-gradient(135deg,#facc15,#f59e0b)', marginBottom: '16px', position: 'relative', overflow: 'hidden' }}>
@@ -233,7 +255,7 @@ export default function ChangoMonedero(props: Props) {
         )}
 
         {/* ── TAB HISTORIAL ── */}
-        {!loading && tab === 'historial' && (
+        {!loading && !loadError && tab === 'historial' && (
           <div>
             <p style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 14px 0' }}>Tus últimos {pedidos.length} pedidos</p>
             {pedidos.length === 0 && (
@@ -271,7 +293,7 @@ export default function ChangoMonedero(props: Props) {
         )}
 
         {/* ── TAB CÓMO FUNCIONA ── */}
-        {!loading && tab === 'como' && (
+        {!loading && !loadError && tab === 'como' && (
           <div>
             {/* Hero */}
             <div style={{ padding: '22px', borderRadius: '20px', background: 'linear-gradient(135deg,#1a1a2e,#facc15)', marginBottom: '20px', textAlign: 'center' }}>
