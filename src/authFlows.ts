@@ -86,11 +86,15 @@ export async function submitAuthForm(
         password: values.password,
       });
       if (error) throw error;
-      if (data?.user) {
+      const userId =
+        typeof data?.user?.id === "string" && data.user.id.length > 0
+          ? data.user.id
+          : null;
+      if (userId) {
         try {
           const { error: profileError } = await client.from("perfiles").upsert(
             {
-              id: data.user.id,
+              id: userId,
               nombre: values.nombre.trim(),
               email: values.email,
               rol: "cliente",
@@ -112,7 +116,7 @@ export async function submitAuthForm(
           };
         }
       }
-      if (!data?.user) {
+      if (!userId) {
         return {
           status: "error",
           message:
