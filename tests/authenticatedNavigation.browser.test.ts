@@ -64,7 +64,12 @@ async function mockSupabase(
   userId = fixtureUserId,
   email = "uliseseven.7@gmail.com",
   requestLog?: string[],
+  requestDetails?: Array<{ method: string; path: string }>,
 ) {
+  const mockState = {
+    role,
+    businessMembership: true,
+  };
   const deviceSessions = [
     {
       session_id: "11111111-1111-4111-8111-111111111111",
@@ -87,6 +92,7 @@ async function mockSupabase(
     const request = route.request();
     const url = new URL(request.url());
     requestLog?.push(url.pathname);
+    requestDetails?.push({ method: request.method(), path: url.pathname });
     const acceptsObject = request.headers().accept?.includes(
       "application/vnd.pgrst.object+json",
     );
@@ -111,29 +117,62 @@ async function mockSupabase(
     } else if (url.pathname === "/rest/v1/perfiles") {
       data = {
         nombre:
-          role === "admin"
+          mockState.role === "admin"
             ? "Browser Fixture Admin"
-            : role === "negocio"
+            : mockState.role === "negocio"
               ? "Browser Fixture Business"
-              : role === "repartidor"
+              : mockState.role === "repartidor"
                 ? "Browser Fixture Delivery"
                 : "Browser Fixture Customer",
-        rol: role,
+        rol: mockState.role,
       };
     } else if (
       url.pathname === "/rest/v1/merchant_admins" &&
-      (role === "admin" || role === "negocio")
+      (mockState.role === "admin" || mockState.role === "negocio")
     ) {
-      data = { merchant_id: fixtureMerchant.id };
+      data = mockState.businessMembership
+        ? { merchant_id: fixtureMerchant.id }
+        : acceptsObject
+          ? null
+          : [];
     } else if (url.pathname === "/rest/v1/merchants") {
-      data =
-        role === "cliente"
+      const ownerLookup = url.searchParams.has("owner_id");
+      const isBusinessOwner = mockState.role === "negocio" && mockState.businessMembership;
+      data = ownerLookup
+        ? isBusinessOwner
+          ? acceptsObject
+            ? fixtureMerchant
+            : [fixtureMerchant]
+          : acceptsObject
+            ? null
+            : []
+        : mockState.role === "cliente"
           ? acceptsObject
             ? null
             : []
           : acceptsObject
             ? fixtureMerchant
             : [fixtureMerchant];
+    } else if (
+      url.pathname === "/rest/v1/pedidos" &&
+      request.method() === "GET" &&
+      mockState.role === "repartidor"
+    ) {
+      data = [
+        {
+          id: "browser-fixture-order",
+          negocio_nombre: "Browser Fixture Delivery Order",
+          cliente_email: "customer@example.test",
+          detalle: "Delivery-only customer order details",
+          direccion: "Delivery-only street address",
+          total_pagar: 150,
+          estatus: "en_camino",
+          forma_pago: "efectivo",
+          canal: "web",
+          created_at: "2026-10-27T10:00:00.000Z",
+          repartidor_id: userId,
+        },
+      ];
     } else if (
       url.pathname === "/rest/v1/pedidos" &&
       request.method() === "HEAD" &&
@@ -172,6 +211,7 @@ async function mockSupabase(
       body: JSON.stringify(data),
     });
   });
+  return mockState;
 }
 
 function createFixtureSession(
@@ -645,6 +685,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
       email: "business@example.test",
       menuLabel: "Panel de Negocios",
       panelMarker: "Browser Fixture Store",
+      panel: "negocio" as const,
       requiredRequests: [
         "/rest/v1/merchant_admins",
         "/rest/v1/merchants",
@@ -657,6 +698,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
       email: "delivery@example.test",
       menuLabel: "Panel Repartidor",
       panelMarker: "Browser Fixture Delivery",
+      panel: "repartidor" as const,
       requiredRequests: ["/rest/v1/pedidos"],
     },
   ]) {
@@ -673,12 +715,14 @@ it("renders every authenticated screen and returns to the dashboard", async func
       pageErrors.push(error.message);
     });
     const roleBackendRequests: string[] = [];
-    await mockSupabase(
+    const roleBackendRequestDetails: Array<{ method: string; path: string }> = [];
+    const mockState = await mockSupabase(
       rolePage,
       account.role,
       account.userId,
       account.email,
       roleBackendRequests,
+      roleBackendRequestDetails,
     );
     await rolePage.goto(appUrl);
     await rolePage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
@@ -703,6 +747,74 @@ it("renders every authenticated screen and returns to the dashboard", async func
       roleBackendRequests.length > 0,
       true,
       `${account.role} should make its authenticated backend requests through the fixture.`,
+    );
+
+    await rolePage.evaluate(async function (panelName) {
+      const fixture = await import("/tests/fixtures/adminAccessHarness.tsx");
+      const container = document.createElement("div");
+      container.id = "revocable-panel-fixture";
+      document.body.append(container);
+      fixture.mountRevocablePanelHarness(container, panelName);
+    }, account.panel);
+    const revocablePanel = rolePage.locator("#revocable-panel-fixture");
+    if (account.panel === "negocio") {
+      await revocablePanel.getByText("Browser Fixture Store").waitFor();
+    } else {
+      await revocablePanel.getByText("Browser Fixture Delivery Order", { exact: true }).waitFor();
+      await revocablePanel.getByText("Browser Fixture Delivery Order", { exact: true }).click();
+      await revocablePanel.getByText("Delivery-only street address", { exact: true }).waitFor();
+      await revocablePanel.getByRole("button", { name: "✅ Marcar entregado" }).waitFor();
+    }
+
+    const writeRequestCount = function (path: string) {
+      return roleBackendRequestDetails.filter(function (request) {
+        return request.path === path && request.method !== "GET" && request.method !== "HEAD";
+      }).length;
+    };
+    const writesBeforeRevocation = writeRequestCount(
+      account.panel === "negocio" ? "/rest/v1/merchants" : "/rest/v1/pedidos",
+    );
+    if (account.panel === "negocio") {
+      mockState.businessMembership = false;
+    } else {
+      mockState.role = "cliente";
+    }
+    await revocablePanel.getByRole("button", { name: "Simulate access removal" }).click();
+    await revocablePanel.getByText("Acceso restringido", { exact: true }).waitFor();
+
+    if (account.panel === "negocio") {
+      assert.equal(
+        await revocablePanel.getByText("Browser Fixture Store").count(),
+        0,
+        "Removing business membership should hide loaded business information.",
+      );
+      assert.equal(
+        await revocablePanel.getByRole("button", { name: "Editar" }).count(),
+        0,
+        "Users without business membership must not keep business edit controls.",
+      );
+    } else {
+      assert.equal(
+        await revocablePanel.getByText("Delivery-only street address", { exact: true }).count(),
+        0,
+        "Removing delivery authorization should hide loaded order details.",
+      );
+      assert.equal(
+        await revocablePanel.getByRole("button", { name: "✅ Marcar entregado" }).count(),
+        0,
+        "Users without delivery authorization must not keep order actions.",
+      );
+    }
+    assert.equal(
+      writeRequestCount(
+        account.panel === "negocio" ? "/rest/v1/merchants" : "/rest/v1/pedidos",
+      ),
+      writesBeforeRevocation,
+      "Revoking panel access must not submit further writes.",
+    );
+    assert.ok(
+      roleBackendRequests.length > 0,
+      "The revocation browser fixture should route backend calls through mocked responses.",
     );
     await roleContext.close();
   }
