@@ -191,13 +191,14 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     pageErrors.push(error.message);
   });
 
-  let failure: "wallet" | "creation" | "orders" | "newWallet" | null = "wallet";
+  let failure: "wallet" | "creation" | "orders" | "laterOrderPage" | "newWallet" | null = "wallet";
   const requests = {
     wallet: 0,
     missingWallet: 0,
     creation: 0,
     successfulCreation: 0,
     orders: 0,
+    laterOrderPage: 0,
   };
   let creationPayload: unknown;
   const orderQueries: string[] = [];
@@ -345,6 +346,15 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       if (url.searchParams.get("select") === "total_pagar") {
         const from = Number(url.searchParams.get("offset") ?? 0);
         const to = from + Number(url.searchParams.get("limit") ?? 1000) - 1;
+        if (failure === "laterOrderPage" && from > 0) {
+          requests.laterOrderPage += 1;
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Later order page fixture failure." }),
+          });
+          return;
+        }
         const rows = deliveredOrders.slice(from, to + 1);
         await route.fulfill({
           status: 200,
@@ -381,8 +391,10 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     { failure: "wallet" as const, requestName: "wallet" as const },
     { failure: "creation" as const, requestName: "creation" as const },
     { failure: "orders" as const, requestName: "orders" as const },
+    { failure: "laterOrderPage" as const, requestName: "laterOrderPage" as const },
   ]) {
     failure = scenario.failure;
+    if (scenario.failure === "laterOrderPage") orderQueries.length = 0;
     await page.getByRole("button", { name: "Abrir menú" }).click();
     await page.getByRole("button", { name: /ChangoMonedero/ }).click();
     await page.getByRole("alert").getByText("No pudimos cargar tu monedero").waitFor({
@@ -394,12 +406,34 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
       0,
       `The wallet summary must stay hidden after the ${scenario.failure} query fails.`,
     );
+    assert.equal(
+      await page.getByText("Total gastado", { exact: true }).count(),
+      0,
+      `The wallet must not expose partial loyalty totals after ${scenario.failure} fails.`,
+    );
     assert.ok(
       requests[scenario.requestName] > 0,
       `The ${scenario.failure} failure should come from its intended query.`,
     );
+    if (scenario.failure === "laterOrderPage") {
+      const deliveredPageOffsets = orderQueries
+        .filter(function (query) {
+          return new URLSearchParams(query).get("select") === "total_pagar";
+        })
+        .map(function (query) {
+          return new URLSearchParams(query).get("offset");
+        });
+      assert.ok(
+        deliveredPageOffsets.includes("0"),
+        "The first delivered-order page should succeed before the later page fails.",
+      );
+      assert.ok(
+        deliveredPageOffsets.includes("1000"),
+        "The fixture should fail the subsequent delivered-order page.",
+      );
+    }
 
-    if (scenario.failure !== "orders") {
+    if (scenario.failure !== "laterOrderPage") {
       await page.locator("button").first().click();
       await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
     }
