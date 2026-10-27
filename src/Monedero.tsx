@@ -156,7 +156,7 @@ export default function Monedero(props: Props) {
       <div style={{ marginBottom:'8px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
           <span style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:600 }}>
-            {envioGratis?.available ? 'Envío gratis disponible' : 'Progreso al próximo envío gratis'}
+            {envioGratis === null ? 'Progreso no disponible' : envioGratis.available ? 'Envío gratis disponible' : 'Progreso al próximo envío gratis'}
           </span>
           <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{envioGratis === null ? '—' : envioGratis.progressPercent + '%'}</span>
         </div>

@@ -195,13 +195,14 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     pageErrors.push(error.message);
   });
 
-  let failure: "wallet" | "creation" | "orders" | "laterOrderPage" | "newWallet" | null = "wallet";
+  let failure: "wallet" | "creation" | "orders" | "deliveredCount" | "laterOrderPage" | "newWallet" | null = "wallet";
   const requests = {
     wallet: 0,
     missingWallet: 0,
     creation: 0,
     successfulCreation: 0,
     orders: 0,
+    deliveredCount: 0,
     laterOrderPage: 0,
   };
   let creationPayload: unknown;
@@ -325,6 +326,21 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     }
     if (url.pathname === "/rest/v1/pedidos") {
       orderQueries.push(url.search);
+      if (
+        failure === "deliveredCount"
+        && (
+          (request.method() === "HEAD" && url.searchParams.get("select") === "id")
+          || url.searchParams.get("select") === "total_pagar"
+        )
+      ) {
+        requests.deliveredCount += 1;
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Delivered-order count fixture failure." }),
+        });
+        return;
+      }
       if (failure === "orders") {
         requests.orders += 1;
         await route.fulfill({
@@ -495,6 +511,36 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   );
   assert.deepEqual(pageErrors, [], "Wallet loading and retry should not throw in the browser.");
 
+  wallet.envios_gratis_usados = 0;
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("¡Ya tienes envío gratis disponible!", { exact: true }).waitFor();
+
+  failure = "deliveredCount";
+  await page.getByRole("button", { name: "Recargar monedero" }).click();
+  await page.getByRole("alert").getByText("No pudimos cargar tu monedero").waitFor({
+    state: "visible",
+    timeout: 10_000,
+  });
+  assert.ok(requests.deliveredCount > 0, "The delivered-order count query should fail.");
+  assert.equal(
+    await page.getByText("¡Ya tienes envío gratis disponible!", { exact: true }).count(),
+    0,
+    "A failed delivered-order count must hide previously available rewards.",
+  );
+  assert.equal(
+    await page.getByText("10/10 pedidos", { exact: true }).count(),
+    0,
+    "A failed delivered-order count must not show stale shipping progress.",
+  );
+
+  failure = null;
+  await page.getByRole("button", { name: "Reintentar" }).click();
+  await page.getByText("$10,050", { exact: true }).waitFor();
+  await page.getByText("¡Ya tienes envío gratis disponible!", { exact: true }).waitFor();
+  await page.getByText("10/10 pedidos", { exact: true }).waitFor();
+
   await page.getByRole("button", { name: "📦 Pedidos" }).click();
   await page.getByText("Pedidos 1–50 de 125", { exact: true }).waitFor();
   await page.getByText("Fixture Store 0", { exact: true }).waitFor();
@@ -641,6 +687,33 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     "The compact wallet should count only this customer's delivered orders.",
   );
 
+  failure = "deliveredCount";
+  await page.evaluate(function() {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("No disponible", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByText("5 de cada 10", { exact: true }).count(),
+    0,
+    "A failed dashboard count must not keep the previous cycle count visible.",
+  );
+  assert.equal(
+    await page.getByText("50%", { exact: true }).count(),
+    0,
+    "A failed dashboard count must not keep the previous progress percentage visible.",
+  );
+  assert.equal(
+    await page.getByText("¡Disponible!", { exact: true }).count(),
+    0,
+    "A failed dashboard count must not advertise a free-shipping reward.",
+  );
+  assert.equal(
+    await page.getByText("Progreso no disponible", { exact: true }).count(),
+    1,
+    "The dashboard should explain that progress could not be loaded.",
+  );
+
+  failure = null;
   deliveredOrders = deliveredOrders.concat({ total_pagar: 10, estatus: "entregado" });
   await page.evaluate(function() {
     window.dispatchEvent(new Event("focus"));
