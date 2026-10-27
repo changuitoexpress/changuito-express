@@ -767,6 +767,68 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(startupEvents, ["session", "ready"]);
   });
 
+  it("termina el inicio y conserva la sesión si la consulta del perfil no responde", async function () {
+    const { client } = createClientFixture({
+      getSession: async function () {
+        return {
+          data: {
+            session: {
+              user: { id: "saved-account", email: "saved@example.test" },
+              expires_at: 1700000000,
+            },
+          },
+        };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: function () {
+                  return new Promise(function () {});
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+
+    const observed: any[] = [];
+    let readyCalls = 0;
+    let markReady: Function = function () {};
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        readyCalls += 1;
+        markReady();
+      },
+    );
+    await startupReady;
+
+    assert.equal(readyCalls, 1);
+    assert.deepEqual(observed, [
+      {
+        expiresAt: 1700000000,
+        user: {
+          id: "saved-account",
+          email: "saved@example.test",
+          nombre: "saved",
+          rol: "cliente",
+        },
+      },
+    ]);
+  });
+
   it("termina el inicio público si falla la consulta de sesión guardada", async function () {
     const { client } = createClientFixture({
       getSession: async function () {

@@ -31,6 +31,8 @@ interface SupabaseSession {
   };
 }
 
+const PROFILE_LOOKUP_TIMEOUT_MS = 1500;
+
 export interface DeviceAuthSession {
   session_id: string;
   user_agent: string | null;
@@ -265,12 +267,21 @@ async function createAppSession(
   client: SupabaseAuthClient,
   session: SupabaseSession,
 ): Promise<AuthAppSession> {
+  let profileLookupTimer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const { data } = await client
-      .from("perfiles")
-      .select("nombre,rol")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    const profileResult = await Promise.race([
+      client
+        .from("perfiles")
+        .select("nombre,rol")
+        .eq("id", session.user.id)
+        .maybeSingle(),
+      new Promise<null>(function (resolve) {
+        profileLookupTimer = setTimeout(function () {
+          resolve(null);
+        }, PROFILE_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+    const data = profileResult?.data;
     return {
       ...(session.expires_at ? { expiresAt: session.expires_at } : {}),
       user: {
@@ -296,6 +307,8 @@ async function createAppSession(
         rol: "cliente",
       },
     };
+  } finally {
+    if (profileLookupTimer) clearTimeout(profileLookupTimer);
   }
 }
 
