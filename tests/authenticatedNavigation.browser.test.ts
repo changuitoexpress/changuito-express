@@ -60,7 +60,7 @@ async function waitForServer(url: string, server: ReturnType<typeof spawn>) {
 
 async function mockSupabase(
   page: import("playwright").Page,
-  role: "admin" | "cliente" = "admin",
+  role: "admin" | "cliente" | "negocio" | "repartidor" = "admin",
   userId = fixtureUserId,
   email = "uliseseven.7@gmail.com",
   requestLog?: string[],
@@ -108,15 +108,21 @@ async function mockSupabase(
         user_metadata: {},
         app_metadata: { provider: "email", providers: ["email"] },
       };
-    } else if (url.pathname === "/rest/v1/perfiles" && acceptsObject) {
+    } else if (url.pathname === "/rest/v1/perfiles") {
       data = {
-        nombre: role === "admin" ? "Browser Fixture Admin" : "Browser Fixture Customer",
+        nombre:
+          role === "admin"
+            ? "Browser Fixture Admin"
+            : role === "negocio"
+              ? "Browser Fixture Business"
+              : role === "repartidor"
+                ? "Browser Fixture Delivery"
+                : "Browser Fixture Customer",
         rol: role,
       };
     } else if (
       url.pathname === "/rest/v1/merchant_admins" &&
-      acceptsObject &&
-      role === "admin"
+      (role === "admin" || role === "negocio")
     ) {
       data = { merchant_id: fixtureMerchant.id };
     } else if (url.pathname === "/rest/v1/merchants") {
@@ -630,6 +636,75 @@ it("renders every authenticated screen and returns to the dashboard", async func
       false,
       `A regular customer must not load business or delivery data from the ${panel} panel.`,
     );
+  }
+
+  for (const account of [
+    {
+      role: "negocio" as const,
+      userId: "browser-fixture-business",
+      email: "business@example.test",
+      menuLabel: "Panel de Negocios",
+      panelMarker: "Browser Fixture Store",
+      requiredRequests: [
+        "/rest/v1/merchant_admins",
+        "/rest/v1/merchants",
+        "/rest/v1/products",
+      ],
+    },
+    {
+      role: "repartidor" as const,
+      userId: "browser-fixture-delivery",
+      email: "delivery@example.test",
+      menuLabel: "Panel Repartidor",
+      panelMarker: "Browser Fixture Delivery",
+      requiredRequests: ["/rest/v1/pedidos"],
+    },
+  ]) {
+    const roleContext = await browser.newContext();
+    await roleContext.addInitScript(
+      function (storedSession) {
+        localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+        localStorage.setItem("changuito-theme", "light");
+      },
+      createFixtureSession(account.userId, account.email),
+    );
+    const rolePage = await roleContext.newPage();
+    rolePage.on("pageerror", function (error) {
+      pageErrors.push(error.message);
+    });
+    const roleBackendRequests: string[] = [];
+    await mockSupabase(
+      rolePage,
+      account.role,
+      account.userId,
+      account.email,
+      roleBackendRequests,
+    );
+    await rolePage.goto(appUrl);
+    await rolePage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+    await rolePage.getByRole("button", { name: "Abrir menú" }).click();
+    const panelEntry = rolePage.getByRole("button", {
+      name: new RegExp(account.menuLabel),
+    });
+    await panelEntry.waitFor({ state: "visible" });
+    await panelEntry.click();
+    await rolePage.getByText(account.panelMarker, { exact: false }).first().waitFor({
+      state: "visible",
+      timeout: 10_000,
+    });
+
+    for (const requiredPath of account.requiredRequests) {
+      assert.ok(
+        roleBackendRequests.includes(requiredPath),
+        `${account.role} accounts should load ${requiredPath} through the mocked backend.`,
+      );
+    }
+    assert.equal(
+      roleBackendRequests.length > 0,
+      true,
+      `${account.role} should make its authenticated backend requests through the fixture.`,
+    );
+    await roleContext.close();
   }
 
   await customerContext.close();
