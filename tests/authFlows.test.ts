@@ -744,6 +744,96 @@ describe("sesión y cierre de sesión", function () {
     ]);
   });
 
+  it("conserva un inicio de sesión reciente si el perfil guardado termina después durante el inicio", async function () {
+    let authListener: Function = function () {};
+    let resolveSavedProfileStarted: Function = function () {};
+    let resolveNewProfileStarted: Function = function () {};
+    let resolveSavedProfile: Function = function () {};
+    let resolveNewProfile: Function = function () {};
+    let markReady: Function = function () {};
+    const savedProfileStarted = new Promise<void>(function (resolve) {
+      resolveSavedProfileStarted = resolve;
+    });
+    const newProfileStarted = new Promise<void>(function (resolve) {
+      resolveNewProfileStarted = resolve;
+    });
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+    const { client } = createClientFixture({
+      getSession: async function () {
+        return {
+          data: {
+            session: {
+              user: { id: "saved-account", email: "saved@example.test" },
+            },
+          },
+        };
+      },
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function (_column: string, userId: string) {
+              return {
+                maybeSingle: function () {
+                  return new Promise(function (resolve) {
+                    if (userId === "saved-account") {
+                      resolveSavedProfileStarted();
+                      resolveSavedProfile = resolve;
+                    } else {
+                      resolveNewProfileStarted();
+                      resolveNewProfile = resolve;
+                    }
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+    const observed: any[] = [];
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+      },
+      function () {
+        markReady();
+      },
+    );
+
+    await savedProfileStarted;
+    authListener("SIGNED_IN", {
+      user: { id: "new-account", email: "new@example.test" },
+    });
+    await newProfileStarted;
+    resolveNewProfile({ data: { nombre: "New account", rol: "cliente" } });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+
+    resolveSavedProfile({ data: { nombre: "Saved account", rol: "admin" } });
+    await startupReady;
+
+    assert.deepEqual(observed, [
+      {
+        user: {
+          id: "new-account",
+          email: "new@example.test",
+          nombre: "New account",
+          rol: "cliente",
+        },
+      },
+    ]);
+  });
+
   it("no restaura la sesión inicial si se cierra sesión mientras carga el perfil", async function () {
     let authListener: Function = function () {};
     let resolveProfile: Function = function () {};
