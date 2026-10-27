@@ -582,6 +582,45 @@ it("renders every authenticated screen and returns to the dashboard", async func
     await tab.content.waitFor({ state: "visible", timeout: 10_000 });
   }
 
+  const drawerSections = [
+    {
+      label: "Restaurantes",
+      content: page.getByRole("heading", { name: "Restaurantes", exact: true }),
+    },
+    {
+      label: "Mandaditos",
+      content: page.getByRole("heading", { name: "🛵 Mandaditos", exact: true }),
+    },
+    {
+      label: "La Tiendita",
+      content: page.getByRole("heading", { name: /Tiendita Changuito/ }),
+    },
+  ];
+
+  for (const section of drawerSections) {
+    await page.getByRole("button", { name: "Abrir menú" }).click();
+    const navigationMenu = page.getByRole("dialog", {
+      name: "Menú de navegación",
+    });
+    await navigationMenu
+      .getByRole("button", { name: section.label, exact: true })
+      .click();
+    await navigationMenu.waitFor({ state: "hidden" });
+    await section.content.waitFor({ state: "visible", timeout: 10_000 });
+
+    await page.getByRole("button", { name: "Abrir menú" }).click();
+    const returnMenu = page.getByRole("dialog", {
+      name: "Menú de navegación",
+    });
+    await returnMenu
+      .getByRole("button", { name: "Restaurantes", exact: true })
+      .click();
+    await returnMenu.waitFor({ state: "hidden" });
+    await page
+      .getByRole("heading", { name: "Restaurantes", exact: true })
+      .waitFor({ state: "visible", timeout: 10_000 });
+  }
+
   const customerId = "browser-fixture-customer";
   const customerEmail = "customer@example.test";
   const customerContext = await browser.newContext();
