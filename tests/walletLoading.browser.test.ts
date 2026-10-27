@@ -17,7 +17,7 @@ const wallet = {
   pedidos_realizados: 7,
   envios_gratis_usados: 1,
 };
-const deliveredOrders = Array.from({ length: 1005 }, function () {
+let deliveredOrders = Array.from({ length: 1005 }, function () {
   return { total_pagar: 10, estatus: "entregado" };
 });
 const recentOrders = Array.from({ length: 50 }, function (_, index) {
@@ -224,6 +224,18 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         return;
       }
 
+      if (request.method() === "HEAD" && url.searchParams.get("select") === "id") {
+        await route.fulfill({
+          status: 200,
+          headers: {
+            "content-range": `*/${deliveredOrders.length}`,
+            "access-control-expose-headers": "content-range",
+          },
+          body: "",
+        });
+        return;
+      }
+
       if (url.searchParams.get("select") === "total_pagar") {
         const from = Number(url.searchParams.get("offset") ?? 0);
         const to = from + Number(url.searchParams.get("limit") ?? 1000) - 1;
@@ -316,5 +328,28 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     "A successful retry should clear the wallet error.",
   );
   assert.deepEqual(pageErrors, [], "Wallet loading and retry should not throw in the browser.");
+
+  await page.locator("button").first().click();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "🍽️ Restaurantes" }).first().click();
+  await page.getByText("5 de cada 10", { exact: true }).waitFor();
+  await page.getByText("50%", { exact: true }).waitFor();
+  assert.ok(
+    orderQueries.some(function(query) {
+      const params = new URLSearchParams(query);
+      return params.get("select") === "id"
+        && params.get("cliente_id") === `eq.${fixtureUserId}`
+        && params.get("estatus") === "eq.entregado";
+    }),
+    "The compact wallet should count only this customer's delivered orders.",
+  );
+
+  deliveredOrders = deliveredOrders.concat({ total_pagar: 10, estatus: "entregado" });
+  await page.evaluate(function() {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("6 de cada 10", { exact: true }).waitFor();
+  await page.getByText("60%", { exact: true }).waitFor();
+
   await context.close();
 });

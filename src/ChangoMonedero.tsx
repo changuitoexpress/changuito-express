@@ -141,7 +141,32 @@ export default function ChangoMonedero(props: Props) {
     finally { setLoading(false); }
   }, [uid]);
 
-  useEffect(function() { cargar(); }, [cargar]);
+  useEffect(function() {
+    let activo = true;
+    const refrescar = function() {
+      if (activo && document.visibilityState === 'visible') cargar();
+    };
+
+    cargar();
+    window.addEventListener('focus', refrescar);
+    document.addEventListener('visibilitychange', refrescar);
+    const channel = supabase
+      .channel('changomonedero-pedidos-' + uid)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'pedidos',
+        filter: 'cliente_id=eq.' + uid,
+      }, refrescar)
+      .subscribe();
+
+    return function() {
+      activo = false;
+      window.removeEventListener('focus', refrescar);
+      document.removeEventListener('visibilitychange', refrescar);
+      supabase.removeChannel(channel);
+    };
+  }, [cargar, uid]);
 
   const envioGratis  = getFreeShippingProgress(entregados);
   const cashback     = monedero?.saldo_cashback ?? 0;
@@ -260,7 +285,7 @@ export default function ChangoMonedero(props: Props) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>{envioGratis.cycleCount}/10 pedidos</span>
-                <span style={{ fontSize: '10px', color: 'var(--color-green)', fontWeight: 700 }}>¡Cada 10 pedidos!</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-green)', fontWeight: 700 }}>¡Cada 10 entregados!</span>
               </div>
             </div>
 
@@ -351,8 +376,8 @@ export default function ChangoMonedero(props: Props) {
             {[
               {
                 emoji: '🚚',
-                titulo: 'Envío Gratis cada 10 pedidos',
-                desc: 'Completa 10 pedidos y tu siguiente envío es completamente gratis. El contador se reinicia automáticamente.',
+                titulo: 'Envío Gratis cada 10 pedidos entregados',
+                desc: 'Completa 10 entregas y tu siguiente envío es completamente gratis. El contador se reinicia automáticamente.',
               },
               {
                 emoji: '💸',
