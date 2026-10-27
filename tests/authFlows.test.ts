@@ -5,6 +5,7 @@ import {
   restoreAuthSession,
   scheduleSessionExpiryWarning,
   signOut,
+  signOutEverywhere,
   startAuthSession,
   submitAuthForm,
   validateAuthForm,
@@ -734,5 +735,53 @@ describe("sesión y cierre de sesión", function () {
     await assert.rejects(signOut(client), function (error) {
       return error === signOutError;
     });
+  });
+
+  it("cierra la sesión local y revoca sesiones en otros dispositivos", async function () {
+    let authListener: Function = function () {};
+    let signOutOptions: any;
+    const { client } = createClientFixture({
+      onAuthStateChange: function (listener: Function) {
+        authListener = listener;
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+      signOut: async function (options: any) {
+        signOutOptions = options;
+        authListener("SIGNED_OUT", null);
+        return { error: null };
+      },
+    });
+    const observed: any[] = [];
+    watchAuthSession(client, function (session) {
+      observed.push(session);
+    });
+    authListener("SIGNED_IN", {
+      user: { id: "fixture-user-id", email: "fixture@example.test" },
+    });
+    await new Promise(function (resolve) {
+      setTimeout(resolve, 0);
+    });
+    assert.equal(observed[0]?.user.id, "fixture-user-id");
+
+    await signOutEverywhere(client);
+
+    assert.deepEqual(signOutOptions, { scope: "global" });
+    assert.equal(observed[1], null);
+  });
+
+  it("informa cuando falla el cierre de sesión en todos los dispositivos", async function () {
+    const signOutError = new Error("network unavailable");
+    let signOutOptions: any;
+    const { client } = createClientFixture({
+      signOut: async function (options: any) {
+        signOutOptions = options;
+        return { error: signOutError };
+      },
+    });
+
+    await assert.rejects(signOutEverywhere(client), function (error) {
+      return error === signOutError;
+    });
+    assert.deepEqual(signOutOptions, { scope: "global" });
   });
 });

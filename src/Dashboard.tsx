@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
-import { signOut } from "./authFlows";
+import { signOut, signOutEverywhere } from "./authFlows";
 import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguitoAI";
 import Monedero from "./Monedero";
@@ -2406,6 +2406,7 @@ export default function Dashboard(props: DashboardProps) {
   const [modalLimite, setModalLimite] = useState(false);
   const [changuiAbierto, setChanguiAbierto] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
@@ -2437,6 +2438,28 @@ export default function Dashboard(props: DashboardProps) {
       setSignOutError(
         "No pudimos cerrar sesión. Tu sesión sigue activa. Intentá de nuevo.",
       );
+    }
+  }
+
+  async function cerrarSesionEnTodosLosDispositivos() {
+    const confirmed = window.confirm(
+      "Se cerrará tu sesión en este dispositivo y se revocarán las sesiones de los demás. En otros dispositivos, el cierre puede tardar hasta que expire el token de acceso actual. ¿Querés continuar?",
+    );
+    if (!confirmed) return;
+
+    setSignOutError("");
+    setSigningOutEverywhere(true);
+    try {
+      await signOutEverywhere(supabase);
+      window.alert(
+        "Se cerró tu sesión en este dispositivo y se revocaron las sesiones de los demás.",
+      );
+    } catch {
+      setSignOutError(
+        "No pudimos cerrar las sesiones de todos los dispositivos. Tu sesión sigue activa. Intentá de nuevo.",
+      );
+    } finally {
+      setSigningOutEverywhere(false);
     }
   }
 
@@ -3931,6 +3954,32 @@ export default function Dashboard(props: DashboardProps) {
               >
                 <LogOut style={{ width: "15px", height: "15px" }} />
                 Cerrar sesión
+              </button>
+              <button
+                onClick={cerrarSesionEnTodosLosDispositivos}
+                disabled={signingOutEverywhere}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  marginTop: "8px",
+                  padding: "11px 12px",
+                  borderRadius: "12px",
+                  background: "transparent",
+                  border: "1px solid var(--border-subtle)",
+                  cursor: signingOutEverywhere ? "wait" : "pointer",
+                  color: "var(--text-secondary)",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  opacity: signingOutEverywhere ? 0.65 : 1,
+                }}
+              >
+                <Shield style={{ width: "15px", height: "15px" }} />
+                {signingOutEverywhere
+                  ? "Cerrando todas las sesiones..."
+                  : "Cerrar sesión en todos los dispositivos"}
               </button>
             </div>
           </div>

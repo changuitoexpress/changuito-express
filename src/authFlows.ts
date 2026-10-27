@@ -310,3 +310,11 @@ export function signOut(client: SupabaseAuthClient) {
     if (result.error) throw result.error;
   });
 }
+
+export function signOutEverywhere(client: SupabaseAuthClient) {
+  return client.auth
+    .signOut({ scope: "global" })
+    .then(function (result: { error?: any }) {
+      if (result.error) throw result.error;
+    });
+}
