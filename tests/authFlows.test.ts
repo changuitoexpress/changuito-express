@@ -168,7 +168,38 @@ describe("acceso y registro Supabase", function () {
 
     assert.deepEqual(
       await resendConfirmationEmail(client, validLogin.email),
-      { status: "error", message: "Email rate limit exceeded" },
+      {
+        status: "error",
+        message:
+          "No pudimos enviar otro correo de confirmación porque el servicio aplica un límite temporal. Esperá unos minutos antes de volver a intentarlo; también revisá spam por si ya recibiste uno anterior.",
+      },
+    );
+  });
+
+  it("explica el límite temporal cuando el proveedor responde con demasiadas solicitudes", async function () {
+    const { client } = createClientFixture({
+      resend: async function () {
+        return { error: { message: "Too many requests", status: 429 } };
+      },
+    });
+
+    const result = await resendConfirmationEmail(client, validLogin.email);
+
+    assert.equal(result.status, "error");
+    assert.match(result.message, /Esperá unos minutos/);
+    assert.match(result.message, /No pudimos enviar otro correo/);
+  });
+
+  it("conserva los errores de reenvío que no son límites de envío", async function () {
+    const { client } = createClientFixture({
+      resend: async function () {
+        return { error: new Error("Network unavailable") };
+      },
+    });
+
+    assert.deepEqual(
+      await resendConfirmationEmail(client, validLogin.email),
+      { status: "error", message: "Network unavailable" },
     );
   });
 

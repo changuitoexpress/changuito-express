@@ -161,6 +161,20 @@ export async function resendConfirmationEmail(
     };
   }
 
+  function isEmailSendingRateLimitError(error: any): boolean {
+    if (error?.status === 429 || error?.status === "429") return true;
+
+    const message = [error?.message, error?.code, error?.error_description]
+      .filter((value): value is string => typeof value === "string")
+      .join(" ")
+      .toLowerCase()
+      .replace(/[_-]+/g, " ");
+
+    return /\b(?:email|e-mail|mail)\b.{0,60}\b(?:rate limit|limit exceeded|too many|requests?)\b|\b(?:rate limit|limit exceeded)\b.{0,60}\b(?:email|e-mail|mail)\b|\btoo many (?:requests|emails?)\b/.test(
+      message,
+    );
+  }
+
   try {
     const { error } = await client.auth.resend({
       type: "signup",
@@ -174,9 +188,10 @@ export async function resendConfirmationEmail(
   } catch (err: any) {
     return {
       status: "error",
-      message:
-        err.message ??
-        "No pudimos reenviar el email de confirmación. Intentá de nuevo.",
+      message: isEmailSendingRateLimitError(err)
+        ? "No pudimos enviar otro correo de confirmación porque el servicio aplica un límite temporal. Esperá unos minutos antes de volver a intentarlo; también revisá spam por si ya recibiste uno anterior."
+        : err.message ??
+          "No pudimos reenviar el email de confirmación. Intentá de nuevo.",
     };
   }
 }
