@@ -207,16 +207,9 @@ export default function AdminGodMode(props: AdminProps) {
     try {
       const { data: rpcData, error: rpcErr } = await supabase
         .rpc('resolver_solicitud_rol', { p_solicitud_id: solId, p_decision: decision });
-      if (rpcErr || !rpcData?.ok) {
-        // Fallback directo
-        await supabase.from('solicitudes_rol').update({ estado: decision }).eq('id', solId);
-        if (decision === 'aprobado') {
-          const sol = solicitudes.find(function(s) { return s.id === solId; });
-          if (sol) {
-            await supabase.from('perfiles')
-              .upsert({ id: sol.user_id, rol: sol.rol_pedido }, { onConflict: 'id' });
-          }
-        }
+      if (rpcErr) throw rpcErr;
+      if (!rpcData?.ok) {
+        throw new Error(rpcData?.error ?? 'No se pudo resolver la solicitud.');
       }
       fetchSolicitudes();
     } catch(e: any) { alert('Error: ' + e.message); }
