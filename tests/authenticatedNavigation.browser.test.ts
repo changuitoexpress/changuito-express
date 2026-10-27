@@ -282,6 +282,18 @@ async function assertWithinViewport(locator: import("playwright").Locator) {
   );
 }
 
+async function waitForScreenAnnouncement(
+  page: import("playwright").Page,
+  expected: string,
+) {
+  await page.waitForFunction(function (announcement) {
+    return (
+      document.querySelector('[role="status"]')?.textContent?.trim() ===
+      announcement
+    );
+  }, expected);
+}
+
 it("renders every authenticated screen and returns to the dashboard", async function (t) {
   const port = await findAvailablePort();
   const appUrl = `http://127.0.0.1:${port}`;
@@ -384,25 +396,63 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await page.getByRole("button", { name: "Cerrar menú" }).click();
 
   const screens = [
-    { menuLabel: "ChangoMonedero", marker: "ChangoMonedero" },
-    { menuLabel: "Bazar Vecinal", marker: "Bazar Vecinal" },
-    { menuLabel: "Directorio Telefónico", marker: "Directorio Telefónico" },
-    { menuLabel: "ChanguiShopping", marker: "ChanguiShopping" },
-    { menuLabel: "Bienes Raíces", marker: "Bienes Raíces" },
-    { menuLabel: "Venta de Autos", marker: "Venta de Autos" },
-    { menuLabel: "Panel de Negocios", marker: "Browser Fixture Store" },
-    { menuLabel: "Panel Repartidor", marker: "Repartidor" },
-    { menuLabel: "God Mode", marker: "Panel de Control" },
+    {
+      menuLabel: "ChangoMonedero",
+      marker: "ChangoMonedero",
+      announcement: "ChangoMonedero",
+    },
+    {
+      menuLabel: "Bazar Vecinal",
+      marker: "Bazar Vecinal",
+      announcement: "Bazar Vecinal",
+    },
+    {
+      menuLabel: "Directorio Telefónico",
+      marker: "Directorio Telefónico",
+      announcement: "Directorio Telefónico",
+    },
+    {
+      menuLabel: "ChanguiShopping",
+      marker: "ChanguiShopping",
+      announcement: "ChanguiShopping",
+    },
+    {
+      menuLabel: "Bienes Raíces",
+      marker: "Bienes Raíces",
+      announcement: "Bienes Raíces",
+    },
+    {
+      menuLabel: "Venta de Autos",
+      marker: "Venta de Autos",
+      announcement: "Venta de Autos",
+    },
+    {
+      menuLabel: "Panel de Negocios",
+      marker: "Browser Fixture Store",
+      announcement: "Panel de Negocios",
+    },
+    {
+      menuLabel: "Panel Repartidor",
+      marker: "Repartidor",
+      announcement: "Panel Repartidor",
+    },
+    {
+      menuLabel: "God Mode",
+      marker: "Panel de Control",
+      announcement: "Panel de Control",
+    },
   ];
 
   for (const screen of screens) {
     await page.getByRole("button", { name: "Abrir menú" }).click();
     await page.getByRole("button", { name: new RegExp(screen.menuLabel) }).click();
+    await waitForScreenAnnouncement(page, screen.announcement);
     await page.getByText(screen.marker, { exact: false }).first().waitFor({
       state: "visible",
       timeout: 10_000,
     });
     await page.locator("button").first().click();
+    await waitForScreenAnnouncement(page, "Inicio");
     await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
       timeout: 10_000,
     });
@@ -434,6 +484,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
     await tabToLocator(page, targetMenuItem);
     await page.keyboard.press("Enter");
 
+    await waitForScreenAnnouncement(page, screen.announcement);
     await page.getByText(screen.marker, { exact: false }).first().waitFor({
       state: "visible",
       timeout: 10_000,
@@ -446,6 +497,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
     });
     await tabToLocator(page, returnButton);
     await page.keyboard.press("Enter");
+    await waitForScreenAnnouncement(page, "Inicio");
     await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
       timeout: 10_000,
     });
@@ -476,11 +528,13 @@ it("renders every authenticated screen and returns to the dashboard", async func
   for (const screen of screens) {
     await page.getByRole("button", { name: "Abrir menú" }).click();
     await page.getByRole("button", { name: new RegExp(screen.menuLabel) }).click();
+    await waitForScreenAnnouncement(page, screen.announcement);
     await page.getByText(screen.marker, { exact: false }).first().waitFor({
       state: "visible",
       timeout: 10_000,
     });
     await page.locator("button").first().click();
+    await waitForScreenAnnouncement(page, "Inicio");
     await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor({
       timeout: 10_000,
     });

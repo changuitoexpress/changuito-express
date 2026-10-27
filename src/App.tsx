@@ -94,6 +94,19 @@ type Pantalla =
   | "autos"
   | "monedero";
 
+const NOMBRES_PANTALLA: Record<Pantalla, string> = {
+  dashboard: "Inicio",
+  bazar: "Bazar Vecinal",
+  servicios: "Directorio Telefónico",
+  admin: "Panel de Control",
+  shopping: "ChanguiShopping",
+  negocio: "Panel de Negocios",
+  repas: "Panel Repartidor",
+  bienes: "Bienes Raíces",
+  autos: "Venta de Autos",
+  monedero: "ChangoMonedero",
+};
+
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
   const t = localStorage.getItem("changuito-theme");
@@ -990,6 +1003,24 @@ export default function App() {
   // ── Navegación entre pantallas ───────────────────────────────────────────────
   return (
     <>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {NOMBRES_PANTALLA[pantalla]}
+      </div>
       <ToastRack toasts={toasts} />
       {sessionExpiryWarning && (
         <div
