@@ -17,6 +17,13 @@ const wallet = {
   pedidos_realizados: 7,
   envios_gratis_usados: 1,
 };
+const initializedWallet = {
+  id: "wallet-fixture-new-wallet",
+  user_id: fixtureUserId,
+  saldo_cashback: 0,
+  pedidos_realizados: 0,
+  envios_gratis_usados: 0,
+};
 let deliveredOrders = Array.from({ length: 1005 }, function () {
   return { total_pagar: 10, estatus: "entregado" };
 });
@@ -173,8 +180,15 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
     pageErrors.push(error.message);
   });
 
-  let failure: "wallet" | "creation" | "orders" | null = "wallet";
-  const requests = { wallet: 0, creation: 0, orders: 0 };
+  let failure: "wallet" | "creation" | "orders" | "newWallet" | null = "wallet";
+  const requests = {
+    wallet: 0,
+    missingWallet: 0,
+    creation: 0,
+    successfulCreation: 0,
+    orders: 0,
+  };
+  let creationPayload: unknown;
   const orderQueries: string[] = [];
   await page.route(`${supabaseUrl}/**`, async function (route) {
     const request = route.request();
@@ -223,6 +237,11 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
           await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
           return;
         }
+        if (failure === "newWallet") {
+          requests.missingWallet += 1;
+          await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+          return;
+        }
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -230,12 +249,22 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
         });
         return;
       }
+      requests.creation += 1;
+      creationPayload = request.postDataJSON();
       if (request.method() === "POST" && failure === "creation") {
-        requests.creation += 1;
         await route.fulfill({
           status: 500,
           contentType: "application/json",
           body: JSON.stringify({ message: "Wallet fixture creation failure." }),
+        });
+        return;
+      }
+      if (failure === "newWallet") {
+        requests.successfulCreation += 1;
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify(initializedWallet),
         });
         return;
       }
@@ -377,6 +406,45 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   deliveredOrders = Array.from({ length: 1005 }, function () {
     return { total_pagar: 10, estatus: "entregado" };
   });
+
+  failure = "newWallet";
+  orderQueries.length = 0;
+  await page.evaluate(function () {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.getByText("$0.00", { exact: true }).waitFor();
+  await page.getByText("$10,050", { exact: true }).waitFor();
+  await page.getByText("Últimos pedidos", { exact: true }).waitFor();
+  await page.getByText("Fixture Store").first().waitFor();
+  await page
+    .getByText("Pedidos totales", { exact: true })
+    .locator("..")
+    .getByText("0", { exact: true })
+    .waitFor();
+  await page
+    .getByText("Envíos gratis", { exact: true })
+    .locator("..")
+    .getByText("0", { exact: true })
+    .waitFor();
+  assert.ok(requests.missingWallet > 0, "A missing wallet should be looked up.");
+  assert.equal(requests.successfulCreation, 1, "A missing wallet should be created once.");
+  assert.deepEqual(
+    creationPayload,
+    [{ user_id: fixtureUserId, saldo_cashback: 0, pedidos_realizados: 0 }],
+    "The new wallet should be initialized for the signed-in customer.",
+  );
+  assert.ok(
+    orderQueries.some(function (query) {
+      return new URLSearchParams(query).get("limit") === "50";
+    }),
+    "Order loading should complete after the new wallet is created.",
+  );
+  assert.equal(
+    await page.getByRole("alert").count(),
+    0,
+    "Successful first-time wallet setup should show the summary without an error.",
+  );
+  failure = null;
 
   await page.locator("button").first().click();
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
