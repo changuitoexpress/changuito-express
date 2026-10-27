@@ -164,6 +164,60 @@ describe("acceso y registro Supabase", function () {
     });
   });
 
+  it("explica que la cuenta se creó cuando Supabase devuelve un error al guardar el perfil", async function () {
+    const fixture = createClientFixture({
+      signUp: async function () {
+        return { data: { user: { id: "fixture-user-id" } }, error: null };
+      },
+    });
+    fixture.client.from = function () {
+      return {
+        upsert: async function () {
+          return { error: new Error("Profile write failed") };
+        },
+      };
+    };
+
+    const result = await submitAuthForm(fixture.client, {
+      ...validLogin,
+      mode: "register",
+      nombre: "Ana",
+    });
+
+    assert.deepEqual(result, {
+      status: "error",
+      message:
+        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+    });
+  });
+
+  it("explica que la cuenta se creó cuando guardar el perfil lanza una excepción", async function () {
+    const fixture = createClientFixture({
+      signUp: async function () {
+        return { data: { user: { id: "fixture-user-id" } }, error: null };
+      },
+    });
+    fixture.client.from = function () {
+      return {
+        upsert: async function () {
+          throw new Error("Profile write threw");
+        },
+      };
+    };
+
+    const result = await submitAuthForm(fixture.client, {
+      ...validLogin,
+      mode: "register",
+      nombre: "Ana",
+    });
+
+    assert.deepEqual(result, {
+      status: "error",
+      message:
+        "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+    });
+  });
+
   it("muestra un fallo de registro sin crear un perfil", async function () {
     const { client, getUpsertCalls } = createClientFixture({
       signUp: async function () {

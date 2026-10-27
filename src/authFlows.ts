@@ -54,7 +54,7 @@ export async function submitAuthForm(
       if (error) throw error;
       if (data.user) {
         try {
-          await client.from("perfiles").upsert(
+          const { error: profileError } = await client.from("perfiles").upsert(
             {
               id: data.user.id,
               nombre: values.nombre.trim(),
@@ -63,7 +63,20 @@ export async function submitAuthForm(
             },
             { onConflict: "id" },
           );
-        } catch (e) {}
+          if (profileError) {
+            return {
+              status: "error",
+              message:
+                "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+            };
+          }
+        } catch (e) {
+          return {
+            status: "error",
+            message:
+              "Tu cuenta se creó, pero no pudimos guardar tu perfil. Revisá tu email para confirmar la cuenta y contactanos para completar la configuración.",
+          };
+        }
       }
       return { status: "registered", message: "Revisá tu email para confirmar." };
     }
