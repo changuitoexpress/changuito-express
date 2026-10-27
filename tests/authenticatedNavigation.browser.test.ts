@@ -1017,6 +1017,13 @@ it("shows uncertain signup results as an error toast in the registration form", 
     "No pudimos confirmar la creación de tu cuenta. Intentá registrarte de nuevo o iniciá sesión si ya tenés una cuenta.";
   const errorToast = page.getByText(guidance, { exact: true });
   await errorToast.waitFor({ state: "visible", timeout: 5_000 });
+  const announcedError = page.getByRole("alert").filter({ hasText: guidance });
+  await announcedError.waitFor({ state: "visible" });
+  assert.equal(
+    await announcedError.getAttribute("aria-live"),
+    "assertive",
+    "Signup error guidance should be announced assertively to assistive technology.",
+  );
   assert.equal(
     await errorToast.evaluate(function (element) {
       return (element as HTMLElement).style.border.includes("var(--color-red)");

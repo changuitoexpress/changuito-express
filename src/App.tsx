@@ -173,9 +173,6 @@ function ToastRack(props: { toasts: Toast[] }) {
   };
   return (
     <div
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
       style={{
         position: "fixed",
         top: "16px",
@@ -191,6 +188,9 @@ function ToastRack(props: { toasts: Toast[] }) {
         return (
           <div
             key={t.id}
+            role={t.kind === "error" ? "alert" : "status"}
+            aria-live={t.kind === "error" ? "assertive" : "polite"}
+            aria-atomic="true"
             className="fade-in"
             style={{
               padding: "12px 16px",
