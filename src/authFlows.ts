@@ -58,7 +58,7 @@ export async function submitAuthForm(
         password: values.password,
       });
       if (error) throw error;
-      if (data.user) {
+      if (data?.user) {
         try {
           const { error: profileError } = await client.from("perfiles").upsert(
             {
@@ -83,6 +83,13 @@ export async function submitAuthForm(
               "Tu cuenta se creó, pero no pudimos guardar tu perfil. Confirmá tu email y luego elegí “Completar perfil” para reintentarlo con tu cuenta existente.",
           };
         }
+      }
+      if (!data?.user) {
+        return {
+          status: "error",
+          message:
+            "No pudimos confirmar la creación de tu cuenta. Intentá registrarte de nuevo o iniciá sesión si ya tenés una cuenta.",
+        };
       }
       return { status: "registered", message: "Revisá tu email para confirmar." };
     }

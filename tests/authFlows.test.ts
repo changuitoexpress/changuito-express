@@ -245,6 +245,27 @@ describe("acceso y registro Supabase", function () {
     assert.equal(getUpsertCalls(), 0);
   });
 
+  it("no confirma el registro cuando Supabase no devuelve usuario ni error", async function () {
+    const { client, getUpsertCalls } = createClientFixture({
+      signUp: async function () {
+        return { data: { user: null }, error: null };
+      },
+    });
+
+    const result = await submitAuthForm(client, {
+      ...validLogin,
+      mode: "register",
+      nombre: "Ana",
+    });
+
+    assert.deepEqual(result, {
+      status: "error",
+      message:
+        "No pudimos confirmar la creación de tu cuenta. Intentá registrarte de nuevo o iniciá sesión si ya tenés una cuenta.",
+    });
+    assert.equal(getUpsertCalls(), 0);
+  });
+
   it("completa el perfil en la cuenta existente sin volver a registrarla", async function () {
     let signupCalls = 0;
     let loginCredentials: any;
