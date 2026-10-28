@@ -3288,40 +3288,65 @@ export default function Dashboard(props: DashboardProps) {
       );
     }
 
+    // Botones de categoría: fichas circulares con acento de la paleta de marca
+    // (verde, amarillo, rojo y azul) para que se sientan familiares y distintos.
+    const ACENTOS_MARCA = ["#2f9e6f", "#e0a526", "#e0483b", "#3b7fd1"];
     const estiloBotonCat: React.CSSProperties = {
-      minWidth: "90px",
-      padding: "12px 8px",
-      background: isDark ? "#1E1E1E" : "var(--bg-card)",
-      border: isDark
-        ? "1px solid rgba(212,175,55,0.35)"
-        : "1px solid var(--border-subtle)",
-      borderRadius: "14px",
+      width: "82px",
+      padding: "2px 0 4px",
+      background: "transparent",
+      border: "none",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      gap: "6px",
+      gap: "7px",
       cursor: "pointer",
       fontSize: "11px",
+      lineHeight: 1.2,
       fontWeight: 700,
-      color: isDark ? "#D4AF37" : "var(--text-primary)",
+      textAlign: "center",
+      color: isDark ? "#E8E2D0" : "var(--text-primary)",
       flexShrink: 0,
+    };
+    function estiloFichaCat(i: number): React.CSSProperties {
+      const c = ACENTOS_MARCA[i % ACENTOS_MARCA.length];
+      return {
+        width: "62px",
+        height: "62px",
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        fontSize: "28px",
+        background: isDark
+          ? "radial-gradient(circle at 30% 25%, " + c + "40, " + c + "14)"
+          : "radial-gradient(circle at 30% 25%, #ffffff, " + c + "26)",
+        border: "1.5px solid " + c + (isDark ? "88" : "66"),
+        boxShadow: "0 6px 14px " + c + (isDark ? "26" : "30"),
+      };
+    }
+    const estiloFichaBot: React.CSSProperties = {
+      width: "62px",
+      height: "62px",
+      borderRadius: "50%",
+      display: "grid",
+      placeItems: "center",
+      fontSize: "28px",
+      background: "linear-gradient(135deg,#f6c445,#e0a526)",
+      border: "2px solid " + (isDark ? "#f6d77a" : "#fff"),
+      boxShadow: "0 0 0 2px #e0a526, 0 8px 18px rgba(224,165,38,.45)",
     };
     const estiloScrollRow: React.CSSProperties = {
       display: "flex",
       overflowX: "auto",
-      gap: "8px",
-      paddingBottom: "6px",
+      gap: "6px",
+      paddingBottom: "8px",
       scrollbarWidth: "none" as any,
       msOverflowStyle: "none" as any,
       WebkitOverflowScrolling: "touch" as any,
     };
     const estiloBotonChanguiBot: React.CSSProperties = {
       ...estiloBotonCat,
-      background: isDark ? "rgba(212,175,55,0.18)" : "rgba(250,204,21,0.22)",
-      border: isDark
-        ? "1.5px solid rgba(212,175,55,0.65)"
-        : "1.5px solid rgba(250,204,21,0.55)",
-      color: isDark ? "#E5C158" : "#92400e",
+      color: isDark ? "#f6d77a" : "#92400e",
     };
     function irAMandadito(sec: string | null) {
       if (tabActiva !== "mandaditos") {
@@ -3366,10 +3391,11 @@ export default function Dashboard(props: DashboardProps) {
       }
     }
     const tituloBloqueStyle: React.CSSProperties = {
-      fontSize: "14px",
-      fontWeight: 700,
-      color: isDark ? "#D4AF37" : "var(--text-primary)",
-      margin: "0 0 5px 0",
+      fontSize: "16px",
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+      color: isDark ? "#E8E2D0" : "var(--text-primary)",
+      margin: "8px 0 8px 0",
     };
     const bloqueBotones = (
       <div>
@@ -3391,7 +3417,7 @@ export default function Dashboard(props: DashboardProps) {
               { emoji: "📚", label: "Papelerías", sec: "Papelerías" },
               { emoji: "🧺", label: "Lavanderías", sec: "Lavandería" },
               { emoji: "🐕", label: "Mascotas", sec: "Mascotas" },
-            ].map(function (btn) {
+            ].map(function (btn, i) {
               return (
                 <button
                   key={btn.label}
@@ -3400,7 +3426,7 @@ export default function Dashboard(props: DashboardProps) {
                   }}
                   style={estiloBotonCat}
                 >
-                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                  <span style={estiloFichaCat(i)}>{btn.emoji}</span>
                   {btn.label}
                 </button>
               );
@@ -3411,7 +3437,7 @@ export default function Dashboard(props: DashboardProps) {
               }}
               style={estiloBotonChanguiBot}
             >
-              <span style={{ fontSize: "20px" }}>🐒</span>
+              <span style={estiloFichaBot}>🐒</span>
               ChanguiBot
             </button>
           </div>
@@ -3480,7 +3506,7 @@ export default function Dashboard(props: DashboardProps) {
                   }}
                   style={estiloBotonCat}
                 >
-                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                  <span style={estiloFichaCat(i)}>{btn.emoji}</span>
                   {btn.label}
                 </button>
               );
@@ -3491,7 +3517,7 @@ export default function Dashboard(props: DashboardProps) {
               }}
               style={estiloBotonChanguiBot}
             >
-              <span style={{ fontSize: "20px" }}>🐒</span>
+              <span style={estiloFichaBot}>🐒</span>
               ChanguiBot
             </button>
           </div>

@@ -60,9 +60,11 @@ import {
   submitAuthForm,
   validateAuthForm,
 } from "./authFlows";
+import ChanguitoLoader from "./components/ChanguitoLoader";
+import { normalizeSupabaseUrl } from "./supabaseUrl";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
-const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
+const SUPABASE_URL: string = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
 const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const profileRecoveryClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1019,52 +1021,7 @@ export default function App() {
   );
 
   if (booting) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg-base)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "16px",
-          }}
-        >
-          <div
-            style={{
-              width: "52px",
-              height: "52px",
-              borderRadius: "18px",
-              background: "#facc15",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 28px rgba(250,204,21,0.4)",
-            }}
-          >
-            <ShoppingCart
-              style={{ width: "26px", height: "26px", color: "#020617" }}
-            />
-          </div>
-          <span
-            className="spinner"
-            style={{
-              borderColor: "var(--border-subtle)",
-              borderTopColor: "#facc15",
-              width: "22px",
-              height: "22px",
-            }}
-          />
-        </div>
-      </div>
-    );
+    return <ChanguitoLoader />;
   }
 
   if (!session) {
@@ -1130,27 +1087,7 @@ export default function App() {
       )}
 
       <Suspense
-        fallback={
-          <div
-            style={{
-              minHeight: "100vh",
-              background: "var(--bg-base)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              className="spinner"
-              style={{
-                borderColor: "var(--border-subtle)",
-                borderTopColor: "#facc15",
-                width: "22px",
-                height: "22px",
-              }}
-            />
-          </div>
-        }
+        fallback={<ChanguitoLoader />}
       >
       {pantalla === "dashboard" && (
         <Dashboard
