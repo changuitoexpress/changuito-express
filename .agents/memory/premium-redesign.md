@@ -8,3 +8,9 @@ The user wants Changuito Express to feel like a premium, carefully crafted app a
 **Why:** the user asked for a high-quality result while avoiding scattered changes and repeated alignment questions.
 
 **How to apply:** make a coherent visual pass on one screen, preserve its existing behavior, verify desktop and mobile, then present it for review before redesigning another screen.
+
+The user wants work handled directly by the main agent, without intermediaries, and prefers free options; do not introduce paid services or external provider costs without discussing them first.
+
+**Why:** the user explicitly asked to collaborate directly and keep the work in free mode.
+
+**How to apply:** do not delegate project work unless the user asks; explain any paid-service requirement before integrating it.

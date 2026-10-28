@@ -21,7 +21,6 @@ import {
   Eye,
   EyeOff,
   MapPin,
-  Phone,
 } from "lucide-react";
 const Dashboard = lazy(function () {
   return import("./Dashboard");
@@ -408,14 +407,48 @@ function AuthScreen(props: {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
-  const [celular, setCelular] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [focused, setFocused] = useState("");
-  const [anonSoon, setAnonSoon] = useState(false);
   const isDark = props.theme === "dark";
   const isLogin = mode === "login";
+
+  async function handleGuestAccess() {
+    if (guestLoading || loading || resendingConfirmation) return;
+    setGuestLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (error) {
+        const message = error.message ?? "";
+        const anonymousDisabled =
+          /anonymous sign[- ]ins? (?:are )?disabled|anonymous provider.*disabled/i.test(
+            message,
+          );
+        props.onToast(
+          anonymousDisabled
+            ? "El acceso sin registro aún no está activado en Supabase. Activa Anonymous Sign-Ins en Authentication y vuelve a intentarlo."
+            : message || "No pudimos iniciar como invitado. Intenta de nuevo.",
+          "error",
+        );
+        return;
+      }
+      if (!data.session?.user?.id) {
+        props.onToast(
+          "Supabase no devolvió una sesión de invitado. Intenta de nuevo.",
+          "error",
+        );
+      }
+    } catch (error: any) {
+      props.onToast(
+        error?.message ?? "No pudimos iniciar como invitado. Intenta de nuevo.",
+        "error",
+      );
+    } finally {
+      setGuestLoading(false);
+    }
+  }
 
   async function handleResendConfirmation() {
     if (loading || resendingConfirmation) return;
@@ -679,18 +712,6 @@ function AuthScreen(props: {
                 </div>
               </div>
             )}
-            {mode === "register" && (
-              <div>
-                <label className="auth-field-label" htmlFor="auth-phone">Celular (opcional)</label>
-                <div style={{ position: "relative" }}>
-                  <Phone style={{ position: "absolute", left: "15px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", color: focused === "celular" ? "#b87c13" : "var(--text-muted)", pointerEvents: "none" }} />
-                  <input id="auth-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="22 21 23 45 67" value={celular} onChange={function (e) { setCelular(e.target.value); }} onFocus={function () { setFocused("celular"); }} onBlur={function () { setFocused(""); }} style={{ ...fieldStyle, border: ib("celular") }} />
-                </div>
-                <p style={{ margin: "7px 0 0 2px", color: "var(--text-muted)", fontSize: "11px" }}>
-                  Por ahora, tu celular no se guarda en el perfil.
-                </p>
-              </div>
-            )}
             <div>
               <label className="auth-field-label" htmlFor="auth-email">Correo electrónico</label>
               <div style={{ position: "relative" }}>
@@ -833,9 +854,9 @@ function AuthScreen(props: {
           </form>
           <button
             type="button"
-            onClick={function () {
-              setAnonSoon(true);
-            }}
+            onClick={handleGuestAccess}
+            disabled={guestLoading || loading || resendingConfirmation}
+            aria-busy={guestLoading}
             style={{
               display: "block",
               width: "100%",
@@ -844,20 +865,22 @@ function AuthScreen(props: {
               minHeight: "48px",
               borderRadius: "12px",
               border: `1px solid ${border}`,
-              background: "transparent",
+              background: guestLoading
+                ? isDark
+                  ? "rgba(235,241,225,.04)"
+                  : "rgba(33,55,57,.04)"
+                : "transparent",
               color: "var(--text-primary)",
               fontSize: "13px",
               fontWeight: 700,
-              cursor: "pointer",
+              cursor:
+                guestLoading || loading || resendingConfirmation
+                  ? "not-allowed"
+                  : "pointer",
             }}
           >
-            Entrar sin registro
+            {guestLoading ? "Entrando como invitado…" : "Entrar sin registro"}
           </button>
-          {anonSoon && (
-            <p role="status" style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", margin: "8px 0 0" }}>
-              Próximamente
-            </p>
-          )}
           {mode === "recover-profile" && (
             <>
               <button
