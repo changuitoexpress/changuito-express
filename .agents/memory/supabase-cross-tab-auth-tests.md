@@ -1,5 +1,5 @@
 ---
-name: Supabase cross-tab auth tests
+name: Supabase browser auth tests
 description: Simulate another tab signing into a different account in browser tests.
 ---
 
@@ -15,3 +15,14 @@ broadcast channel.
 **How to apply:** Use a second same-origin page and the Supabase auth channel
 when testing account changes that must reach the app's `onAuthStateChange`
 listener.
+
+When a browser test simulates sign-out by clearing stored session data and
+reloading, guard its `addInitScript` so the initial session is seeded only once
+per tab. Playwright reruns initialization scripts on every navigation, including
+reloads.
+
+**Why:** An unguarded session seed silently signs the test back in after a
+simulated logout.
+
+**How to apply:** Use a session-scoped marker when a browser test reloads after
+clearing the session.

@@ -50,9 +50,39 @@ describe("authenticated form drafts", function () {
   it("restores draft values for the matching user", function () {
     const values = { street: "Av. Reforma", payment: "tarjeta" };
     writeFormDraft("user-one", "checkout", values, 1000);
+    writeFormDraft(
+      "user-one",
+      "customer-written-order:merchant-one",
+      "Pick up a package.",
+      1000,
+    );
+    writeFormDraft(
+      "user-one",
+      "customer-written-order:merchant-two",
+      "Leave groceries at the door.",
+      1000,
+    );
+    writeFormDraft(
+      "user-two",
+      "customer-written-order:merchant-one",
+      "Different customer's request.",
+      1000,
+    );
 
     assert.deepEqual(readFormDraft("user-one", "checkout", 2000), values);
     assert.equal(readFormDraft("user-two", "checkout", 2000), null);
+    assert.equal(
+      readFormDraft("user-one", "customer-written-order:merchant-one", 2000),
+      "Pick up a package.",
+    );
+    assert.equal(
+      readFormDraft("user-one", "customer-written-order:merchant-two", 2000),
+      "Leave groceries at the door.",
+    );
+    assert.equal(
+      readFormDraft("user-two", "customer-written-order:merchant-one", 2000),
+      "Different customer's request.",
+    );
   });
 
   it("removes expired or malformed drafts instead of restoring them", function () {
@@ -68,6 +98,12 @@ describe("authenticated form drafts", function () {
   it("clears one form or all drafts for the explicitly signed-out user only", function () {
     writeFormDraft("user-one", "checkout", { step: "payment" });
     writeFormDraft("user-one", "profile", { name: "Ana" });
+    writeFormDraft("user-one", "customer-written-order:merchant-one", {
+      text: "Leave the package at reception.",
+    });
+    writeFormDraft("user-one", "customer-written-order-active", {
+      merchantId: "merchant-one",
+    });
     writeFormDraft("user-two", "checkout", { step: "address" });
 
     clearFormDraft("user-one", "checkout");
@@ -76,6 +112,14 @@ describe("authenticated form drafts", function () {
 
     clearUserFormDrafts("user-one");
     assert.equal(readFormDraft("user-one", "profile"), null);
+    assert.equal(
+      readFormDraft("user-one", "customer-written-order:merchant-one"),
+      null,
+    );
+    assert.equal(
+      readFormDraft("user-one", "customer-written-order-active"),
+      null,
+    );
     assert.deepEqual(readFormDraft("user-two", "checkout"), { step: "address" });
   });
 });

@@ -7,7 +7,7 @@
 - [Supabase count pagination fixtures](supabase-count-pagination.md) — browser mocks must expose `content-range` for Supabase exact counts to be visible to the client.
 - [Browser fixture response shapes](browser-fixture-response-shapes.md) — authenticated browser mocks must match the data shapes the destination screen consumes.
 - [Supabase session management](supabase-session-management.md) — per-device operations must stay JWT-scoped; revoked access tokens can work until expiry.
-- [Supabase cross-tab auth tests](supabase-cross-tab-auth-tests.md) — simulate sign-ins through the auth BroadcastChannel; changing local storage alone does not notify the app listener.
+- [Supabase browser auth tests](supabase-cross-tab-auth-tests.md) — use BroadcastChannel for cross-tab sign-ins and one-time session seeding for simulated logout reloads.
 - [Free-shipping redemption](free-shipping-redemption.md) — calculate rewards from delivered orders minus uses; create a discounted order and record redemption atomically through a protected RPC.
 - [Supabase URL format](supabase-url-format.md) — use the project origin; the user enabled anonymous sign-ins and confirmed guest access works.
 - [AI ordering safety](ai-ordering-safety.md) — conversational orders are validated proposals; confirm before cart changes and verify model latency with live requests.
