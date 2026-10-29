@@ -56,7 +56,7 @@ export default function PedidoChat(props: Props) {
       .from("mensajes_chat")
       .select("id, pedido_id, autor_id, autor_rol, texto, created_at, adjunto_path, adjunto_nombre")
       .eq("pedido_id", props.pedido.id)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(200);
 
     if (queryError) {
@@ -65,7 +65,7 @@ export default function PedidoChat(props: Props) {
       return;
     }
 
-    const rows = (data ?? []) as ChatMessage[];
+    const rows = ((data ?? []) as ChatMessage[]).reverse();
     const imagePaths = rows
       .map(function (message) { return message.adjunto_path; })
       .filter(function (path): path is string { return Boolean(path); });
@@ -242,7 +242,7 @@ export default function PedidoChat(props: Props) {
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" onChange={function (event) { seleccionarImagen(event.target.files?.[0]); }} style={{ display: "none" }} />
+          <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={function (event) { seleccionarImagen(event.target.files?.[0]); }} style={{ display: "none" }} />
           <button type="button" onClick={function () { imageInputRef.current?.click(); }} disabled={sending} aria-label="Adjuntar foto" title="Adjuntar foto" style={{ width: 42, height: 42, flexShrink: 0, border: "1px solid var(--border-subtle)", borderRadius: 13, background: "var(--bg-card)", color: "var(--text-primary)", display: "grid", placeItems: "center", cursor: "pointer" }}><ImagePlus size={19} /></button>
           <textarea value={text} onChange={function (event) { setText(event.target.value); }} onKeyDown={function (event) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void enviarMensaje(); } }} rows={1} maxLength={1000} placeholder="Escribe un mensaje…" aria-label="Escribe un mensaje" style={{ flex: 1, minWidth: 0, resize: "none", padding: "12px", borderRadius: 14, border: "1px solid var(--border-subtle)", outline: "none", background: isDark ? "rgba(255,255,255,0.05)" : "white", color: "var(--text-primary)", font: "inherit", fontSize: 13 }} />
           <button type="button" onClick={function () { void enviarMensaje(); }} disabled={sending || (!text.trim() && !image)} aria-label="Enviar mensaje" style={{ width: 44, height: 44, flexShrink: 0, border: 0, borderRadius: 14, background: sending || (!text.trim() && !image) ? "var(--border-subtle)" : "var(--color-yellow)", color: "#111827", display: "grid", placeItems: "center", cursor: sending || (!text.trim() && !image) ? "not-allowed" : "pointer" }}>
