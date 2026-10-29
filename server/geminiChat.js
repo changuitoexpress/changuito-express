@@ -114,11 +114,21 @@ function validateModelResult(modelResult, catalog) {
     };
   }
 
+  let reply =
+    typeof modelResult?.reply === "string"
+      ? modelResult.reply.trim().slice(0, 700)
+      : "Revisa la propuesta y dime si quieres cambiar algo.";
+  if (rawItems.length > 0 && validatedItems.length === 0) {
+    reply = "No pude asociar esa propuesta con productos disponibles. Dime el negocio y el producto para revisarlo.";
+  } else if (
+    /\$\s*\d|\d[\d.,]*\s*(?:pesos|mxn)|pedido confirmado|(?:agregu[eé]|a[nñ]ad[ií]).*carrito/i.test(reply)
+  ) {
+    reply = validatedItems.length > 0
+      ? "Preparé esta propuesta. Revisa las cantidades y los precios del catálogo antes de confirmar."
+      : "Puedo orientarte con productos del catálogo. Dime qué negocio y producto prefieres.";
+  }
   return {
-    reply:
-      typeof modelResult?.reply === "string"
-        ? modelResult.reply.trim().slice(0, 700)
-        : "Encontré algunas opciones. Revisa la propuesta y dime si quieres cambiar algo.",
+    reply,
     items: validatedItems.map(function (item) {
       return { id: item.id, quantity: item.quantity };
     }),
@@ -130,6 +140,13 @@ export async function handleGeminiChatRequest(req, res) {
     res.setHeader("Allow", "POST");
     return sendJson(res, 405, { error: "Método no permitido." });
   }
+  if (!String(req.headers?.["content-type"] ?? "").startsWith("application/json")) {
+    return sendJson(res, 415, { error: "Usa una solicitud JSON." });
+  }
+  const authorization = req.headers?.authorization;
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
+    return sendJson(res, 401, { error: "Vuelve a entrar a la app para usar ChanguiBot." });
+  }
   if (isRateLimited(req)) {
     return sendJson(res, 429, {
       error: "Llegaste al límite de mensajes por ahora. Espera unos minutos y vuelve a intentarlo.",
@@ -140,6 +157,29 @@ export async function handleGeminiChatRequest(req, res) {
   if (!apiKey) {
     return sendJson(res, 503, {
       error: "El asistente no está configurado por el momento.",
+    });
+  }
+  try {
+    const supabaseOrigin = new URL(process.env.VITE_SUPABASE_URL).origin;
+    const verification = await fetch(supabaseOrigin + "/auth/v1/user", {
+      headers: {
+        apikey: process.env.VITE_SUPABASE_ANON_KEY ?? "",
+        Authorization: authorization,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!verification.ok) {
+      return sendJson(res, 401, {
+        error: "Tu sesión no está disponible. Vuelve a entrar para usar ChanguiBot.",
+      });
+    }
+    const user = await verification.json();
+    if (typeof user?.id !== "string" || !user.id) {
+      return sendJson(res, 401, { error: "No pude verificar tu sesión." });
+    }
+  } catch {
+    return sendJson(res, 503, {
+      error: "No pude verificar tu sesión por ahora. Intenta de nuevo.",
     });
   }
 
@@ -201,12 +241,14 @@ export async function handleGeminiChatRequest(req, res) {
   let response;
   try {
     response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" +
-        encodeURIComponent(apiKey),
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(25_000),
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        signal: AbortSignal.timeout(40_000),
         body: JSON.stringify({
           systemInstruction: {
             parts: [{ text: "Interpreta pedidos con cuidado y devuelve solo el JSON solicitado." }],
@@ -238,15 +280,24 @@ export async function handleGeminiChatRequest(req, res) {
         }),
       },
     );
-  } catch {
+  } catch (error) {
+    console.error("Gemini request connection error", error?.name ?? "UnknownError");
     return sendJson(res, 504, {
       error: "ChanguiBot tardó demasiado. Intenta enviar tu pedido otra vez.",
     });
   }
 
   if (!response.ok) {
-    // Do not include provider payloads or credentials in application logs/responses.
-    console.error("Gemini API request failed with status", response.status);
+    let providerStatus = "UNKNOWN";
+    let providerMessage = "";
+    try {
+      const details = await response.json();
+      providerStatus = String(details?.error?.status ?? "UNKNOWN");
+      providerMessage = String(details?.error?.message ?? "")
+        .replaceAll(apiKey, "[redacted]")
+        .slice(0, 280);
+    } catch {}
+    console.error("Gemini API request failed", response.status, providerStatus, providerMessage);
     return sendJson(
       res,
       response.status === 429 ? 429 : 502,

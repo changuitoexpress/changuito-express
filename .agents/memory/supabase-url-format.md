@@ -7,4 +7,4 @@ The `VITE_SUPABASE_URL` secret was stored as `https://<project>.supabase.co/rest
 
 **Why:** this caused the guest-login error and the earlier failed read-only query.
 
-**How to apply:** build clients with `normalizeSupabaseUrl`; if a Supabase "invalid path" error appears again, check the URL shape first. Anonymous sign-ins are disabled in the Supabase project until the user enables them in Authentication settings.
+**How to apply:** build clients with the project origin; if a Supabase "invalid path" error appears again, check the URL shape before changing SQL or auth logic. The user has now enabled Anonymous Sign-Ins and confirmed guest access works.

@@ -100,14 +100,18 @@ export default function ChanguiAssistant(props: Props) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const confirmationLockRef = useRef(false);
+  const mountedRef = useRef(true);
   const isDark = props.theme === "dark";
 
   useEffect(function () {
     let activo = true;
+    mountedRef.current = true;
     async function cargarCatalogo() {
       setCatalogoCargando(true);
       setErrorCatalogo("");
-      const [productosResult, negociosResult] = await Promise.all([
+      try {
+        const [productosResult, negociosResult] = await Promise.all([
         supabase
           .from("products")
           .select("id, merchant_id, name, price, is_available")
@@ -118,20 +122,27 @@ export default function ChanguiAssistant(props: Props) {
           .select("id, name, phone_number")
           .limit(200),
       ]);
-      if (!activo) return;
-      if (productosResult.error || negociosResult.error) {
+        if (!activo) return;
+        if (productosResult.error || negociosResult.error) {
         setErrorCatalogo(
           "No pude cargar el catálogo. Cierra y abre ChanguiBot para volver a intentarlo.",
         );
-      } else {
+        } else {
         setProductos((productosResult.data ?? []) as Producto[]);
         setNegocios((negociosResult.data ?? []) as Negocio[]);
+        }
+      } catch {
+        if (activo) {
+          setErrorCatalogo("No pude conectar con el catálogo. Cierra y abre ChanguiBot para reintentar.");
+        }
+      } finally {
+        if (activo) setCatalogoCargando(false);
       }
-      setCatalogoCargando(false);
     }
     void cargarCatalogo();
     return function () {
       activo = false;
+      mountedRef.current = false;
       recognitionRef.current?.stop?.();
     };
   }, []);
@@ -157,6 +168,10 @@ export default function ChanguiAssistant(props: Props) {
     }
   }, [props.abierto, mensajes.length]);
 
+  useEffect(function () {
+    if (!props.abierto) recognitionRef.current?.stop?.();
+  }, [props.abierto]);
+
   function agregarMensajeBot(texto: string) {
     setMensajes(function (prev) {
       return [
@@ -166,18 +181,63 @@ export default function ChanguiAssistant(props: Props) {
     });
   }
 
-  function confirmarPropuesta() {
-    if (propuesta.length === 0 || cargando) return;
-    props.onAddToCart(propuesta);
-    setPropuesta([]);
-    agregarMensajeBot(
-      "Listo, pasé la propuesta confirmada al carrito. Desde ahí puedes revisar el total y continuar al pago.",
-    );
+  async function confirmarPropuesta() {
+    if (propuesta.length === 0 || cargando || confirmationLockRef.current) return;
+    confirmationLockRef.current = true;
+    setCargando(true);
+    let confirmado = false;
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, merchant_id, name, price, is_available")
+        .in("id", propuesta.map(function (item) { return item.id; }));
+      if (!mountedRef.current) return;
+      if (error || !data) throw new Error("No pude revisar los precios actuales. Intenta confirmar de nuevo.");
+      const actualizados: PropuestaItem[] = [];
+      let huboCambios = false;
+      for (const item of propuesta) {
+        const actual = data.find(function (producto) {
+          return String(producto.id) === item.id;
+        });
+        if (!actual?.is_available || String(actual.merchant_id) !== item.negocio_id) {
+          huboCambios = true;
+          continue;
+        }
+        const precio = Number(actual.price);
+        if (!Number.isFinite(precio) || precio < 0) {
+          huboCambios = true;
+          continue;
+        }
+        if (precio !== item.precio || actual.name !== item.nombre) huboCambios = true;
+        actualizados.push({ ...item, nombre: actual.name, precio });
+      }
+      if (huboCambios) {
+        setPropuesta(actualizados);
+        agregarMensajeBot(
+          actualizados.length > 0
+            ? "El catálogo cambió: actualicé precios y quité los productos que ya no están disponibles. Revisa la propuesta y vuelve a confirmar."
+            : "Los productos de la propuesta ya no están disponibles. No agregué nada; podemos buscar otra opción.",
+        );
+        return;
+      }
+      props.onAddToCart(actualizados);
+      confirmado = true;
+      setPropuesta([]);
+      agregarMensajeBot(
+        "Listo, pasé la propuesta confirmada al carrito. Desde ahí puedes revisar el total y continuar al pago.",
+      );
+    } catch (error: any) {
+      agregarMensajeBot(error?.message ?? "No pude confirmar la propuesta. Intenta de nuevo.");
+    } finally {
+      setCargando(false);
+      if (!confirmado) confirmationLockRef.current = false;
+    }
   }
 
   async function enviarMensaje(textoOriginal?: string) {
     const texto = (textoOriginal ?? input).trim();
     if (!texto || cargando) return;
+    recognitionRef.current?.stop?.();
     setInput("");
     const historial = mensajes
       .slice(-8)
@@ -195,7 +255,7 @@ export default function ChanguiAssistant(props: Props) {
     });
 
     if (propuesta.length > 0 && esConfirmacion(texto)) {
-      confirmarPropuesta();
+      await confirmarPropuesta();
       return;
     }
     if (propuesta.length > 0 && esCancelacion(texto)) {
@@ -230,9 +290,16 @@ export default function ChanguiAssistant(props: Props) {
           merchantName: negocio?.name ?? "Negocio local",
         };
       });
+      const { data: authData, error: authError } = await supabase.auth.getSession();
+      if (authError || !authData.session?.access_token) {
+        throw new Error("Tu sesión no está disponible. Vuelve a entrar para usar ChanguiBot.");
+      }
       const response = await fetch("/api/gemini-chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + authData.session.access_token,
+        },
         body: JSON.stringify({
           message: texto,
           history: historial,
@@ -288,6 +355,7 @@ export default function ChanguiAssistant(props: Props) {
           "Para calcular correctamente el pedido, hagámoslo con un solo negocio a la vez. ¿Cuál prefieres?",
         );
       } else {
+        confirmationLockRef.current = false;
         setPropuesta(propuestaNueva);
         agregarMensajeBot(
           String(data.reply ?? "¿Quieres ajustar algo de tu pedido?"),
@@ -304,6 +372,10 @@ export default function ChanguiAssistant(props: Props) {
   }
 
   function iniciarDictado() {
+    if (dictando) {
+      recognitionRef.current?.stop?.();
+      return;
+    }
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
@@ -610,7 +682,9 @@ export default function ChanguiAssistant(props: Props) {
               </div>
               <button
                 type="button"
+                disabled={cargando}
                 onClick={function () {
+                  if (cargando) return;
                   setPropuesta([]);
                   agregarMensajeBot("Descarté la propuesta. ¿Qué te gustaría pedir?");
                 }}
@@ -716,8 +790,8 @@ export default function ChanguiAssistant(props: Props) {
           <button
             type="button"
             onClick={iniciarDictado}
-            disabled={cargando || catalogoCargando || dictando}
-            aria-label={dictando ? "Escuchando el pedido" : "Dictar pedido"}
+            disabled={cargando || catalogoCargando}
+            aria-label={dictando ? "Detener dictado" : "Dictar pedido"}
             title="Dictar pedido"
             style={{
               width: "44px",
@@ -729,7 +803,7 @@ export default function ChanguiAssistant(props: Props) {
               color: dictando ? "#d94343" : "#2f9e6f",
               display: "grid",
               placeItems: "center",
-              cursor: cargando || dictando ? "not-allowed" : "pointer",
+              cursor: cargando ? "not-allowed" : "pointer",
             }}
           >
             {dictando ? <MicOff size={18} /> : <Mic size={18} />}
