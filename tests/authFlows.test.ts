@@ -706,13 +706,13 @@ describe("sesión y cierre de sesión", function () {
     assert.equal(await restoreAuthSession(client), null);
   });
 
-  it("restaura la sesión guardada con perfil alternativo si falla la consulta del perfil", async function () {
+  it("restaura una sesión guardada sin correo si falla la consulta del perfil", async function () {
     const { client } = createClientFixture({
       getSession: async function () {
         return {
           data: {
             session: {
-              user: { id: "saved-account", email: "saved@example.test" },
+              user: { id: "saved-account" },
             },
           },
         };
@@ -761,8 +761,8 @@ describe("sesión y cierre de sesión", function () {
       {
         user: {
           id: "saved-account",
-          email: "saved@example.test",
-          nombre: "saved",
+          email: undefined,
+          nombre: "usuario",
           rol: "cliente",
         },
       },
