@@ -1,9 +1,10 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Wallet, Gift, Star, TrendingUp, Package, RefreshCw, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Wallet, Gift, Star, TrendingUp, Package, RefreshCw, ChevronRight, MessageCircle } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
 import { getFreeShippingProgress } from './freeShippingProgress';
+import PedidoChat from './components/PedidoChat';
 
 interface Props {
   session:       AppSession;
@@ -26,6 +27,7 @@ interface PedidoResumen {
   total_pagar:   number | null;
   estatus:       string;
   created_at:    string;
+  repartidor_id: string | null;
 }
 
 const ESTATUS_COLOR: Record<string, string> = {
@@ -97,6 +99,7 @@ export default function ChangoMonedero(props: Props) {
   const requestSequence = useRef(0);
   const historyRequestSequence = useRef(0);
   const [tab,      setTab]        = useState<'resumen' | 'historial' | 'como'>('resumen');
+  const [chatPedido, setChatPedido] = useState<PedidoResumen | null>(null);
 
   const isDark = props.theme === 'dark';
   const uid    = props.session.user.id;
@@ -136,7 +139,7 @@ export default function ChangoMonedero(props: Props) {
       const [pedidosResult, resumenEntregados] = await Promise.all([
         supabase
           .from('pedidos')
-          .select('id, negocio_nombre, total_pagar, estatus, created_at', { count: 'exact' })
+          .select('id, negocio_nombre, total_pagar, estatus, created_at, repartidor_id', { count: 'exact' })
           .eq('cliente_id', uid)
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
@@ -180,7 +183,7 @@ export default function ChangoMonedero(props: Props) {
     try {
       const { data, error } = await supabase
         .from('pedidos')
-        .select('id, negocio_nombre, total_pagar, estatus, created_at')
+        .select('id, negocio_nombre, total_pagar, estatus, created_at, repartidor_id')
         .eq('cliente_id', uid)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
@@ -239,6 +242,18 @@ export default function ChangoMonedero(props: Props) {
     const activo = tab === t;
     return { flex: 1, padding: '9px 4px', border: 'none', borderRadius: '11px', cursor: 'pointer', fontSize: '11px', fontWeight: activo ? 900 : 600, background: activo ? 'var(--color-yellow)' : 'transparent', color: activo ? '#020617' : 'var(--text-muted)' };
   };
+
+  if (chatPedido) {
+    return (
+      <PedidoChat
+        session={props.session}
+        theme={props.theme}
+        pedido={chatPedido}
+        role="cliente"
+        onBack={function () { setChatPedido(null); }}
+      />
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'system-ui,sans-serif', maxWidth: '480px', margin: '0 auto' }}>
@@ -366,20 +381,28 @@ export default function ChangoMonedero(props: Props) {
                 {pedidos.slice(0, 3).map(function(p) {
                   const fecha = new Date(p.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
                   return (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(250,204,21,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Package style={{ width: '16px', height: '16px', color: 'var(--color-yellow)' }} />
+                    <div key={p.id} style={{ padding: '12px 14px', borderRadius: '14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(250,204,21,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Package style={{ width: '16px', height: '16px', color: 'var(--color-yellow)' }} />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 1px 0', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.negocio_nombre ?? 'Pedido'}</p>
+                            <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>{fecha}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 1px 0', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.negocio_nombre ?? 'Pedido'}</p>
-                          <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>{fecha}</p>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ fontSize: '13px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 2px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)', textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '13px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 2px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
-                        <span style={{ fontSize: '9px', fontWeight: 800, color: ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)', textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
-                      </div>
+                      {p.repartidor_id && p.estatus !== 'entregado' && p.estatus !== 'cancelado' && (
+                        <button type="button" onClick={function () { setChatPedido(p); }}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 10, background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+                          <MessageCircle size={14} /> Chat con el repartidor
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -413,22 +436,33 @@ export default function ChangoMonedero(props: Props) {
               const label = fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) + ' · ' + fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
               const color = ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)';
               return (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(250,204,21,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Package style={{ width: '18px', height: '18px', color: 'var(--color-yellow)' }} />
+                <div key={p.id} style={{ padding: '14px 16px', borderRadius: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(250,204,21,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Package style={{ width: '18px', height: '18px', color: 'var(--color-yellow)' }} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                          {p.negocio_nombre ?? 'Pedido'}
+                        </p>
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>{label}</p>
+                      </div>
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
-                        {p.negocio_nombre ?? 'Pedido'}
-                      </p>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>{label}</p>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <p style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 3px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
+                      <span style={{ fontSize: '9px', fontWeight: 800, color: color, textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 3px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: color, textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
-                  </div>
+                  {p.repartidor_id && p.estatus !== 'entregado' && p.estatus !== 'cancelado' && (
+                    <button type="button" onClick={function () { setChatPedido(p); }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 10, padding: '9px 12px', border: '1px solid var(--border-subtle)', borderRadius: 11, background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                      <MessageCircle size={15} /> Chat con el repartidor
+                    </button>
+                  )}
+                  {!p.repartidor_id && p.estatus !== 'entregado' && p.estatus !== 'cancelado' && (
+                    <p style={{ margin: '9px 0 0', color: 'var(--text-muted)', fontSize: 10 }}>El chat se activa cuando se asigne un repartidor.</p>
+                  )}
                 </div>
               );
             })}

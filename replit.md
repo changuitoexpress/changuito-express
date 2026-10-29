@@ -32,6 +32,7 @@ Set these in Replit Secrets before running:
 
 - `VITE_SUPABASE_URL` — your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` — your Supabase anon/public key
+- `GEMINI_API_KEY` — server-only Gemini API key used by ChanguiBot
 
 ## Dev Server
 

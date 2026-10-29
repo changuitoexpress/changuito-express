@@ -12,6 +12,7 @@ import AdminCatalogo from './admin/AdminCatalogo';
 import AdminNegocios from './admin/AdminNegocios';
 import AdminTablas from './admin/AdminTablas';
 import AdminMandaditos from './admin/AdminMandaditos';
+import PedidoChat from './components/PedidoChat';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
@@ -94,6 +95,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [error, setError]           = useState('');
   const [filtroEstatus, setFiltro]  = useState('todos');
   const [pedidoAbierto, setPedAbi]  = useState<string | null>(null);
+  const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
   const [tab, setTab]               = useState<'resumen'|'pedidos'|'catalogo'|'negocios'|'otros'|'clientes'>('resumen');
   const [merchants, setMerchants]         = useState<any[]>([]);
   const [repartidores, setRepartidores]   = useState<any[]>([]);
@@ -231,7 +233,7 @@ export default function AdminGodMode(props: AdminProps) {
       if (nuevoEstatus === 'entregado') {
         const detalle = rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.';
         const siguientePaso = rpcErr
-          ? 'Ejecuta supabase_fix_cambiar_estatus_pedido.sql en el SQL Editor de Supabase.'
+          ? 'Ejecuta supabase_admin_upgrade.sql en el SQL Editor de Supabase.'
           : 'Confirma que iniciaste sesión con la cuenta del administrador general.';
         alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\n' + siguientePaso + '\n\n' + detalle);
         return;
@@ -290,6 +292,18 @@ export default function AdminGodMode(props: AdminProps) {
     const active = tab === t;
     return { flex:'1 0 auto', padding:'10px 14px', whiteSpace:'nowrap', border:'none', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:active?900:600, background:active?'var(--color-yellow)':'transparent', color:active?'#020617':'var(--text-muted)' };
   };
+
+  if (chatPedido) {
+    return (
+      <PedidoChat
+        session={props.session}
+        theme={props.theme}
+        pedido={chatPedido}
+        role="admin"
+        onBack={function () { setChatPedido(null); }}
+      />
+    );
+  }
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', fontFamily:'system-ui,sans-serif', maxWidth:'1100px', margin:'0 auto' }}>
@@ -530,14 +544,20 @@ export default function AdminGodMode(props: AdminProps) {
                           )}
                         </div>
 
-                        {/* Chat interno */}
+                        {/* Chat cliente–repartidor con acceso de supervisión para admin */}
                         <div style={{ padding:'10px 12px', borderRadius:'12px', background:'var(--border-subtle)' }}>
                           <p style={{ fontSize:'11px', fontWeight:700, color:'var(--text-muted)', margin:'0 0 2px 0' }}>
-                            💬 Chat interno
+                            💬 Chat del pedido
                           </p>
                           <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>
-                            El repartidor asignado puede chatear con el cliente desde su panel 🛵
+                            Cliente y repartidor pueden enviarse mensajes y fotos.
                           </p>
+                          {pedido.repartidor_id && (
+                            <button type="button" onClick={function () { setChatPedido(pedido); }}
+                              style={{ marginTop:'8px', padding:'7px 11px', border:'none', borderRadius:'9px', background:'var(--color-yellow)', color:'#020617', fontSize:'11px', fontWeight:800, cursor:'pointer' }}>
+                              Supervisar conversación
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

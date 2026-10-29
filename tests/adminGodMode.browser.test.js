@@ -17,7 +17,7 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     const products = [{ id: "p1", merchant_id: "m1", name: "Hamburguesa clásica", description: "x", price: 89, image_url: null, category: "Burgers", is_available: true }];
     const pedidos = [
       { id: "o1", total_pagar: 200, estatus: "entregado", created_at: new Date().toISOString(), negocio_nombre: "Burger Prueba", forma_pago: "efectivo", cliente_id: "c1" },
-      { id: "o2", total_pagar: 100, estatus: "pendiente", created_at: new Date().toISOString(), negocio_nombre: "Domino Prueba", forma_pago: "tarjeta", cliente_id: "c1" },
+      { id: "o2", total_pagar: 100, estatus: "pendiente", created_at: new Date().toISOString(), negocio_nombre: "Domino Prueba", forma_pago: "tarjeta", cliente_id: "c1", repartidor_id: "r1" },
     ];
     const user = {
       id: "fixture-chat-user",
@@ -100,15 +100,20 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     await page.waitForFunction(function () { return document.body.innerText.includes("Entregado"); });
     assert.ok(writes.some(function (w) { return w.startsWith("POST cambiar_estatus_pedido") && w.includes("\"p_estatus\":\"entregado\""); }));
 
+    await page.getByText("Domino Prueba", { exact: true }).click();
+    await page.getByRole("button", { name: "Supervisar conversación" }).click();
+    await page.getByText("Conversa sobre este pedido").waitFor();
+    await page.getByRole("button", { name: "Volver" }).click();
+
     await page.getByRole("button", { name: /Mandaditos/ }).click();
-    await page.getByText("Domino Prueba").waitFor();
+    await page.getByText("Domino Prueba", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Elegir destino" }).click();
     await page.getByLabel("Tipo de comida en Restaurantes").selectOption("hamburguesas");
     await page.getByRole("button", { name: "Mover a Restaurantes" }).click();
     await page.getByText("Domino Prueba ahora aparecerá en Restaurantes.").waitFor();
 
     await page.getByRole("button", { name: /Restaurantes/ }).click();
-    await page.getByText("Domino Prueba").waitFor();
+    await page.getByText("Domino Prueba", { exact: true }).waitFor();
     await page.getByText("Hamburguesa clásica").waitFor();
     await page.getByText("Hamburguesa clásica").locator("xpath=../..").getByRole("button", { name: "Editar", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
@@ -125,7 +130,7 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     await page.screenshot({ path: "/tmp/god-negocios.jpg" });
     await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
     await page.getByText("Negocio guardado.").waitFor();
-    assert.ok(writes.some(function (w) { return w.startsWith("PATCH merchants") && w.includes("\"category\":\"mandaditos\"") && w.includes("\"cashback_pct\":3"); }));
+    assert.ok(writes.some(function (w) { return w.startsWith("PATCH merchants") && w.includes("\"category\":\"hamburguesas\"") && w.includes("\"cashback_pct\":3"); }));
 
     assert.ok(writes.some(function (w) { return w.startsWith("PATCH merchants") && w.includes("\"category\":\"hamburguesas\""); }));
   } finally {
