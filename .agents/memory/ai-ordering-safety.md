@@ -21,6 +21,12 @@ El usuario quiere platicar con el asistente y oír sus respuestas sin pulsar Env
 
 **How to apply:** mantener una opción de conversación por turnos, además de texto y dictado; la voz conserva los mismos límites de confirmación y precios que el chat escrito.
 
+Keep spoken replies short and conversational; do not repeat the full visible order summary. Let customers interrupt speech, and prefer a masculine Spanish system voice only when the device exposes a clearly identifiable one.
+
+**Why:** the user observed that full spoken recaps waste customers' time and asked for natural interruption and a possible male voice, while leaving the voice choice to product judgment.
+
+**How to apply:** speak one or two brief sentences, listen for a user interjection during playback with echo filtering, and fall back to an available Spanish voice rather than assuming a device supports a masculine voice.
+
 Una propuesta puede incluir productos de varios negocios que el cliente haya identificado; el resumen visible debe agruparlos por negocio y nunca mostrar identificadores internos.
 
 **Why:** el usuario quiere completar una compra entre negocios desde un mismo carrito y reportó que el bot mostraba IDs en sus respuestas.

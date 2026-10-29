@@ -218,13 +218,12 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     await page.getByText("Límite temporal de prueba. Intenta después.", { exact: true }).waitFor();
     assert.equal(apiCalls, 2);
 
-    // Conversation automatically submits, speaks a real-price summary and listens again.
+    // Conversation can be interrupted, keeps the full proposal visible, and speaks briefly.
     returnQuotaError = false;
     await page.evaluate(function () {
       window.__slowSpeech = true;
       window.__voiceTurns = [
         "Quiero una hamburguesa del Negocio de prueba y un taco de Taco Prueba",
-        "sí",
         "sí",
       ];
     });
@@ -246,7 +245,9 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     assert.equal(apiCalls, 3);
     assert.doesNotMatch(await page.locator("[role=log]").innerText().catch(function () { return ""; }), /\b(?:burger|taco-shop)\b/i);
     const spoken = await page.evaluate(function () { return window.__spokenReplies; });
-    assert.ok(spoken.some(function (text) { return text.includes("Taco Prueba") && text.includes("119.00 pesos mexicanos"); }));
+    assert.ok(spoken.some(function (text) {
+      return text.includes("Ya preparé tu propuesta") && !text.includes("Taco Prueba") && !text.includes("119.00 pesos mexicanos");
+    }));
     await page.waitForFunction(function () { return document.body.innerText.includes("Te escucho · habla y haz una pausa"); });
     await page.getByRole("button", { name: "Cerrar ChanguiBot", exact: true }).click();
     const micStartsAtClose = await page.evaluate(function () { return window.__micStarts; });

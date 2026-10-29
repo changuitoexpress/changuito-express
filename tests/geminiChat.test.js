@@ -79,6 +79,15 @@ test("validates the Supabase session and keeps the Gemini key server-side", asyn
   assert.equal(JSON.stringify(result).includes("fixture-server-secret"), false);
 });
 
+test("asks Gemini for short replies without repeating the visible proposal", async function () {
+  const calls = mockProvider({ reply: "Preparé tu propuesta.", items: [] });
+  const result = await invoke({ message: "¿Qué me recomiendas?", catalog });
+  assert.equal(result.status, 200);
+  const prompt = JSON.parse(calls[1].init.body).contents[0].parts[0].text;
+  assert.match(prompt, /una o dos frases cortas/);
+  assert.match(prompt, /no repitas toda la lista del pedido/);
+});
+
 test("rejects expired sessions before provider usage", async function () {
   const calls = mockProvider({}, { authStatus: 401 });
   const result = await invoke({ message: "hola", catalog });

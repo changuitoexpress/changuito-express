@@ -229,7 +229,11 @@ export default function AdminGodMode(props: AdminProps) {
 
     if (rpcErr || !rpcData?.ok) {
       if (nuevoEstatus === 'entregado') {
-        alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\nEjecuta la versión actualizada de supabase_setup.sql en el SQL Editor de Supabase para habilitar el crédito seguro.\n\n' + (rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.'));
+        const detalle = rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.';
+        const siguientePaso = rpcErr
+          ? 'Ejecuta supabase_fix_cambiar_estatus_pedido.sql en el SQL Editor de Supabase.'
+          : 'Confirma que iniciaste sesión con la cuenta del administrador general.';
+        alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\n' + siguientePaso + '\n\n' + detalle);
         return;
       }
       // Fallback: actualización directa
@@ -265,6 +269,11 @@ export default function AdminGodMode(props: AdminProps) {
       fetchPedidos(); fetchMetricas();
     }
     setAsignando(null);
+  }
+
+  function confirmarEntregaAdmin(pedidoId: string, negocio: string | null) {
+    if (!window.confirm('¿Confirmas que el pedido de ' + (negocio ?? 'este negocio') + ' ya fue entregado? El cashback se acreditará si aplica.')) return;
+    cambiarEstatus(pedidoId, 'entregado');
   }
 
   async function toggleMerchant(id: string, actual: boolean) {
@@ -397,6 +406,17 @@ export default function AdminGodMode(props: AdminProps) {
                       <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(pedido.total_pagar ?? 0).toFixed(0)}</p>
                       <span style={{ fontSize:'9px', fontWeight:800, padding:'2px 8px', borderRadius:'8px', background:cfg.bg, color:cfg.color, textTransform:'uppercase' }}>{cfg.label}</span>
                     </div>
+                    {pedido.estatus !== 'entregado' && pedido.estatus !== 'cancelado' && (
+                      <button
+                        type="button"
+                        aria-label={'Marcar pedido de ' + (pedido.negocio_nombre ?? 'negocio') + ' como entregado'}
+                        title="Marcar entregado como administrador"
+                        onClick={function(e){ e.stopPropagation(); confirmarEntregaAdmin(pedido.id, pedido.negocio_nombre); }}
+                        style={{ width:'34px', height:'34px', borderRadius:'11px', border:'1px solid rgba(34,197,94,.32)', background:'rgba(34,197,94,.13)', color:'var(--color-green)', display:'grid', placeItems:'center', cursor:'pointer', flexShrink:0 }}
+                      >
+                        <CheckCircle style={{ width:'17px', height:'17px' }} />
+                      </button>
+                    )}
                     {abierto ? <ChevronUp style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} /> : <ChevronDown style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} />}
                   </div>
 
@@ -447,7 +467,7 @@ export default function AdminGodMode(props: AdminProps) {
                               return (
                                 <button key={s} onClick={function(){ cambiarEstatus(pedido.id, s); }}
                                   style={{ padding:'6px 12px', borderRadius:'10px', border:activo?'none':'1px solid var(--border-subtle)', background:activo?c.bg:'transparent', color:activo?c.color:'var(--text-muted)', fontSize:'11px', fontWeight:activo?800:600, cursor:'pointer' }}>
-                                  {activo && '✓ '}{c.label}
+                                  {activo ? '✓ ' + c.label : s === 'entregado' ? 'Marcar como entregado' : c.label}
                                 </button>
                               );
                             })}

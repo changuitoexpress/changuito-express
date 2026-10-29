@@ -88,20 +88,14 @@ function dinero(valor: number): string {
   }).format(valor);
 }
 
-function resumenHablado(items: PropuestaItem[]) {
-  const groups = new Map<string, PropuestaItem[]>();
-  items.forEach(function (item) {
-    const group = groups.get(item.negocio_id) ?? [];
-    group.push(item);
-    groups.set(item.negocio_id, group);
-  });
-  return Array.from(groups.values()).map(function (group) {
-    return "En " + group[0].negocio + ": " + group.map(function (item) {
-      return item.cantidad + " de " + item.nombre + ", por " + (item.precio * item.cantidad).toFixed(2) + " pesos";
-    }).join(", ");
-  }).join(". ") + ". Subtotal de productos: " +
-    items.reduce(function (total, item) { return total + item.precio * item.cantidad; }, 0).toFixed(2) +
-    " pesos mexicanos. El envío final se calcula en el carrito y puede cambiar con varios negocios. ¿Confirmas que pase todo al carrito? Puedes decir sí o pedirme un cambio.";
+function textoVozBreve(texto: string) {
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  const frases = limpio.match(/[^.!?]+[.!?]?/g)?.map(function (frase) { return frase.trim(); }).filter(Boolean) ?? [];
+  let breve = frases.slice(0, 2).join(" ");
+  if (breve.length > 180) {
+    breve = breve.slice(0, 177).replace(/\s+\S*$/, "").trim() + "…";
+  }
+  return breve || "Listo. ¿Qué más necesitas?";
 }
 
 export default function ChanguiAssistant(props: Props) {
@@ -181,8 +175,7 @@ export default function ChanguiAssistant(props: Props) {
           id: "bienvenida",
           rol: "bot",
           hora: horaActual(),
-          texto:
-            "¡Hola! Soy ChanguiBot. Cuéntame o dicta lo que necesitas; revisaré el catálogo y te mostraré una propuesta con precios reales. No agregaré nada al carrito hasta que tú confirmes.",
+          texto: "¡Hola! ¿Qué se te antoja? Te preparo una propuesta con precios reales y tú decides antes de agregarla al carrito.",
         },
       ]);
       setTimeout(function () {
@@ -202,7 +195,7 @@ export default function ChanguiAssistant(props: Props) {
         { id: "b-" + Date.now(), rol: "bot", texto, hora: horaActual() },
       ];
     });
-    conversation.speak(textoHablado ?? texto);
+    conversation.speak(textoHablado ?? textoVozBreve(texto));
   }
 
   async function confirmarPropuesta() {
@@ -241,7 +234,7 @@ export default function ChanguiAssistant(props: Props) {
           actualizados.length > 0
             ? "El catálogo cambió: actualicé precios y quité los productos que ya no están disponibles. Revisa la propuesta y vuelve a confirmar."
             : "Los productos de la propuesta ya no están disponibles. No agregué nada; podemos buscar otra opción.",
-          actualizados.length > 0 ? "El catálogo cambió. No agregué nada. Esta es la propuesta actualizada. " + resumenHablado(actualizados) : undefined,
+          actualizados.length > 0 ? "Actualicé la propuesta porque cambió el catálogo. Revísala en pantalla y dime qué quieres ajustar." : undefined,
         );
         return;
       }
@@ -380,7 +373,7 @@ export default function ChanguiAssistant(props: Props) {
       agregarMensajeBot(
         String(data.reply ?? "¿Quieres ajustar algo de tu pedido?"),
         propuestaNueva.length > 0
-          ? String(data.reply ?? "Preparé tu propuesta.") + ". No agregué nada todavía. " + resumenHablado(propuestaNueva)
+          ? "Ya preparé tu propuesta. Revísala en pantalla; puedes pedirme cambios o agregar algo. Aún no la he pasado al carrito."
           : undefined,
       );
     } catch (error: any) {
@@ -821,14 +814,18 @@ export default function ChanguiAssistant(props: Props) {
               disabled={!conversation.enabled && (cargando || catalogoCargando)}
               onClick={function () {
                 recognitionRef.current?.stop?.();
-                conversation.start();
+                if (conversation.enabled && conversation.status.includes("hablando")) {
+                  conversation.interrupt();
+                } else {
+                  conversation.start();
+                }
               }}
               style={{ padding: "10px 13px", borderRadius: "12px", background: conversation.enabled ? "var(--color-red)" : "var(--color-blue)", color: "#fff", fontSize: "12px", fontWeight: 800, whiteSpace: "nowrap" }}
             >
-              {conversation.enabled ? "Terminar conversación" : "Conversar"}
+              {conversation.enabled ? conversation.status.includes("hablando") ? "Interrumpir y hablar" : "Terminar conversación" : "Conversar"}
             </button>
             <p role="status" style={{ margin: 0, fontSize: "11px", lineHeight: 1.4, color: "var(--text-secondary)" }}>
-              {conversation.enabled ? conversation.status : "Habla, escucha la respuesta y sigue platicando. Sin pulsar Enviar."}
+              {conversation.enabled ? conversation.status : "Respuestas cortas; puedes interrumpir mientras Changui habla."}
             </p>
           </div>
           {conversation.transcript && <p aria-live="polite" style={{ margin: "8px 0 0", fontSize: "12px", color: "var(--text-primary)" }}>{conversation.transcript}</p>}
@@ -926,7 +923,7 @@ export default function ChanguiAssistant(props: Props) {
             lineHeight: 1.4,
           }}
         >
-          Voz según tu navegador · El micrófono se apaga al cerrar · Confirmas antes de agregar
+          Voz en español del dispositivo, masculina si está disponible · El micrófono se apaga al cerrar · Confirmas antes de agregar
         </p>
       </div>
     </div>

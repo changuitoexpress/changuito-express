@@ -63,6 +63,13 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
         const merchant = merchants.find(function (m) { return m.id === merchantId; });
         if (merchant) Object.assign(merchant, request.postDataJSON());
       }
+      let rpcResponse = null;
+      if (request.method() === "POST" && table === "cambiar_estatus_pedido") {
+        const args = request.postDataJSON();
+        const pedido = pedidos.find(function (p) { return p.id === args.p_id; });
+        if (pedido) pedido.estatus = args.p_estatus;
+        rpcResponse = { ok: true, estatus: args.p_estatus };
+      }
       let data = [];
       if (table === "perfiles") data = [{ id: user.id, nombre: "Admin", rol: "admin" }];
       if (table === "merchants") data = merchants;
@@ -72,7 +79,7 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
       await route.fulfill({
         status: request.method() === "OPTIONS" ? 204 : 200,
         headers: { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*", "access-control-expose-headers": "content-range", "content-range": "0-0/0" },
-        body: request.method() === "OPTIONS" ? "" : JSON.stringify(acceptsObject ? data[0] ?? null : data),
+        body: request.method() === "OPTIONS" ? "" : JSON.stringify(rpcResponse ?? (acceptsObject ? data[0] ?? null : data)),
       });
     });
     const baseUrl = process.env.REPLIT_DEV_DOMAIN ? "https://" + process.env.REPLIT_DEV_DOMAIN : "http://127.0.0.1:5173";
@@ -86,6 +93,12 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     await page.getByText("Tendencia de ventas").waitFor();
     assert.match(await page.locator("body").innerText(), /\$300/);
     await page.screenshot({ path: "/tmp/god-resumen.jpg" });
+
+    await page.getByRole("button", { name: /Pedidos/ }).click();
+    page.once("dialog", function (dialog) { dialog.accept(); });
+    await page.getByRole("button", { name: "Marcar pedido de Domino Prueba como entregado" }).click();
+    await page.waitForFunction(function () { return document.body.innerText.includes("Entregado"); });
+    assert.ok(writes.some(function (w) { return w.startsWith("POST cambiar_estatus_pedido") && w.includes("\"p_estatus\":\"entregado\""); }));
 
     await page.getByRole("button", { name: /Mandaditos/ }).click();
     await page.getByText("Domino Prueba").waitFor();
