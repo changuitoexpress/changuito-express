@@ -14,3 +14,9 @@ Choose a low-latency model using a live generation check, not a documentation he
 **Why:** a valid key listed models successfully, but a newer reasoning model timed out and a listed legacy model returned 404 on generation. The available Flash Lite alias completed the small order fixture in about one second.
 
 **How to apply:** use safe metadata diagnostics and a small catalog fixture when changing providers/models. Never log credentials, and do not repeatedly switch to newer/heavier models while assuming they will be faster.
+
+El usuario quiere platicar con el asistente y oír sus respuestas sin pulsar Enviar después de cada turno; no considera suficiente un micrófono que solo rellene el campo de texto.
+
+**Why:** distinguió explícitamente la conversación hablada del dictado manual.
+
+**How to apply:** mantener una opción de conversación por turnos, además de texto y dictado; la voz conserva los mismos límites de confirmación y precios que el chat escrito.

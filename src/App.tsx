@@ -499,8 +499,8 @@ function AuthScreen(props: {
     }
   }
 
-  const inputBg = isDark ? "rgba(5,16,26,0.56)" : "rgba(245,241,230,0.78)";
-  const surface = isDark ? "#142b36" : "#fffdf7";
+  const inputBg = isDark ? "rgba(5,26,16,0.56)" : "#f1f7f2";
+  const surface = isDark ? "#162b24" : "#ffffff";
   const border = isDark ? "rgba(235,241,225,0.12)" : "rgba(33,55,57,0.12)";
   const fieldStyle: React.CSSProperties = {
     width: "100%",
@@ -516,7 +516,7 @@ function AuthScreen(props: {
   };
   const ib = function (f: string) {
     return focused === f
-      ? "1px solid #d99a25"
+      ? "1px solid var(--color-blue)"
       : isDark
         ? "1px solid rgba(235,241,225,0.15)"
         : "1px solid rgba(33,55,57,0.16)";
@@ -527,7 +527,7 @@ function AuthScreen(props: {
       className="auth-screen fade-in"
       style={{
         minHeight: "100dvh",
-        background: isDark ? "#0d2029" : "#f3efe2",
+        background: isDark ? "#0c1b17" : "#f3f8f4",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -539,9 +539,11 @@ function AuthScreen(props: {
     >
       <style>{`
         .auth-screen, .auth-screen * { box-sizing: border-box; }
+        .auth-shell { position: relative; }
+        .auth-shell::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 6px; z-index: 1; background: linear-gradient(90deg,#159447 0% 25%,#F6C945 25% 50%,#E84844 50% 75%,#2979DA 75% 100%); }
         .auth-screen button { font: inherit; }
         .auth-screen button:focus-visible, .auth-screen input:focus-visible {
-          outline: 3px solid rgba(215, 151, 37, .55) !important;
+          outline: 3px solid var(--color-blue) !important;
           outline-offset: 3px;
         }
         .auth-shell { width: 100%; max-width: 1030px; display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(390px, .98fr); border-radius: 30px; overflow: hidden; box-shadow: 0 28px 90px rgba(15,35,39,.18); animation: auth-arrive .55s cubic-bezier(.2,.75,.25,1) both; }
@@ -568,7 +570,7 @@ function AuthScreen(props: {
         <ThemeToggle theme={props.theme} onToggle={props.onThemeToggle} />
       </div>
       <main className="auth-shell" style={{ position: "relative", zIndex: 1, border: `1px solid ${border}` }}>
-        <section className="auth-story" aria-label="Changuito Express en Lomas y Puebla" style={{ background: "#d99a25", color: "#18353a", padding: "clamp(34px, 5vw, 58px)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <section className="auth-story" aria-label="Changuito Express en Lomas y Puebla" style={{ background: "#F6C945", color: "#18353a", padding: "clamp(34px, 5vw, 58px)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div style={{ position: "absolute", inset: 0, opacity: .12, backgroundImage: "radial-gradient(circle, #18353a 1px, transparent 1.2px)", backgroundSize: "17px 17px", maskImage: "linear-gradient(135deg, black, transparent 74%)", pointerEvents: "none" }} />
           <div style={{ position: "absolute", width: "330px", height: "330px", border: "1px solid rgba(24,53,58,.2)", borderRadius: "50%", right: "-126px", top: "104px", boxShadow: "0 0 0 34px rgba(24,53,58,.045), 0 0 0 68px rgba(24,53,58,.035)" }} />
           <div style={{ position: "relative", zIndex: 1 }}>
@@ -632,7 +634,7 @@ function AuthScreen(props: {
                     fontSize: "12px",
                     fontWeight: 900,
                     letterSpacing: "0.01em",
-                    background: active ? "#d99a25" : "transparent",
+                    background: active ? "var(--color-yellow)" : "transparent",
                     color: active ? "#18353a" : "var(--text-muted)",
                     boxShadow: active
                       ? "0 3px 9px rgba(112,76,14,.15)"
@@ -805,8 +807,8 @@ function AuthScreen(props: {
                 background:
                   loading || resendingConfirmation
                     ? "rgba(250,204,21,0.5)"
-                    : "#d99a25",
-                color: "#18353a",
+                    : "var(--color-green)",
+                color: "#ffffff",
                 fontWeight: 900,
                 fontSize: "14px",
                 letterSpacing: "0.01em",

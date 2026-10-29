@@ -11,3 +11,4 @@
 - [Free-shipping redemption](free-shipping-redemption.md) — calculate rewards from delivered orders minus uses; create a discounted order and record redemption atomically through a protected RPC.
 - [Supabase URL format](supabase-url-format.md) — use the project origin; the user enabled anonymous sign-ins and confirmed guest access works.
 - [AI ordering safety](ai-ordering-safety.md) — conversational orders are validated proposals; confirm before cart changes and verify model latency with live requests.
+- [Customer navigation](customer-navigation.md) — Changui Súper opens products directly; restaurant shortcuts precede Mandaditos, including written restaurant orders.

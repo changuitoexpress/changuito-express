@@ -58,6 +58,8 @@ import VistaNegocio from "./VistaNegocio";
 import ChanguitoAI from "./ChanguiAssistant";
 import Monedero from "./Monedero";
 import { getFreeShippingProgress, getShippingCharge } from "./freeShippingProgress";
+import SuperCatalog from "./components/SuperCatalog";
+import { scrollToSectionHeading } from "./sectionScroll";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface Merchant {
@@ -361,6 +363,23 @@ const SECCIONES_MAND = [
 ];
 
 // ─── Horario helpers ──────────────────────────────────────────────────────────
+const MANDADITOS_FOOD_TITLES = new Set([
+  ...SECCIONES_REST.map(function (section) { return section.titulo; }),
+  "Desayunos", "Pollos y Flautas", "Sandwiches", "Elotes y Esquites",
+  "Fresas con Crema", "Las Marquesitas", "Waffles", "Saludable",
+  "Panaderías", "Pastelerías", "Heladerías", "Bebidas Preparadas", "Comida Libanesa",
+]);
+const SECCIONES_PEDIDOS_ESCRITOS = [
+  {
+    titulo: "Restaurantes por escrito",
+    emoji: "📝",
+    keys: SECCIONES_MAND.filter(function (section) {
+      return MANDADITOS_FOOD_TITLES.has(section.titulo.trim());
+    }).flatMap(function (section) { return section.keys; }),
+  },
+  ...SECCIONES_MAND,
+];
+
 function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
   const ahora = new Date();
   const horaActual = ahora.getHours() * 60 + ahora.getMinutes();
@@ -663,8 +682,9 @@ function SeccionH(props: {
   loading: boolean;
   onSelect: (m: Merchant) => void;
   customId?: string;
+  forceVisible?: boolean;
 }) {
-  if (!props.loading && props.merchants.length === 0) return null;
+  if (!props.loading && props.merchants.length === 0 && !props.forceVisible) return null;
   return (
     <div
       id={props.customId ?? tituloAId(props.titulo)}
@@ -696,6 +716,9 @@ function SeccionH(props: {
           </span>
         )}
       </div>
+      {!props.loading && props.merchants.length === 0 && (
+        <p style={{ padding: "12px 16px", fontSize: "13px", color: "var(--text-secondary)" }}>Todavía no hay negocios disponibles en esta categoría.</p>
+      )}
       <div
         style={{
           overflowX: "auto",
@@ -864,6 +887,10 @@ function ModalMandadito(props: {
       onClick={props.onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="written-order-title"
+        onKeyDown={function (event) { if (event.key === "Escape") props.onClose(); }}
         style={{
           width: "100%",
           maxWidth: "480px",
@@ -885,7 +912,9 @@ function ModalMandadito(props: {
             margin: "0 auto 20px",
           }}
         />
+        <button type="button" aria-label="Cerrar pedido por escrito" onClick={props.onClose} style={{ display: "block", marginLeft: "auto", padding: "8px", color: "var(--text-primary)" }}><X size={20} /></button>
         <h2
+          id="written-order-title"
           style={{
             fontSize: "18px",
             fontWeight: 900,
@@ -921,6 +950,8 @@ function ModalMandadito(props: {
           </div>
         )}
         <textarea
+          aria-label="Tu pedido por escrito"
+          autoFocus
           value={texto}
           onChange={function (e) {
             if (cerrado) return;
@@ -2741,6 +2772,7 @@ export default function Dashboard(props: DashboardProps) {
     null,
   );
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
+  const [restSectionTarget, setRestSectionTarget] = useState("");
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
   const [modalCheckout, setModalCheckout] = useState<boolean>(function () {
     return Boolean(getCheckoutDraft(props.session.user.id, props.carritoGlobal));
@@ -3098,6 +3130,7 @@ export default function Dashboard(props: DashboardProps) {
 
   function tabStyle(t: MainTab): React.CSSProperties {
     const active = tabActiva === t;
+    const accent = t === "restaurantes" ? "var(--color-red)" : t === "mandaditos" ? "var(--color-blue)" : "var(--color-green)";
     return {
       flex: 1,
       padding: "10px 4px",
@@ -3106,15 +3139,15 @@ export default function Dashboard(props: DashboardProps) {
       cursor: "pointer",
       fontSize: "11px",
       fontWeight: active ? 900 : 600,
-      background: active ? "var(--color-yellow)" : "transparent",
-      color: active ? "#020617" : "var(--text-muted)",
-      boxShadow: active ? "0 4px 12px rgba(250,204,21,0.3)" : "none",
+      background: active ? accent : "transparent",
+      color: active ? "#ffffff" : "var(--text-secondary)",
+      boxShadow: active ? "0 4px 12px rgba(15,50,40,0.18)" : "none",
       transition: "all 0.2s",
     };
   }
 
   function renderContenido() {
-    if (search.trim() !== "") {
+    if (search.trim() !== "" && tabActiva !== "tiendita") {
       const q = search.toLowerCase();
       const resNegocios = merchants.filter(function (m) {
         return (
@@ -3290,7 +3323,7 @@ export default function Dashboard(props: DashboardProps) {
 
     // Botones de categoría: fichas circulares con acento de la paleta de marca
     // (verde, amarillo, rojo y azul) para que se sientan familiares y distintos.
-    const ACENTOS_MARCA = ["#2f9e6f", "#e0a526", "#e0483b", "#3b7fd1"];
+    const ACENTOS_MARCA = ["#159447", "#F6C945", "#E84844", "#2979DA"];
     const estiloBotonCat: React.CSSProperties = {
       width: "82px",
       padding: "2px 0 4px",
@@ -3358,36 +3391,20 @@ export default function Dashboard(props: DashboardProps) {
       }
       setTimeout(function () {
         const id = sec ? tituloAId(sec) : "seccion-mandaditos-top";
-        const el = document.getElementById(id);
-        if (el) {
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.scrollY - 120,
-            behavior: "smooth",
-          });
-        }
+        scrollToSectionHeading(id);
       }, 160);
     }
     function irARestaurante(secId: string) {
+      setRestSectionTarget(secId);
       if (tabActiva !== "restaurantes") {
         setTabActiva("restaurantes");
         setSearch("");
         setTimeout(function () {
-          const el = document.getElementById(secId);
-          if (el) {
-            window.scrollTo({
-              top: el.getBoundingClientRect().top + window.scrollY - 120,
-              behavior: "smooth",
-            });
-          }
+          scrollToSectionHeading(secId);
         }, 160);
       } else {
-        const el = document.getElementById(secId);
-        if (el) {
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.scrollY - 120,
-            behavior: "smooth",
-          });
-        }
+        setSearch("");
+        setTimeout(function () { scrollToSectionHeading(secId); }, 160);
       }
     }
     const tituloBloqueStyle: React.CSSProperties = {
@@ -3397,37 +3414,23 @@ export default function Dashboard(props: DashboardProps) {
       color: isDark ? "#E8E2D0" : "var(--text-primary)",
       margin: "8px 0 8px 0",
     };
-    const bloqueBotones = (
-      <div>
+    const bloqueMandaditos = (
         <div style={{ padding: "4px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Mandaditos</h3>
+          <p style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "12px" }}>Compras y restaurantes por escrito · sin menú, nos dices qué llevar</p>
           <div style={estiloScrollRow}>
-            {[
-              { emoji: "🛒", label: "Supermercados", sec: "Supermercados" },
-              { emoji: "💊", label: "Farmacias", sec: "Farmacias" },
-              {
-                emoji: "🍎",
-                label: "Verdulerías",
-                sec: "Frutas y Verduras",
-              },
-              { emoji: "🥩", label: "Carnicerías", sec: "Carnicerías" },
-              { emoji: "🐓", label: "Pollerías", sec: "Pollerías" },
-              { emoji: "🐟", label: "Pescaderías", sec: "Pescadería" },
-              { emoji: "🧀", label: "Lácteos/Embutidos", sec: "Lácteos" },
-              { emoji: "📚", label: "Papelerías", sec: "Papelerías" },
-              { emoji: "🧺", label: "Lavanderías", sec: "Lavandería" },
-              { emoji: "🐕", label: "Mascotas", sec: "Mascotas" },
-            ].map(function (btn, i) {
+            {SECCIONES_PEDIDOS_ESCRITOS.map(function (sec, i) {
               return (
                 <button
-                  key={btn.label}
+                  key={sec.titulo}
+                  aria-label={"Mandaditos: " + sec.titulo.trim()}
                   onClick={function () {
-                    irAMandadito(btn.sec);
+                    irAMandadito(sec.titulo);
                   }}
                   style={estiloBotonCat}
                 >
-                  <span style={estiloFichaCat(i)}>{btn.emoji}</span>
-                  {btn.label}
+                  <span style={estiloFichaCat(i)}>{sec.emoji}</span>
+                  {sec.titulo.trim()}
                 </button>
               );
             })}
@@ -3442,6 +3445,8 @@ export default function Dashboard(props: DashboardProps) {
             </button>
           </div>
         </div>
+    );
+    const bloqueRestaurantes = (
         <div style={{ padding: "3px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Restaurantes</h3>
           <div style={estiloScrollRow}>
@@ -3501,6 +3506,7 @@ export default function Dashboard(props: DashboardProps) {
               return (
                 <button
                   key={btn.label + i}
+                  aria-label={"Restaurantes: " + btn.label}
                   onClick={function () {
                     irARestaurante(btn.secId);
                   }}
@@ -3522,8 +3528,8 @@ export default function Dashboard(props: DashboardProps) {
             </button>
           </div>
         </div>
-      </div>
     );
+    const bloqueBotones = <div>{bloqueRestaurantes}{bloqueMandaditos}</div>;
 
     if (tabActiva === "restaurantes") {
       return (
@@ -3536,7 +3542,8 @@ export default function Dashboard(props: DashboardProps) {
           <div id="seccion-restaurantes" style={{ marginTop: "4px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
-              if (!loading && lista.length === 0) return null;
+              const selected = restSectionTarget === ((sec as any).customId ?? tituloAId(sec.titulo));
+              if (!loading && lista.length === 0 && !selected) return null;
               return (
                 <SeccionH
                   key={sec.titulo}
@@ -3546,6 +3553,7 @@ export default function Dashboard(props: DashboardProps) {
                   loading={loading}
                   onSelect={setSelectedMerchant}
                   customId={(sec as any).customId}
+                  forceVisible={selected}
                 />
               );
             })}
@@ -3644,9 +3652,9 @@ export default function Dashboard(props: DashboardProps) {
           {bloqueBotones}
 
           {/* Acordeón de secciones */}
-          {SECCIONES_MAND.map(function (sec) {
+          {SECCIONES_PEDIDOS_ESCRITOS.map(function (sec) {
             const lista = porKeys(sec.keys);
-            if (!loading && lista.length === 0) return null;
+            if (!loading && lista.length === 0 && seccionAbierta !== sec.titulo) return null;
             const abierta = seccionAbierta === sec.titulo;
             return (
               <div
@@ -3722,6 +3730,7 @@ export default function Dashboard(props: DashboardProps) {
                       paddingBottom: "8px",
                     }}
                   >
+                    {lista.length === 0 && !loading && <p style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>Todavía no hay negocios disponibles en esta categoría.</p>}
                     {lista.map(function (m) {
                       return (
                         <TarjetaNegocio
@@ -3796,132 +3805,10 @@ export default function Dashboard(props: DashboardProps) {
 
     if (tabActiva === "tiendita") {
       const lista = merchants.filter(function (m) {
-        return m.category?.toLowerCase() === "tiendita";
+        return ["tiendita", "changui super", "changui súper", "changuito super", "changuito súper"].includes(m.category?.toLowerCase().trim());
       });
       return (
-        <div style={{ padding: "16px 16px 40px" }}>
-          <div
-            style={{
-              background: "linear-gradient(135deg,#facc15,#f59e0b)",
-              borderRadius: "20px",
-              padding: "20px",
-              marginBottom: "20px",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                right: "-10px",
-                top: "-10px",
-                width: "80px",
-                height: "80px",
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.15)",
-              }}
-            />
-            <p
-              style={{
-                fontSize: "9px",
-                fontWeight: 900,
-                color: "rgba(2,6,23,0.5)",
-                textTransform: "uppercase",
-                letterSpacing: "0.2em",
-                margin: "0 0 4px 0",
-              }}
-            >
-              Exclusivo Changuito
-            </p>
-            <h2
-              style={{
-                fontSize: "20px",
-                fontWeight: 900,
-                color: "#020617",
-                margin: "0 0 4px 0",
-              }}
-            >
-              🛒 Tiendita Changuito
-            </h2>
-            <p
-              style={{ fontSize: "12px", color: "rgba(2,6,23,0.6)", margin: 0 }}
-            >
-              Entrega express · Todo lo que necesitas
-            </p>
-          </div>
-          {bloqueBotones}
-          {lista.map(function (m) {
-            return (
-              <div
-                key={m.id}
-                onClick={function () {
-                  setSelectedMerchant(m);
-                }}
-                style={{
-                  background: "var(--bg-card)",
-                  borderRadius: "18px",
-                  padding: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "14px",
-                  border: "1px solid var(--border-subtle)",
-                  cursor: "pointer",
-                  marginBottom: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "14px",
-                    background: "linear-gradient(135deg,#facc15,#f59e0b)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "24px",
-                    flexShrink: 0,
-                  }}
-                >
-                  🛒
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: 800,
-                      color: "var(--text-primary)",
-                      margin: "0 0 3px 0",
-                    }}
-                  >
-                    {m.name}
-                  </p>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--color-yellow)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ★ {(m.rating ?? 4.9).toFixed(1)}
-                  </span>
-                  <span
-                    style={{ fontSize: "11px", color: "var(--text-muted)" }}
-                  >
-                    {" "}
-                    · {m.delivery_time ?? "10-20 min"}
-                  </span>
-                </div>
-                <ChevronRight
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    color: "var(--text-muted)",
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
+        <SuperCatalog merchants={lista} cart={props.carritoGlobal} search={search} onUpdateCart={props.onUpdateCarritoGlobal} loadingMerchants={loading} />
       );
     }
     return null;
@@ -3940,6 +3827,7 @@ export default function Dashboard(props: DashboardProps) {
     >
       {/* Header */}
       <div
+        data-dashboard-header
         style={{
           position: "sticky",
           top: 0,
@@ -3950,6 +3838,7 @@ export default function Dashboard(props: DashboardProps) {
           padding: "14px 16px 12px",
         }}
       >
+        <div className="brand-stripe" aria-hidden="true" style={{ margin: "-14px -16px 14px" }} />
         <div
           style={{
             display: "flex",
@@ -4096,7 +3985,7 @@ export default function Dashboard(props: DashboardProps) {
           />
           <input
             type="text"
-            placeholder="Buscar negocios o categorías..."
+            placeholder={tabActiva === "tiendita" ? "Buscar productos de Changui Súper..." : "Buscar negocios o categorías..."}
             value={search}
             onChange={function (e) {
               setSearch(e.target.value);
@@ -4201,7 +4090,7 @@ export default function Dashboard(props: DashboardProps) {
               setSearch("");
             }}
           >
-            🛒 Tiendita
+            🛒 Changui Súper
           </button>
         </div>
       </div>
@@ -4334,7 +4223,7 @@ export default function Dashboard(props: DashboardProps) {
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
               >
                 <ShoppingCart style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
-                <span>La Tiendita</span>
+                <span>Changui Súper</span>
               </button>
 
               <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
@@ -4716,7 +4605,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "tiendita",
-              label: "ChanguiSuper",
+              label: "Changui Súper",
               emoji: "🛒",
               onClick: function () {
                 setTabActiva("tiendita");

@@ -14,3 +14,9 @@ The user wants work handled directly by the main agent, without intermediaries, 
 **Why:** the user explicitly asked to collaborate directly and keep the work in free mode.
 
 **How to apply:** do not delegate project work unless the user asks; explain any paid-service requirement before integrating it.
+
+La marca usa verde, amarillo, rojo y azul, y el usuario quiere ver los cuatro activados en la aplicación, no dejarlo para después ni limitar la identidad al dorado.
+
+**Why:** el usuario repitió la petición de aplicar ya los cuatro colores de la marca.
+
+**How to apply:** conservar una presencia visible de los cuatro colores al modificar la interfaz, tanto en claro como en oscuro.

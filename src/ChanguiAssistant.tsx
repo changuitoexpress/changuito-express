@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Check, Mic, MicOff, Send, Trash2, X } from "lucide-react";
 import { supabase } from "./supabase";
 import type { AppSession, Theme } from "./App";
+import { useVoiceConversation } from "./hooks/useVoiceConversation";
 
 interface ItemCarrito {
   id: string;
@@ -87,6 +88,14 @@ function dinero(valor: number): string {
   }).format(valor);
 }
 
+function resumenHablado(items: PropuestaItem[]) {
+  return items.map(function (item) {
+    return item.cantidad + " de " + item.nombre + ", por " + (item.precio * item.cantidad).toFixed(2) + " pesos";
+  }).join(", ") + ". Subtotal de productos: " +
+    items.reduce(function (total, item) { return total + item.precio * item.cantidad; }, 0).toFixed(2) +
+    " pesos mexicanos. El envío se calcula después. ¿Confirmas que lo pase al carrito? Puedes decir sí o pedirme un cambio.";
+}
+
 export default function ChanguiAssistant(props: Props) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [input, setInput] = useState("");
@@ -103,6 +112,12 @@ export default function ChanguiAssistant(props: Props) {
   const confirmationLockRef = useRef(false);
   const mountedRef = useRef(true);
   const isDark = props.theme === "dark";
+  const conversation = useVoiceConversation({
+    open: props.abierto,
+    busy: cargando || catalogoCargando,
+    onTurn: async function (text) { await enviarMensaje(text); },
+    onNotice: function (text) { agregarMensajeBot(text); },
+  });
 
   useEffect(function () {
     let activo = true;
@@ -172,13 +187,14 @@ export default function ChanguiAssistant(props: Props) {
     if (!props.abierto) recognitionRef.current?.stop?.();
   }, [props.abierto]);
 
-  function agregarMensajeBot(texto: string) {
+  function agregarMensajeBot(texto: string, textoHablado?: string) {
     setMensajes(function (prev) {
       return [
         ...prev,
         { id: "b-" + Date.now(), rol: "bot", texto, hora: horaActual() },
       ];
     });
+    conversation.speak(textoHablado ?? texto);
   }
 
   async function confirmarPropuesta() {
@@ -217,6 +233,7 @@ export default function ChanguiAssistant(props: Props) {
           actualizados.length > 0
             ? "El catálogo cambió: actualicé precios y quité los productos que ya no están disponibles. Revisa la propuesta y vuelve a confirmar."
             : "Los productos de la propuesta ya no están disponibles. No agregué nada; podemos buscar otra opción.",
+          actualizados.length > 0 ? "El catálogo cambió. No agregué nada. Esta es la propuesta actualizada. " + resumenHablado(actualizados) : undefined,
         );
         return;
       }
@@ -359,6 +376,9 @@ export default function ChanguiAssistant(props: Props) {
         setPropuesta(propuestaNueva);
         agregarMensajeBot(
           String(data.reply ?? "¿Quieres ajustar algo de tu pedido?"),
+          propuestaNueva.length > 0
+            ? String(data.reply ?? "Preparé tu propuesta.") + ". No agregué nada todavía. " + resumenHablado(propuestaNueva)
+            : undefined,
         );
       }
     } catch (error: any) {
@@ -372,6 +392,7 @@ export default function ChanguiAssistant(props: Props) {
   }
 
   function iniciarDictado() {
+    conversation.stop();
     if (dictando) {
       recognitionRef.current?.stop?.();
       return;
@@ -786,6 +807,26 @@ export default function ChanguiAssistant(props: Props) {
           flexShrink: 0,
         }}
       >
+        <div style={{ marginBottom: "10px", padding: "10px 12px", background: conversation.enabled ? "var(--color-blue-dim)" : "var(--color-green-dim)", borderRadius: "16px", border: "1px solid " + (conversation.enabled ? "var(--color-blue)" : "var(--border-subtle)") }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              type="button"
+              aria-pressed={conversation.enabled}
+              disabled={!conversation.enabled && (cargando || catalogoCargando)}
+              onClick={function () {
+                recognitionRef.current?.stop?.();
+                conversation.start();
+              }}
+              style={{ padding: "10px 13px", borderRadius: "12px", background: conversation.enabled ? "var(--color-red)" : "var(--color-blue)", color: "#fff", fontSize: "12px", fontWeight: 800, whiteSpace: "nowrap" }}
+            >
+              {conversation.enabled ? "Terminar conversación" : "Conversar"}
+            </button>
+            <p role="status" style={{ margin: 0, fontSize: "11px", lineHeight: 1.4, color: "var(--text-secondary)" }}>
+              {conversation.enabled ? conversation.status : "Habla, escucha la respuesta y sigue platicando. Sin pulsar Enviar."}
+            </p>
+          </div>
+          {conversation.transcript && <p aria-live="polite" style={{ margin: "8px 0 0", fontSize: "12px", color: "var(--text-primary)" }}>{conversation.transcript}</p>}
+        </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <button
             type="button"
@@ -812,6 +853,7 @@ export default function ChanguiAssistant(props: Props) {
             ref={inputRef}
             value={input}
             onChange={function (event) {
+              if (conversation.enabled) conversation.stop();
               setInput(event.target.value);
             }}
             onKeyDown={function (event) {
@@ -878,7 +920,7 @@ export default function ChanguiAssistant(props: Props) {
             lineHeight: 1.4,
           }}
         >
-          Dictado disponible según tu navegador · Precios del catálogo · Confirmas antes de agregar
+          Voz según tu navegador · El micrófono se apaga al cerrar · Confirmas antes de agregar
         </p>
       </div>
     </div>
