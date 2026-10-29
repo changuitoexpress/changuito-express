@@ -11,6 +11,7 @@ import AdminResumen from './admin/AdminResumen';
 import AdminCatalogo from './admin/AdminCatalogo';
 import AdminNegocios from './admin/AdminNegocios';
 import AdminTablas from './admin/AdminTablas';
+import AdminMandaditos from './admin/AdminMandaditos';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
@@ -308,8 +309,8 @@ export default function AdminGodMode(props: AdminProps) {
         <div style={{ display:'flex', overflowX:'auto', scrollbarWidth:'none', background:isDark?'rgba(0,0,0,0.4)':'rgba(0,0,0,0.05)', borderRadius:'14px', padding:'3px', gap:'3px' }}>
           <button style={tabStyle('resumen')}  onClick={function(){ setTab('resumen');  }}>📈 Resumen</button>
           <button style={tabStyle('pedidos')}  onClick={function(){ setTab('pedidos');  }}>📦 Pedidos</button>
-          <button style={tabStyle('catalogo')} onClick={function(){ setTab('catalogo'); }}>🍔 Productos</button>
-          <button style={tabStyle('negocios')} onClick={function(){ setTab('negocios'); }}>🏪 Negocios</button>
+          <button style={tabStyle('catalogo')} onClick={function(){ setTab('catalogo'); }}>🛵 Mandaditos</button>
+          <button style={tabStyle('negocios')} onClick={function(){ setTab('negocios'); }}>🍽️ Restaurantes</button>
           <button style={tabStyle('otros')}    onClick={function(){ setTab('otros');    }}>🛍️ Otros</button>
           <button style={tabStyle('clientes')} onClick={function(){ setTab('clientes'); }}>👥 Gestión</button>
         </div>
@@ -326,7 +327,7 @@ export default function AdminGodMode(props: AdminProps) {
         {tab === 'resumen' && (
           <AdminResumen totalClientes={metricas?.totalClientes ?? 0} negociosAbiertos={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} totalNegocios={merchants.length} />
         )}
-        {tab === 'catalogo' && <AdminCatalogo merchants={merchants} />}
+        {tab === 'catalogo' && <AdminMandaditos merchants={merchants} onCambio={fetchMerchants} />}
         {tab === 'otros' && <AdminTablas />}
 
         {/* ── TAB PEDIDOS ── */}
@@ -539,7 +540,18 @@ export default function AdminGodMode(props: AdminProps) {
               <MetricaCard emoji="🏪" titulo="Total negocios"  valor={merchants.length} />
               <MetricaCard emoji="✅" titulo="Abiertos ahora"  valor={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} color="var(--color-green)" />
             </div>
-            <AdminNegocios merchants={merchants} onCambio={function(){ fetchMerchants(); fetchMetricas(); }} abiertoAhora={estaAbiertoAhora} onToggle={toggleMerchant} />
+            <p style={{ fontSize:'12px', color:'var(--text-muted)', margin:'0 0 12px' }}>
+              Negocios con catálogo de productos. Desde aquí puedes editar sus datos y administrar nombre, precio, fotos y disponibilidad de cada producto.
+            </p>
+            <AdminNegocios
+              merchants={merchants.filter(function(m){ return String(m.category ?? '').toLowerCase().trim() !== 'mandaditos'; })}
+              onCambio={function(){ fetchMerchants(); fetchMetricas(); }}
+              abiertoAhora={estaAbiertoAhora}
+              onToggle={toggleMerchant}
+            />
+            <div style={{ marginTop:'22px' }}>
+              <AdminCatalogo merchants={merchants.filter(function(m){ return String(m.category ?? '').toLowerCase().trim() !== 'mandaditos'; })} />
+            </div>
           </div>
         )}
 

@@ -106,7 +106,9 @@ GRANT EXECUTE ON FUNCTION public.crear_pedidos_multinegocio(jsonb, text, text, t
 
 -- 4. Estatus del pedido con cashback configurable por negocio
 --    (misma firma y misma protección contra doble crédito que la versión anterior).
-CREATE OR REPLACE FUNCTION cambiar_estatus_pedido(p_id uuid, p_estatus text)
+--    DROP es necesario si la función instalada devuelve jsonb en lugar de json.
+DROP FUNCTION IF EXISTS public.cambiar_estatus_pedido(uuid, text);
+CREATE FUNCTION public.cambiar_estatus_pedido(p_id uuid, p_estatus text)
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER

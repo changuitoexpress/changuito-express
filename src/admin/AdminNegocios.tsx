@@ -34,7 +34,7 @@ export default function AdminNegocios(props: { merchants: any[]; onCambio: () =>
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
-  const [filtro, setFiltro] = useState<'todas' | Seccion>('todas');
+  const [filtro, setFiltro] = useState<'todas' | 'restaurantes' | 'tiendita'>('todas');
 
   function abrir(m?: any) {
     setError(''); setOk('');
@@ -90,7 +90,7 @@ export default function AdminNegocios(props: { merchants: any[]; onCambio: () =>
       {error && !editando && <Aviso tipo="error" texto={error} />}
       {ok && <Aviso tipo="ok" texto={ok} />}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px', alignItems: 'center' }}>
-        {(['todas', 'restaurantes', 'mandaditos', 'tiendita'] as const).map(function (f) {
+        {(['todas', 'restaurantes', 'tiendita'] as const).map(function (f) {
           const activo = filtro === f;
           return <button key={f} type="button" onClick={function () { setFiltro(f); }} style={{ ...btn(activo ? 'primary' : 'ghost'), padding: '8px 14px' }}>{f === 'todas' ? 'Todos' : ETIQUETA[f]}</button>;
         })}
