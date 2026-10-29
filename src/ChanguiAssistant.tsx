@@ -89,11 +89,19 @@ function dinero(valor: number): string {
 }
 
 function resumenHablado(items: PropuestaItem[]) {
-  return items.map(function (item) {
-    return item.cantidad + " de " + item.nombre + ", por " + (item.precio * item.cantidad).toFixed(2) + " pesos";
-  }).join(", ") + ". Subtotal de productos: " +
+  const groups = new Map<string, PropuestaItem[]>();
+  items.forEach(function (item) {
+    const group = groups.get(item.negocio_id) ?? [];
+    group.push(item);
+    groups.set(item.negocio_id, group);
+  });
+  return Array.from(groups.values()).map(function (group) {
+    return "En " + group[0].negocio + ": " + group.map(function (item) {
+      return item.cantidad + " de " + item.nombre + ", por " + (item.precio * item.cantidad).toFixed(2) + " pesos";
+    }).join(", ");
+  }).join(". ") + ". Subtotal de productos: " +
     items.reduce(function (total, item) { return total + item.precio * item.cantidad; }, 0).toFixed(2) +
-    " pesos mexicanos. El envío se calcula después. ¿Confirmas que lo pase al carrito? Puedes decir sí o pedirme un cambio.";
+    " pesos mexicanos. El envío final se calcula en el carrito y puede cambiar con varios negocios. ¿Confirmas que pase todo al carrito? Puedes decir sí o pedirme un cambio.";
 }
 
 export default function ChanguiAssistant(props: Props) {
@@ -237,6 +245,12 @@ export default function ChanguiAssistant(props: Props) {
         );
         return;
       }
+      const cantidadNegocios = new Set(
+        props.carritoGlobal.concat(actualizados).map(function (item) { return item.negocio_id; }),
+      ).size;
+      if (cantidadNegocios > 4) {
+        throw new Error("El carrito admite hasta 4 negocios. Ajusta la propuesta para poder agregarla completa.");
+      }
       props.onAddToCart(actualizados);
       confirmado = true;
       setPropuesta([]);
@@ -361,26 +375,14 @@ export default function ChanguiAssistant(props: Props) {
           tipo: "producto",
         });
       }
-      const merchantIds = new Set(
-        propuestaNueva.map(function (item) {
-          return item.negocio_id;
-        }),
+      confirmationLockRef.current = false;
+      setPropuesta(propuestaNueva);
+      agregarMensajeBot(
+        String(data.reply ?? "¿Quieres ajustar algo de tu pedido?"),
+        propuestaNueva.length > 0
+          ? String(data.reply ?? "Preparé tu propuesta.") + ". No agregué nada todavía. " + resumenHablado(propuestaNueva)
+          : undefined,
       );
-      if (merchantIds.size > 1) {
-        setPropuesta([]);
-        agregarMensajeBot(
-          "Para calcular correctamente el pedido, hagámoslo con un solo negocio a la vez. ¿Cuál prefieres?",
-        );
-      } else {
-        confirmationLockRef.current = false;
-        setPropuesta(propuestaNueva);
-        agregarMensajeBot(
-          String(data.reply ?? "¿Quieres ajustar algo de tu pedido?"),
-          propuestaNueva.length > 0
-            ? String(data.reply ?? "Preparé tu propuesta.") + ". No agregué nada todavía. " + resumenHablado(propuestaNueva)
-            : undefined,
-        );
-      }
     } catch (error: any) {
       agregarMensajeBot(
         error?.message ??
@@ -447,6 +449,12 @@ export default function ChanguiAssistant(props: Props) {
   const totalPropuesta = propuesta.reduce(function (total, item) {
     return total + item.precio * item.cantidad;
   }, 0);
+  const gruposPropuesta = Array.from(propuesta.reduce(function (groups, item) {
+    const items = groups.get(item.negocio_id) ?? [];
+    items.push(item);
+    groups.set(item.negocio_id, items);
+    return groups;
+  }, new Map<string, PropuestaItem[]>()).values());
 
   return (
     <div
@@ -698,7 +706,7 @@ export default function ChanguiAssistant(props: Props) {
                     fontWeight: 850,
                   }}
                 >
-                  {propuesta[0].negocio}
+                  {gruposPropuesta.length === 1 ? "1 negocio" : gruposPropuesta.length + " negocios"}
                 </div>
               </div>
               <button
@@ -725,26 +733,24 @@ export default function ChanguiAssistant(props: Props) {
                 <Trash2 size={15} />
               </button>
             </div>
-            {propuesta.map(function (item) {
+            {gruposPropuesta.map(function (grupo) {
+              const subtotalNegocio = grupo.reduce(function (sum, item) {
+                return sum + item.precio * item.cantidad;
+              }, 0);
               return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                    padding: "8px 0",
-                    borderTop: "1px solid var(--border-subtle)",
-                    fontSize: "12px",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  <span>
-                    {item.cantidad} × {item.nombre}
-                  </span>
-                  <strong style={{ whiteSpace: "nowrap" }}>
-                    {dinero(item.precio * item.cantidad)}
-                  </strong>
+                <div key={grupo[0].negocio_id} style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "8px", marginTop: "4px" }}>
+                  <h4 style={{ margin: "0 0 4px", fontSize: "12px", color: "var(--text-primary)" }}>{grupo[0].negocio}</h4>
+                  {grupo.map(function (item) {
+                    return (
+                      <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "8px 0", fontSize: "12px", color: "var(--text-primary)" }}>
+                        <span>{item.cantidad} × {item.nombre}</span>
+                        <strong style={{ whiteSpace: "nowrap" }}>{dinero(item.precio * item.cantidad)}</strong>
+                      </div>
+                    );
+                  })}
+                  <div style={{ textAlign: "right", padding: "4px 0 8px", fontSize: "11px", color: "var(--text-secondary)" }}>
+                    Subtotal de {grupo[0].negocio}: <strong>{dinero(subtotalNegocio)}</strong>
+                  </div>
                 </div>
               );
             })}
@@ -770,7 +776,7 @@ export default function ChanguiAssistant(props: Props) {
                 color: "var(--text-muted)",
               }}
             >
-              El envío se calcula después. Nada se agrega hasta que lo confirmes.
+              {gruposPropuesta.length > 1 ? "El envío final puede incluir cargo por varios negocios y se calcula en el carrito." : "El envío se calcula después."} Nada se agrega hasta que lo confirmes.
             </p>
             <button
               type="button"

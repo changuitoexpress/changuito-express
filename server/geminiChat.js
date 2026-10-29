@@ -83,6 +83,28 @@ function sanitizeHistory(history) {
   });
 }
 
+function ocultarIdentificadores(text, catalog) {
+  let safeText = text;
+  const byId = new Map();
+  for (const product of catalog) {
+    byId.set(product.id, product.name);
+    byId.set(product.merchantId, product.merchantName);
+  }
+  for (const [id, label] of Array.from(byId.entries()).sort(function (a, b) {
+    return b[0].length - a[0].length;
+  })) {
+    if (!id) continue;
+    const token = new RegExp(
+      "(^|[^a-z0-9_])" + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=$|[^a-z0-9_])",
+      "gi",
+    );
+    safeText = safeText.replace(token, function (_match, prefix) {
+      return prefix + label;
+    });
+  }
+  return safeText;
+}
+
 function validateModelResult(modelResult, catalog) {
   const productsById = new Map(catalog.map(function (product) {
     return [product.id, product];
@@ -104,20 +126,12 @@ function validateModelResult(modelResult, catalog) {
   const validatedItems = Array.from(combined.entries()).map(function ([id, quantity]) {
     return { id, quantity, product: productsById.get(id) };
   });
-  const merchantIds = new Set(validatedItems.map(function (item) {
-    return item.product.merchantId;
-  }));
-  if (merchantIds.size > 1) {
-    return {
-      reply: "Puedo ayudarte con un negocio a la vez para calcular bien el envío. ¿De cuál negocio quieres hacer el pedido?",
-      items: [],
-    };
-  }
-
-  let reply =
+  let reply = ocultarIdentificadores(
     typeof modelResult?.reply === "string"
       ? modelResult.reply.trim().slice(0, 700)
-      : "Revisa la propuesta y dime si quieres cambiar algo.";
+      : "Revisa la propuesta y dime si quieres cambiar algo.",
+    catalog,
+  );
   if (rawItems.length > 0 && validatedItems.length === 0) {
     reply = "No pude asociar esa propuesta con productos disponibles. Dime el negocio y el producto para revisarlo.";
   } else if (
@@ -216,12 +230,16 @@ export async function handleGeminiChatRequest(req, res) {
     "Eres ChanguiBot, asistente de pedidos de Changuito Express en México.",
     "Habla español mexicano, de forma amable, clara y breve.",
     "Debes orientar, identificar productos y ayudar a preparar una propuesta.",
-    "Usa exclusivamente productos e IDs de CATALOGO. No inventes nombres, precios, disponibilidad ni negocios.",
+    "Selecciona productos exclusivamente por su ID interno del CATALOGO. No inventes nombres, precios, disponibilidad ni negocios.",
+    "Los IDs son secretos internos de la integración: jamás los muestres, pronuncies ni escribas en reply. Usa nombres comerciales en el texto; conserva IDs solo en el campo estructurado productId.",
     "No escribas precios en tu texto: la aplicación los calcula con el catálogo real.",
     "Devuelve en items la propuesta COMPLETA del pedido, no solo los cambios. Conserva el borrador salvo que el cliente lo quite, cancele o corrija.",
     "Si el pedido es ambiguo, no agregues un producto por suposición: explica qué falta y devuelve items vacío o conserva el borrador existente.",
     "No agregues nada al carrito ni confirmes la compra. La aplicación espera confirmación explícita del cliente.",
-    "Un carrito solo puede incluir productos de un negocio. Si el pedido mezcla negocios, pregunta cuál prefiere y devuelve items vacío.",
+    "Puedes preparar una sola propuesta con productos de varios negocios y la aplicación los organizará por negocio dentro del mismo carrito.",
+    "Incluye todos los negocios que el cliente haya mencionado con claridad. No excluyas artículos solo porque provienen de negocios distintos.",
+    "Si hay productos repetidos con el mismo nombre en diferentes negocios y el cliente no especificó cuál, pregunta por el negocio antes de agregar ese producto. No adivines.",
+    "En reply usa nombres de productos y negocios, cantidades y preguntas concretas; nunca enumeres IDs, JSON ni códigos internos.",
     "Si el mensaje pide algo que no existe en el catálogo, dilo con claridad y sugiere opciones reales del mismo negocio cuando las haya.",
     "No pidas ni repitas datos sensibles, direcciones, contraseñas ni números de tarjeta.",
     "",

@@ -30,11 +30,13 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     const products = [
       { id: "burger", merchant_id: "shop", name: "Hamburguesa de res", price: 89, is_available: true },
       { id: "fries", merchant_id: "shop", name: "Papas a la francesa", price: 45, is_available: true },
+      { id: "taco", merchant_id: "taco-shop", name: "Taco al pastor", price: 20, is_available: true },
       { id: "rice", merchant_id: "super", name: "Arroz de prueba", description: "Bolsa de un kilo", price: 25, image_url: null, category: "Despensa", is_available: true },
       { id: "milk", merchant_id: "super", name: "Leche de prueba", description: "Un litro", price: 30, image_url: null, category: "Lácteos", is_available: true },
     ];
     const merchants = [
       { ...merchant, category: "hamburguesas" },
+      { ...merchant, id: "taco-shop", name: "Taco Prueba", category: "taqueria" },
       { ...merchant, id: "written", name: "Domino de prueba", category: "mandaditos" },
       { ...merchant, id: "super", name: "Negocio interno de súper", category: "tiendita" },
     ];
@@ -59,6 +61,7 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
       window.__spokenReplies = [];
       window.__micStarts = 0;
       window.__micAborts = 0;
+      window.__slowSpeech = false;
       class FixtureRecognition {
         start() {
           const self = this;
@@ -87,7 +90,7 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
           cancel: function () {},
           speak: function (utterance) {
             window.__spokenReplies.push(utterance.text);
-            setTimeout(function () { utterance.onend?.(); }, 30);
+            setTimeout(function () { utterance.onend?.(); }, window.__slowSpeech ? 1200 : 30);
           },
         },
       });
@@ -152,14 +155,23 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
       apiCalls += 1;
       assert.equal(route.request().headers().authorization, "Bearer " + accessToken);
       const input = route.request().postDataJSON();
-      assert.equal(input.message, apiCalls === 2 ? "Otra opción" : "Quiero una hamburguesa y dos papas");
-      assert.equal(input.catalog.length, 4);
+      assert.equal(input.message, apiCalls === 2
+        ? "Otra opción"
+        : apiCalls === 3
+          ? "Quiero una hamburguesa del Negocio de prueba y un taco de Taco Prueba"
+          : "Quiero una hamburguesa y dos papas");
+      assert.equal(input.catalog.length, 5);
       await route.fulfill({
         status: returnQuotaError ? 429 : 200,
         contentType: "application/json",
         body: JSON.stringify(returnQuotaError
           ? { error: "Límite temporal de prueba. Intenta después." }
-          : { reply: "Preparé esta propuesta para revisar.", items: [{ id: "burger", quantity: 1 }, { id: "fries", quantity: 2 }] }),
+          : {
+              reply: "Preparé esta propuesta para revisar.",
+              items: apiCalls === 3
+                ? [{ id: "burger", quantity: 1 }, { id: "taco", quantity: 1 }]
+                : [{ id: "burger", quantity: 1 }, { id: "fries", quantity: 2 }],
+            }),
       });
     });
 
@@ -209,17 +221,32 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     // Conversation automatically submits, speaks a real-price summary and listens again.
     returnQuotaError = false;
     await page.evaluate(function () {
-      window.__voiceTurns = ["Quiero una hamburguesa y dos papas", "sí", "sí"];
+      window.__slowSpeech = true;
+      window.__voiceTurns = [
+        "Quiero una hamburguesa del Negocio de prueba y un taco de Taco Prueba",
+        "sí",
+        "sí",
+      ];
     });
     await page.getByRole("button", { name: "Conversar", exact: true }).click();
+    const multiBusinessRegion = page.getByRole("region", { name: "Propuesta de pedido" });
+    await multiBusinessRegion.waitFor();
+    const multiBusinessProposal = await multiBusinessRegion.innerText();
+    assert.match(multiBusinessProposal, /2 negocios/);
+    assert.match(multiBusinessProposal, /Negocio de prueba/);
+    assert.match(multiBusinessProposal, /Taco Prueba/);
+    await page.screenshot({ path: "/tmp/changui-assistant-multi-business.jpg" });
+    await page.evaluate(function () { window.__slowSpeech = false; });
     await page.waitForFunction(function () {
       const cart = JSON.parse(localStorage.getItem("changuito-cart") || "[]");
       return cart.find(function (item) { return item.id === "burger"; })?.cantidad === 2 &&
-        cart.find(function (item) { return item.id === "fries"; })?.cantidad === 4;
+        cart.find(function (item) { return item.id === "fries"; })?.cantidad === 2 &&
+        cart.find(function (item) { return item.id === "taco"; })?.cantidad === 1;
     });
     assert.equal(apiCalls, 3);
+    assert.doesNotMatch(await page.locator("[role=log]").innerText().catch(function () { return ""; }), /\b(?:burger|taco-shop)\b/i);
     const spoken = await page.evaluate(function () { return window.__spokenReplies; });
-    assert.ok(spoken.some(function (text) { return text.includes("189.00 pesos mexicanos"); }));
+    assert.ok(spoken.some(function (text) { return text.includes("Taco Prueba") && text.includes("119.00 pesos mexicanos"); }));
     await page.waitForFunction(function () { return document.body.innerText.includes("Te escucho · habla y haz una pausa"); });
     await page.getByRole("button", { name: "Cerrar ChanguiBot", exact: true }).click();
     const micStartsAtClose = await page.evaluate(function () { return window.__micStarts; });
@@ -273,7 +300,7 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     await page.getByRole("button", { name: "Ver Leche de prueba", exact: true }).click();
     assert.equal(await page.getByRole("dialog", { name: "Leche de prueba" }).getByRole("button", { name: "Cerrado por ahora" }).isDisabled(), true);
     assert.deepEqual(pageErrors, []);
-    console.log("UI verified: dictation, automatic voice turns/spoken prices/reconfirmation, mic off on close, quote safety, category order, heading visibility, written restaurant access, direct Super products/categories/cart/empty search; mobile and desktop; no live DB writes.");
+    console.log("UI verified: conversation spans two businesses and displays names/prices without IDs; confirmation, category order, written orders and Super products work. Mobile and desktop fixtures made no live DB writes.");
     await context.close();
   } finally {
     await browser.close();

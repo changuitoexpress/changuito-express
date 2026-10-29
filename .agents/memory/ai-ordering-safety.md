@@ -20,3 +20,9 @@ El usuario quiere platicar con el asistente y oír sus respuestas sin pulsar Env
 **Why:** distinguió explícitamente la conversación hablada del dictado manual.
 
 **How to apply:** mantener una opción de conversación por turnos, además de texto y dictado; la voz conserva los mismos límites de confirmación y precios que el chat escrito.
+
+Una propuesta puede incluir productos de varios negocios que el cliente haya identificado; el resumen visible debe agruparlos por negocio y nunca mostrar identificadores internos.
+
+**Why:** el usuario quiere completar una compra entre negocios desde un mismo carrito y reportó que el bot mostraba IDs en sus respuestas.
+
+**How to apply:** mantener los IDs solo para resolver productos del catálogo internamente; presentar y hablar con nombres de producto y negocio, mostrar subtotales agrupados y conservar el límite actual de cuatro negocios por carrito.

@@ -10,7 +10,7 @@ process.env.VITE_SUPABASE_ANON_KEY = "fixture-public-key";
 const catalog = [
   { id: "burger", name: "Hamburguesa", price: 89, merchantId: "shop", merchantName: "Prueba" },
   { id: "fries", name: "Papas", price: 45, merchantId: "shop", merchantName: "Prueba" },
-  { id: "taco", name: "Taco", price: 20, merchantId: "other", merchantName: "Otro" },
+  { id: "product_5af91", name: "Taco", price: 20, merchantId: "store_4bd20", merchantName: "Otro" },
 ];
 let requestNumber = 0;
 
@@ -100,14 +100,19 @@ test("does not accept invented IDs or invalid quantities", async function () {
   assert.match(result.body.reply, /No pude asociar/);
 });
 
-test("merges repeated items and asks before mixing businesses", async function () {
+test("merges repeated items and retains products from each requested business", async function () {
   mockProvider({
-    reply: "Propuesta",
-    items: [{ productId: "burger", quantity: 1 }, { productId: "taco", quantity: 1 }],
+    reply: "Incluí burger del negocio shop y product_5af91 del negocio store_4bd20.",
+    items: [
+      { productId: "burger", quantity: 1 },
+      { productId: "burger", quantity: 1 },
+      { productId: "product_5af91", quantity: 2 },
+    ],
   });
   const result = await invoke({ message: "pedido", catalog });
-  assert.deepEqual(result.body.items, []);
-  assert.match(result.body.reply, /negocio a la vez/);
+  assert.deepEqual(result.body.items, [{ id: "burger", quantity: 2 }, { id: "product_5af91", quantity: 2 }]);
+  assert.match(result.body.reply, /Hamburguesa del negocio Prueba y Taco del negocio Otro/);
+  assert.doesNotMatch(result.body.reply, /\b(?:burger|shop|product_5af91|store_4bd20)\b/i);
 });
 
 test("never repeats prices or false checkout claims from generated prose", async function () {
