@@ -55,7 +55,7 @@ import {
   writeFormDraft,
 } from "./formDrafts";
 import VistaNegocio from "./VistaNegocio";
-import ChanguitoAI from "./ChanguitoAI";
+import ChanguitoAI from "./ChanguiAssistant";
 import Monedero from "./Monedero";
 import { getFreeShippingProgress, getShippingCharge } from "./freeShippingProgress";
 
