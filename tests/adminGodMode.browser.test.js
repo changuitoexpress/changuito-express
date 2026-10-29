@@ -1,0 +1,134 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { chromium } from "playwright";
+
+test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async function () {
+  const browser = await chromium.launch({ executablePath: "/repl/tools/bin/chromium", headless: true, args: ["--no-sandbox"] });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const pageErrors = [];
+    page.on("pageerror", function (e) { pageErrors.push(e.message); });
+    const writes = [];
+    const merchants = [
+      { id: "m1", name: "Burger Prueba", category: "hamburguesas", is_open: true, rating: 5, cashback_pct: null },
+      { id: "m2", name: "Domino Prueba", category: "mandaditos", is_open: true, rating: 5, cashback_pct: 3 },
+    ];
+    const products = [{ id: "p1", merchant_id: "m1", name: "Hamburguesa clásica", description: "x", price: 89, image_url: null, category: "Burgers", is_available: true }];
+    const pedidos = [
+      { id: "o1", total_pagar: 200, estatus: "entregado", created_at: new Date().toISOString(), negocio_nombre: "Burger Prueba", forma_pago: "efectivo", cliente_id: "c1" },
+      { id: "o2", total_pagar: 100, estatus: "pendiente", created_at: new Date().toISOString(), negocio_nombre: "Domino Prueba", forma_pago: "tarjeta", cliente_id: "c1" },
+    ];
+    const user = {
+      id: "fixture-chat-user",
+      email: "uliseseven.7@gmail.com",
+      aud: "authenticated",
+      role: "authenticated",
+      app_metadata: {},
+      user_metadata: {},
+      created_at: new Date().toISOString(),
+    };
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+    const accessToken = [
+      Buffer.from('{"alg":"HS256","typ":"JWT"}').toString("base64url"),
+      Buffer.from(JSON.stringify({ sub: user.id, exp: expiresAt, role: "authenticated" })).toString("base64url"),
+      "fixture-signature",
+    ].join(".");
+
+    await page.route("**/auth/v1/**", async function (route) {
+      const request = route.request();
+      const isToken = request.url().includes("/token");
+      await route.fulfill({
+        status: request.method() === "OPTIONS" ? 204 : 200,
+        headers: {
+          "content-type": "application/json",
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers": "*",
+        },
+        body: request.method() === "OPTIONS" ? "" : JSON.stringify(
+          isToken
+            ? { access_token: accessToken, token_type: "bearer", refresh_token: "fixture-refresh", expires_in: 3600, expires_at: expiresAt, user }
+            : user,
+        ),
+      });
+    });
+    await page.route("**/rest/v1/**", async function (route) {
+      const request = route.request();
+      const url = new URL(request.url());
+      const table = url.pathname.split("/").pop();
+      const acceptsObject = (request.headers().accept ?? "").includes("object");
+      if (request.method() !== "GET" && request.method() !== "OPTIONS") writes.push(request.method() + " " + table + " " + (request.postData() ?? ""));
+      if (request.method() === "PATCH" && table === "merchants") {
+        const merchantId = (url.searchParams.get("id") ?? "").replace(/^eq\./, "");
+        const merchant = merchants.find(function (m) { return m.id === merchantId; });
+        if (merchant) Object.assign(merchant, request.postDataJSON());
+      }
+      let rpcResponse = null;
+      if (request.method() === "POST" && table === "cambiar_estatus_pedido") {
+        const args = request.postDataJSON();
+        const pedido = pedidos.find(function (p) { return p.id === args.p_id; });
+        if (pedido) pedido.estatus = args.p_estatus;
+        rpcResponse = { ok: true, estatus: args.p_estatus };
+      }
+      let data = [];
+      if (table === "perfiles") data = [{ id: user.id, nombre: "Admin", rol: "admin" }];
+      if (table === "merchants") data = merchants;
+      if (table === "products") data = products;
+      if (table === "pedidos") data = pedidos;
+      if (request.method() !== "GET" && request.method() !== "OPTIONS") data = [{ id: "x" }];
+      await route.fulfill({
+        status: request.method() === "OPTIONS" ? 204 : 200,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*", "access-control-expose-headers": "content-range", "content-range": "0-0/0" },
+        body: request.method() === "OPTIONS" ? "" : JSON.stringify(rpcResponse ?? (acceptsObject ? data[0] ?? null : data)),
+      });
+    });
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN ? "https://" + process.env.REPLIT_DEV_DOMAIN : "http://127.0.0.1:5173";
+    await page.goto(baseUrl);
+    await page.getByLabel("Correo electrónico", { exact: true }).fill(user.email);
+    await page.getByLabel("Contraseña", { exact: true }).fill("fixture-password");
+    await page.getByRole("button", { name: "Entrar", exact: true }).last().click();
+    await page.getByLabel("Abrir menú").click({ timeout: 20000 });
+    await page.getByRole("button", { name: "God Mode" }).click();
+
+    await page.getByText("Tendencia de ventas").waitFor();
+    assert.match(await page.locator("body").innerText(), /\$300/);
+    await page.screenshot({ path: "/tmp/god-resumen.jpg" });
+
+    await page.getByRole("button", { name: /Pedidos/ }).click();
+    page.once("dialog", function (dialog) { dialog.accept(); });
+    await page.getByRole("button", { name: "Marcar pedido de Domino Prueba como entregado" }).click();
+    await page.waitForFunction(function () { return document.body.innerText.includes("Entregado"); });
+    assert.ok(writes.some(function (w) { return w.startsWith("POST cambiar_estatus_pedido") && w.includes("\"p_estatus\":\"entregado\""); }));
+
+    await page.getByRole("button", { name: /Mandaditos/ }).click();
+    await page.getByText("Domino Prueba").waitFor();
+    await page.getByRole("button", { name: "Elegir destino" }).click();
+    await page.getByLabel("Tipo de comida en Restaurantes").selectOption("hamburguesas");
+    await page.getByRole("button", { name: "Mover a Restaurantes" }).click();
+    await page.getByText("Domino Prueba ahora aparecerá en Restaurantes.").waitFor();
+
+    await page.getByRole("button", { name: /Restaurantes/ }).click();
+    await page.getByText("Domino Prueba").waitFor();
+    await page.getByText("Hamburguesa clásica").waitFor();
+    await page.getByText("Hamburguesa clásica").locator("xpath=../..").getByRole("button", { name: "Editar", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    await page.getByText("Producto guardado.").waitFor();
+    assert.ok(writes.some(function (w) { return w.startsWith("PATCH products") && w.includes("\"price\":89"); }));
+    await page.screenshot({ path: "/tmp/god-productos.jpg" });
+
+    await page.getByRole("button", { name: /Otros/ }).click();
+    await page.getByText("Changui Shopping").first().waitFor();
+    assert.deepEqual(pageErrors, []);
+    await page.getByRole("button", { name: /Restaurantes/ }).click();
+    await page.getByRole("button", { name: "Editar", exact: true }).nth(1).click();
+    await page.getByRole("dialog").getByText("Cashback a clientes (%)").waitFor();
+    await page.screenshot({ path: "/tmp/god-negocios.jpg" });
+    await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+    await page.getByText("Negocio guardado.").waitFor();
+    assert.ok(writes.some(function (w) { return w.startsWith("PATCH merchants") && w.includes("\"category\":\"mandaditos\"") && w.includes("\"cashback_pct\":3"); }));
+
+    assert.ok(writes.some(function (w) { return w.startsWith("PATCH merchants") && w.includes("\"category\":\"hamburguesas\""); }));
+  } finally {
+    await browser.close();
+  }
+});

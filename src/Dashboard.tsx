@@ -41,9 +41,25 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
+import {
+  listDeviceAuthSessions,
+  revokeDeviceAuthSession,
+  signOut,
+  signOutEverywhere,
+} from "./authFlows";
+import type { DeviceAuthSession } from "./authFlows";
+import {
+  clearFormDraft,
+  clearUserFormDrafts,
+  readFormDraft,
+  writeFormDraft,
+} from "./formDrafts";
 import VistaNegocio from "./VistaNegocio";
-import ChanguitoAI from "./ChanguitoAI";
+import ChanguitoAI from "./ChanguiAssistant";
 import Monedero from "./Monedero";
+import { getFreeShippingProgress, getShippingCharge } from "./freeShippingProgress";
+import SuperCatalog from "./components/SuperCatalog";
+import { scrollToSectionHeading } from "./sectionScroll";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface Merchant {
@@ -116,6 +132,79 @@ const FORMAS_PAGO = [
   { id: "transferencia", label: "Transferencia", emoji: "📲" },
   { id: "en_linea", label: "Pago en línea", emoji: "🌐" },
 ];
+
+type CheckoutDraft = {
+  cartSignature: string;
+  paso: "carrito" | "direccion" | "pago" | "resumen";
+  dirSeleccionadaId: string | null;
+  formaNueva: boolean;
+  alias: string;
+  calle: string;
+  numero: string;
+  referencias: string;
+  preferencias: string;
+  formaPago: string;
+  fraccionamientoId: string | null;
+  fracSearch: string;
+};
+
+const CHECKOUT_DRAFT_ID = "customer-checkout";
+
+function checkoutCartSignature(carrito: CartItem[]): string {
+  return carrito
+    .map(function (item) {
+      return item.id + ":" + item.cantidad;
+    })
+    .sort()
+    .join("|");
+}
+
+function getCheckoutDraft(userId: string, carrito: CartItem[]): CheckoutDraft | null {
+  if (!carrito.length) return null;
+  const draft = readFormDraft<CheckoutDraft>(userId, CHECKOUT_DRAFT_ID);
+  if (!draft || draft.cartSignature !== checkoutCartSignature(carrito)) {
+    if (draft) clearFormDraft(userId, CHECKOUT_DRAFT_ID);
+    return null;
+  }
+  return draft;
+}
+
+function deviceDescription(userAgent: string | null): string {
+  if (!userAgent) return "Dispositivo no identificado";
+
+  const platform = /iphone|ipad|ipod/i.test(userAgent)
+    ? "iPhone o iPad"
+    : /android/i.test(userAgent)
+      ? "Android"
+      : /windows/i.test(userAgent)
+        ? "Windows"
+        : /macintosh|mac os/i.test(userAgent)
+          ? "Mac"
+          : /linux/i.test(userAgent)
+            ? "Linux"
+            : "otro dispositivo";
+  const browser = /edg\//i.test(userAgent)
+    ? "Edge"
+    : /firefox\//i.test(userAgent)
+      ? "Firefox"
+      : /chrome\//i.test(userAgent) && !/chromium/i.test(userAgent)
+        ? "Chrome"
+        : /safari\//i.test(userAgent) && !/chrome\//i.test(userAgent)
+          ? "Safari"
+          : "Navegador";
+
+  return `${browser} · ${platform}`;
+}
+
+function deviceActivityDate(value: string | null): string {
+  if (!value) return "Actividad reciente no disponible";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Actividad reciente no disponible";
+  return `Última actividad: ${date.toLocaleString("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })}`;
+}
 
 // ─── Secciones Restaurantes ───────────────────────────────────────────────────
 const SECCIONES_REST = [
@@ -274,6 +363,23 @@ const SECCIONES_MAND = [
 ];
 
 // ─── Horario helpers ──────────────────────────────────────────────────────────
+const MANDADITOS_FOOD_TITLES = new Set([
+  ...SECCIONES_REST.map(function (section) { return section.titulo; }),
+  "Desayunos", "Pollos y Flautas", "Sandwiches", "Elotes y Esquites",
+  "Fresas con Crema", "Las Marquesitas", "Waffles", "Saludable",
+  "Panaderías", "Pastelerías", "Heladerías", "Bebidas Preparadas", "Comida Libanesa",
+]);
+const SECCIONES_PEDIDOS_ESCRITOS = [
+  {
+    titulo: "Restaurantes por escrito",
+    emoji: "📝",
+    keys: SECCIONES_MAND.filter(function (section) {
+      return MANDADITOS_FOOD_TITLES.has(section.titulo.trim());
+    }).flatMap(function (section) { return section.keys; }),
+  },
+  ...SECCIONES_MAND,
+];
+
 function esAbierto(horarioApertura: string, horarioCierre: string): boolean {
   const ahora = new Date();
   const horaActual = ahora.getHours() * 60 + ahora.getMinutes();
@@ -576,8 +682,9 @@ function SeccionH(props: {
   loading: boolean;
   onSelect: (m: Merchant) => void;
   customId?: string;
+  forceVisible?: boolean;
 }) {
-  if (!props.loading && props.merchants.length === 0) return null;
+  if (!props.loading && props.merchants.length === 0 && !props.forceVisible) return null;
   return (
     <div
       id={props.customId ?? tituloAId(props.titulo)}
@@ -609,6 +716,9 @@ function SeccionH(props: {
           </span>
         )}
       </div>
+      {!props.loading && props.merchants.length === 0 && (
+        <p style={{ padding: "12px 16px", fontSize: "13px", color: "var(--text-secondary)" }}>Todavía no hay negocios disponibles en esta categoría.</p>
+      )}
       <div
         style={{
           overflowX: "auto",
@@ -777,6 +887,10 @@ function ModalMandadito(props: {
       onClick={props.onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="written-order-title"
+        onKeyDown={function (event) { if (event.key === "Escape") props.onClose(); }}
         style={{
           width: "100%",
           maxWidth: "480px",
@@ -798,7 +912,9 @@ function ModalMandadito(props: {
             margin: "0 auto 20px",
           }}
         />
+        <button type="button" aria-label="Cerrar pedido por escrito" onClick={props.onClose} style={{ display: "block", marginLeft: "auto", padding: "8px", color: "var(--text-primary)" }}><X size={20} /></button>
         <h2
+          id="written-order-title"
           style={{
             fontSize: "18px",
             fontWeight: 900,
@@ -834,6 +950,8 @@ function ModalMandadito(props: {
           </div>
         )}
         <textarea
+          aria-label="Tu pedido por escrito"
+          autoFocus
           value={texto}
           onChange={function (e) {
             if (cerrado) return;
@@ -906,18 +1024,21 @@ function ModalCheckout(props: {
   onRemoveItem: (id: string) => void;
   onUpdateCantidad: (id: string, delta: number) => void;
 }) {
+  const [draft] = useState<CheckoutDraft | null>(function () {
+    return getCheckoutDraft(props.clienteId, props.carrito);
+  });
   const [paso, setPaso] = useState<
     "carrito" | "direccion" | "pago" | "resumen"
-  >("carrito");
+  >(draft?.paso ?? "carrito");
   const [direcciones, setDirecciones] = useState<Direccion[]>([]);
   const [dirSeleccionada, setDirSel] = useState<Direccion | null>(null);
-  const [formaNueva, setFormaNueva] = useState(false);
-  const [alias, setAlias] = useState("Casa");
-  const [calle, setCalle] = useState("");
-  const [numero, setNumero] = useState("");
-  const [referencias, setReferencias] = useState("");
-  const [preferencias, setPreferencias] = useState("");
-  const [formaPago, setFormaPago] = useState("efectivo");
+  const [formaNueva, setFormaNueva] = useState(draft?.formaNueva ?? false);
+  const [alias, setAlias] = useState(draft?.alias ?? "Casa");
+  const [calle, setCalle] = useState(draft?.calle ?? "");
+  const [numero, setNumero] = useState(draft?.numero ?? "");
+  const [referencias, setReferencias] = useState(draft?.referencias ?? "");
+  const [preferencias, setPreferencias] = useState(draft?.preferencias ?? "");
+  const [formaPago, setFormaPago] = useState(draft?.formaPago ?? "efectivo");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [fraccionamientos, setFraccionamientos] = useState<Fraccionamiento[]>(
@@ -925,8 +1046,69 @@ function ModalCheckout(props: {
   );
   const [fraccionamientoSel, setFraccionamientoSel] =
     useState<Fraccionamiento | null>(null);
-  const [fracSearch, setFracSearch] = useState("");
+  const [fracSearch, setFracSearch] = useState(draft?.fracSearch ?? "");
   const [costoEnvio, setCostoEnvio] = useState(50);
+  const [aplicarEnvioGratis, setAplicarEnvioGratis] = useState(false);
+  const [envioGratis, setEnvioGratis] = useState<{
+    status: "loading" | "available" | "unavailable" | "error";
+    remainingOrders: number | null;
+  }>({ status: "loading", remainingOrders: null });
+
+  useEffect(function () {
+    let activo = true;
+    let solicitud = 0;
+    const cargarDisponibilidad = async function () {
+      const solicitudActual = ++solicitud;
+      setEnvioGratis({ status: "loading", remainingOrders: null });
+      try {
+        const [walletResult, deliveredResult] = await Promise.all([
+          supabase
+            .from("monedero_cliente")
+            .select("envios_gratis_usados")
+            .eq("user_id", props.clienteId)
+            .maybeSingle(),
+          supabase
+            .from("pedidos")
+            .select("id", { count: "exact", head: true })
+            .eq("cliente_id", props.clienteId)
+            .eq("estatus", "entregado"),
+        ]);
+        if (walletResult.error) throw walletResult.error;
+        if (deliveredResult.error) throw deliveredResult.error;
+        if (deliveredResult.count === null) {
+          throw new Error("No se pudo verificar el historial de pedidos.");
+        }
+        if (!activo || solicitudActual !== solicitud) return;
+        const progress = getFreeShippingProgress(
+          deliveredResult.count,
+          walletResult.data?.envios_gratis_usados ?? 0,
+        );
+        setAplicarEnvioGratis(progress.available);
+        setEnvioGratis({
+          status: progress.available ? "available" : "unavailable",
+          remainingOrders: progress.remainingOrders,
+        });
+      } catch (error) {
+        console.error("[Changuito] No se pudo verificar el envío gratis:", error);
+        if (activo && solicitudActual === solicitud) {
+          setEnvioGratis({ status: "error", remainingOrders: null });
+        }
+      }
+    };
+    const refrescarDisponibilidad = function () {
+      if (document.visibilityState === "visible") cargarDisponibilidad();
+    };
+
+    cargarDisponibilidad();
+    window.addEventListener("focus", refrescarDisponibilidad);
+    document.addEventListener("visibilitychange", refrescarDisponibilidad);
+    return function () {
+      activo = false;
+      solicitud += 1;
+      window.removeEventListener("focus", refrescarDisponibilidad);
+      document.removeEventListener("visibilitychange", refrescarDisponibilidad);
+    };
+  }, [props.clienteId]);
 
   const subtotal = props.carrito.reduce(function (a, i) {
     return a + i.precio * i.cantidad;
@@ -936,7 +1118,12 @@ function ModalCheckout(props: {
       return i.negocio_id;
     }),
   ).size;
-  const totalEnvio = costoEnvio + Math.max(0, negociosCount - 1) * 15;
+  const cargoEnvio = getShippingCharge(
+    costoEnvio,
+    Math.max(0, negociosCount - 1) * 15,
+    envioGratis.status === "available" && aplicarEnvioGratis,
+  );
+  const totalEnvio = cargoEnvio.total;
   const total = subtotal + totalEnvio;
 
   // Cargar direcciones guardadas
@@ -951,6 +1138,9 @@ function ModalCheckout(props: {
           setDirecciones(r.data as Direccion[]);
           setDirSel(
             r.data.find(function (d: Direccion) {
+              return d.id === draft?.dirSeleccionadaId;
+            }) ??
+              r.data.find(function (d: Direccion) {
               return d.es_principal;
             }) ?? r.data[0],
           );
@@ -967,9 +1157,50 @@ function ModalCheckout(props: {
       .select("id,nombre,costo_envio")
       .order("nombre", { ascending: true })
       .then(function (r) {
-        if (r.data) setFraccionamientos(r.data as Fraccionamiento[]);
+        if (r.data) {
+          setFraccionamientos(r.data as Fraccionamiento[]);
+          const restored = (r.data as Fraccionamiento[]).find(function (item) {
+            return item.id === draft?.fraccionamientoId;
+          });
+          if (restored) setFraccionamientoSel(restored);
+        }
       });
   }, []);
+
+  useEffect(
+    function () {
+      writeFormDraft<CheckoutDraft>(props.clienteId, CHECKOUT_DRAFT_ID, {
+        cartSignature: checkoutCartSignature(props.carrito),
+        paso,
+        dirSeleccionadaId: dirSeleccionada?.id ?? draft?.dirSeleccionadaId ?? null,
+        formaNueva,
+        alias,
+        calle,
+        numero,
+        referencias,
+        preferencias,
+        formaPago,
+        fraccionamientoId:
+          fraccionamientoSel?.id ?? draft?.fraccionamientoId ?? null,
+        fracSearch,
+      });
+    },
+    [
+      props.clienteId,
+      props.carrito,
+      paso,
+      dirSeleccionada,
+      formaNueva,
+      alias,
+      calle,
+      numero,
+      referencias,
+      preferencias,
+      formaPago,
+      fraccionamientoSel,
+      fracSearch,
+    ],
+  );
 
   async function guardarDireccionNueva(): Promise<Direccion | null> {
     if (!calle || !numero) {
@@ -997,6 +1228,8 @@ function ModalCheckout(props: {
   }
 
   async function confirmarPedido() {
+    const usarEnvioGratis =
+      envioGratis.status === "available" && aplicarEnvioGratis;
     setEnviando(true);
     setError("");
     try {
@@ -1019,30 +1252,112 @@ function ModalCheckout(props: {
       // Un solo pedido para todo el carrito
       const negocioNombres = Array.from(new Set(props.carrito.map(function(i) { return i.negocio; }))).join(', ');
       const primerNegocioId = props.carrito[0]?.negocio_id ?? '';
-      const { error: errPedido } = await supabase.from("pedidos").insert({
-        cliente_id: props.clienteId,
-        negocio_id: primerNegocioId,
-        negocio_nombre: negocioNombres,
-        total_pagar: total,
-        estatus: "pendiente",
-        canal: "webapp",
-        cliente_email: props.clienteEmail,
-        forma_pago: formaPago,
-        direccion: dir ? dir.calle + " " + dir.numero_casa : "",
-      });
-      if (errPedido) {
-        console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
-        throw new Error("Error al guardar pedido: " + errPedido.message);
+      const idsNegocios = Object.keys(porNegocio);
+      if (idsNegocios.length > 1) {
+        // Un pedido por negocio: cada comercio y repartidor ve solo lo suyo.
+        // El envío completo se asigna al primer pedido; la suma iguala al total.
+        const ordenes = idsNegocios.map(function (id, indice) {
+          const items = porNegocio[id];
+          const sub = items.reduce(function (a, i) {
+            return a + i.precio * i.cantidad;
+          }, 0);
+          return {
+            negocio_id: id,
+            negocio_nombre: items[0].negocio,
+            total_pagar: Math.round((sub + (indice === 0 ? totalEnvio : 0)) * 100) / 100,
+          };
+        });
+        const direccionTexto = dir ? dir.calle + " " + dir.numero_casa : "";
+        const { data: multi, error: errorMulti } = await supabase.rpc(
+          "crear_pedidos_multinegocio",
+          {
+            p_pedidos: ordenes,
+            p_cliente_email: props.clienteEmail,
+            p_forma_pago: formaPago,
+            p_direccion: direccionTexto,
+            p_usar_envio_gratis: usarEnvioGratis,
+          },
+        );
+        if (errorMulti) {
+          const funcionAusente =
+            errorMulti.code === "PGRST202" || errorMulti.code === "42883";
+          if (funcionAusente && !usarEnvioGratis) {
+            const { error: errFilas } = await supabase.from("pedidos").insert(
+              ordenes.map(function (o) {
+                return {
+                  cliente_id: props.clienteId,
+                  negocio_id: o.negocio_id,
+                  negocio_nombre: o.negocio_nombre,
+                  total_pagar: o.total_pagar,
+                  estatus: "pendiente",
+                  canal: "webapp",
+                  cliente_email: props.clienteEmail,
+                  forma_pago: formaPago,
+                  direccion: direccionTexto,
+                };
+              }),
+            );
+            if (errFilas) throw new Error("Error al guardar pedido: " + errFilas.message);
+          } else {
+            console.error("[Changuito] Error creando pedidos por negocio:", errorMulti);
+            throw new Error(
+              "No pudimos crear tus pedidos y no se guardó ninguno. Intenta de nuevo.",
+            );
+          }
+        } else if (!multi?.ok) {
+          throw new Error(
+            multi?.error ?? "No se pudieron crear los pedidos. No se guardó ninguno.",
+          );
+        }
+      } else if (usarEnvioGratis) {
+        const { data, error: errorPedido } = await supabase.rpc(
+          "crear_pedido_con_envio_gratis",
+          {
+            p_negocio_id: primerNegocioId,
+            p_negocio_nombre: negocioNombres,
+            p_total_pagar: total,
+            p_cliente_email: props.clienteEmail,
+            p_forma_pago: formaPago,
+            p_direccion: dir ? dir.calle + " " + dir.numero_casa : "",
+          },
+        );
+        if (errorPedido) {
+          console.error("[Changuito] Error aplicando el envío gratis:", errorPedido);
+          throw new Error(
+            "No pudimos aplicar tu envío gratis y no se creó el pedido. Intenta de nuevo o desactiva la recompensa para pagar el envío normal.",
+          );
+        }
+        if (!data?.ok) {
+          throw new Error(
+            data?.error ??
+              "Tu envío gratis ya no está disponible. No se creó el pedido; vuelve a revisar el total.",
+          );
+        }
+      } else {
+        const { error: errPedido } = await supabase.from("pedidos").insert({
+          cliente_id: props.clienteId,
+          negocio_id: primerNegocioId,
+          negocio_nombre: negocioNombres,
+          total_pagar: total,
+          estatus: "pendiente",
+          canal: "webapp",
+          cliente_email: props.clienteEmail,
+          forma_pago: formaPago,
+          direccion: dir ? dir.calle + " " + dir.numero_casa : "",
+        });
+        if (errPedido) {
+          console.error("[Changuito] Error guardando pedido en Supabase:", errPedido);
+          throw new Error("Error al guardar pedido: " + errPedido.message);
+        }
       }
 
       // Actualizar monedero: +1 pedido
-      try {
-        const userId = props.session?.user?.id;
-        if (userId) {
+      if (!usarEnvioGratis) {
+        try {
           const { data: mon } = await supabase
             .from("monedero_cliente")
             .select("id, pedidos_realizados")
-            .eq("user_id", userId)
+            .eq("user_id", props.clienteId)
             .single();
           if (mon) {
             await supabase
@@ -1055,11 +1370,11 @@ function ModalCheckout(props: {
           } else {
             await supabase
               .from("monedero_cliente")
-              .insert([{ user_id: userId, pedidos_realizados: 1 }]);
+              .insert([{ user_id: props.clienteId, pedidos_realizados: 1 }]);
           }
+        } catch (_) {
+          /* silencioso */
         }
-      } catch (_) {
-        /* silencioso */
       }
 
       // Mensaje WhatsApp estructurado
@@ -1106,6 +1421,9 @@ function ModalCheckout(props: {
       });
 
       msg += "\n🚚 *Envío:* $" + totalEnvio.toFixed(2);
+      if (cargoEnvio.discount > 0) {
+        msg += "\n🎁 *Envío gratis aplicado:* -$" + cargoEnvio.discount.toFixed(2);
+      }
       if (fraccionamientoSel) msg += " (" + fraccionamientoSel.nombre + ")";
       if (negociosCount > 1)
         msg +=
@@ -1117,6 +1435,7 @@ function ModalCheckout(props: {
         "https://wa.me/" + PHONE_OPERATIVO + "?text=" + encodeURIComponent(msg),
         "_blank",
       );
+      clearFormDraft(props.clienteId, CHECKOUT_DRAFT_ID);
       props.onPedidoOk();
     } catch (err: any) {
       setError(err.message ?? "Error al procesar el pedido.");
@@ -2228,6 +2547,96 @@ function ModalCheckout(props: {
               })}
             </div>
 
+            {envioGratis.status === "available" && (
+              <div
+                role="status"
+                style={{
+                  padding: "11px 13px",
+                  borderRadius: "12px",
+                  background: "rgba(34,197,94,0.1)",
+                  border: "1px solid rgba(34,197,94,0.35)",
+                  color: textPrim,
+                  fontSize: "12px",
+                  lineHeight: 1.45,
+                  marginBottom: "10px",
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "9px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={aplicarEnvioGratis}
+                    onChange={function (event) {
+                      setAplicarEnvioGratis(event.target.checked);
+                    }}
+                    style={{ marginTop: "2px" }}
+                  />
+                  <span>
+                    <strong style={{ color: "var(--color-green)" }}>
+                      🎁 Tu envío gratis está disponible.
+                    </strong>{" "}
+                    {aplicarEnvioGratis
+                      ? "Se descuentan $" +
+                        cargoEnvio.discount.toFixed(2) +
+                        " de la tarifa de entrega."
+                      : "Activa esta opción para descontar $" +
+                        costoEnvio.toFixed(2) +
+                        " de la tarifa de entrega."}
+                    {cargoEnvio.multiBusinessCharge > 0 && aplicarEnvioGratis
+                      ? " El recargo por varios negocios se mantiene."
+                      : ""}
+                  </span>
+                </label>
+              </div>
+            )}
+            {envioGratis.status === "unavailable" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                Envío gratis no disponible.{" "}
+                {envioGratis.remainingOrders === 1
+                  ? "Te falta 1 pedido entregado para ganarlo."
+                  : "Te faltan " +
+                    envioGratis.remainingOrders +
+                    " pedidos entregados para ganarlo."}
+              </p>
+            )}
+            {envioGratis.status === "loading" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                Verificando si tienes envío gratis disponible…
+              </p>
+            )}
+            {envioGratis.status === "error" && (
+              <p
+                role="status"
+                style={{
+                  fontSize: "11px",
+                  color: textMuted,
+                  margin: "0 0 10px 0",
+                }}
+              >
+                No pudimos verificar tu recompensa; se muestra el envío normal.
+              </p>
+            )}
+
             {/* Total */}
             <div
               style={{
@@ -2254,6 +2663,28 @@ function ModalCheckout(props: {
                   ${subtotal.toFixed(2)}
                 </span>
               </div>
+              {cargoEnvio.discount > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span style={{ fontSize: "13px", color: "var(--color-green)" }}>
+                    🎁 Envío gratis aplicado
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "var(--color-green)",
+                    }}
+                  >
+                    −${cargoEnvio.discount.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -2398,18 +2829,71 @@ export default function Dashboard(props: DashboardProps) {
     null,
   );
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
+  const [restSectionTarget, setRestSectionTarget] = useState("");
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
-  const [modalCheckout, setModalCheckout] = useState(false);
+  const [modalCheckout, setModalCheckout] = useState<boolean>(function () {
+    return Boolean(getCheckoutDraft(props.session.user.id, props.carritoGlobal));
+  });
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement | null>(null);
   const [esMerchantAdmin, setEsMerchantAdmin] = useState(false);
   const [modalLimite, setModalLimite] = useState(false);
   const [changuiAbierto, setChanguiAbierto] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
+  const [deviceSessionsOpen, setDeviceSessionsOpen] = useState(false);
+  const [deviceSessions, setDeviceSessions] = useState<DeviceAuthSession[]>([]);
+  const [loadingDeviceSessions, setLoadingDeviceSessions] = useState(false);
+  const [deviceSessionsError, setDeviceSessionsError] = useState("");
+  const [revokingDeviceSession, setRevokingDeviceSession] = useState("");
+  const [deviceSessionsNotice, setDeviceSessionsNotice] = useState("");
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
   const rol = props.session.user.rol ?? "cliente";
   const puedeNegocio = esAdmin || rol === "negocio" || esMerchantAdmin;
   const puedeRepartidor = esAdmin || rol === "repartidor";
+
+  useEffect(function () {
+    if (!menuAbierto) return;
+
+    const menuPanel = menuPanelRef.current;
+    const closeButton = menuPanel?.querySelector<HTMLButtonElement>("button");
+    closeButton?.focus();
+
+    function handleMenuKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuAbierto(false);
+        menuTriggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !menuPanel) return;
+      const focusableElements = Array.from(
+        menuPanel.querySelectorAll<HTMLButtonElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleMenuKeyDown);
+    return function () {
+      document.removeEventListener("keydown", handleMenuKeyDown);
+    };
+  }, [menuAbierto]);
 
   useEffect(function () {
     async function checkMerchantAdmin() {
@@ -2428,7 +2912,97 @@ export default function Dashboard(props: DashboardProps) {
   }, []);
 
   async function cerrarSesion() {
-    await supabase.auth.signOut();
+    setSignOutError("");
+    try {
+      await signOut(supabase);
+      clearUserFormDrafts(props.session.user.id);
+    } catch {
+      setSignOutError(
+        "No pudimos cerrar sesión. Tu sesión sigue activa. Intentá de nuevo.",
+      );
+    }
+  }
+
+  async function cerrarSesionEnTodosLosDispositivos() {
+    const confirmed = window.confirm(
+      "Se cerrará tu sesión en este dispositivo y se revocarán las sesiones de los demás. En otros dispositivos, el cierre puede tardar hasta que expire el token de acceso actual. ¿Querés continuar?",
+    );
+    if (!confirmed) return;
+
+    setSignOutError("");
+    setSigningOutEverywhere(true);
+    try {
+      await signOutEverywhere(supabase);
+      clearUserFormDrafts(props.session.user.id);
+      window.alert(
+        "Se cerró tu sesión en este dispositivo y se revocaron las sesiones de los demás.",
+      );
+    } catch {
+      setSignOutError(
+        "No pudimos cerrar las sesiones de todos los dispositivos. Tu sesión sigue activa. Intentá de nuevo.",
+      );
+    } finally {
+      setSigningOutEverywhere(false);
+    }
+  }
+
+  async function cargarDispositivos() {
+    setLoadingDeviceSessions(true);
+    setDeviceSessionsError("");
+    setDeviceSessionsNotice("");
+    try {
+      setDeviceSessions(await listDeviceAuthSessions(supabase));
+    } catch {
+      setDeviceSessionsError(
+        "No pudimos cargar tus dispositivos. Revisá tu conexión y que las funciones de sesiones estén instaladas en Supabase.",
+      );
+    } finally {
+      setLoadingDeviceSessions(false);
+    }
+  }
+
+  async function revocarDispositivo(session: DeviceAuthSession) {
+    if (session.is_current || revokingDeviceSession) return;
+    const dispositivo = deviceDescription(session.user_agent);
+    if (
+      !window.confirm(
+        `¿Querés cerrar la sesión de ${dispositivo}? Ya no podrá renovarse, aunque el acceso actual podría seguir funcionando hasta que venza. Después deberá iniciar sesión de nuevo.`,
+      )
+    ) {
+      return;
+    }
+
+    setRevokingDeviceSession(session.session_id);
+    setDeviceSessionsError("");
+    setDeviceSessionsNotice("");
+    try {
+      const revoked = await revokeDeviceAuthSession(
+        supabase,
+        session.session_id,
+      );
+      if (revoked) {
+        setDeviceSessionsNotice(
+          "La sesión se revocó. El acceso actual de ese dispositivo podría continuar hasta que venza.",
+        );
+      } else {
+        setDeviceSessionsNotice(
+          "Esa sesión ya no estaba activa. Actualizamos la lista.",
+        );
+      }
+      setDeviceSessions(await listDeviceAuthSessions(supabase));
+    } catch {
+      setDeviceSessionsError(
+        "No pudimos cerrar esa sesión. Puede que ya no esté activa; actualizá la lista e intentá de nuevo.",
+      );
+    } finally {
+      setRevokingDeviceSession("");
+    }
+  }
+
+  function alternarDispositivos() {
+    const abrir = !deviceSessionsOpen;
+    setDeviceSessionsOpen(abrir);
+    if (abrir) void cargarDispositivos();
   }
 
   // FIX PARPADEO: aplicar el tema ANTES del primer paint
@@ -2613,6 +3187,7 @@ export default function Dashboard(props: DashboardProps) {
 
   function tabStyle(t: MainTab): React.CSSProperties {
     const active = tabActiva === t;
+    const accent = t === "restaurantes" ? "var(--color-red)" : t === "mandaditos" ? "var(--color-blue)" : "var(--color-green)";
     return {
       flex: 1,
       padding: "10px 4px",
@@ -2621,15 +3196,15 @@ export default function Dashboard(props: DashboardProps) {
       cursor: "pointer",
       fontSize: "11px",
       fontWeight: active ? 900 : 600,
-      background: active ? "var(--color-yellow)" : "transparent",
-      color: active ? "#020617" : "var(--text-muted)",
-      boxShadow: active ? "0 4px 12px rgba(250,204,21,0.3)" : "none",
+      background: active ? accent : "transparent",
+      color: active ? "#ffffff" : "var(--text-secondary)",
+      boxShadow: active ? "0 4px 12px rgba(15,50,40,0.18)" : "none",
       transition: "all 0.2s",
     };
   }
 
   function renderContenido() {
-    if (search.trim() !== "") {
+    if (search.trim() !== "" && tabActiva !== "tiendita") {
       const q = search.toLowerCase();
       const resNegocios = merchants.filter(function (m) {
         return (
@@ -2803,40 +3378,65 @@ export default function Dashboard(props: DashboardProps) {
       );
     }
 
+    // Botones de categoría: fichas circulares con acento de la paleta de marca
+    // (verde, amarillo, rojo y azul) para que se sientan familiares y distintos.
+    const ACENTOS_MARCA = ["#159447", "#F6C945", "#E84844", "#2979DA"];
     const estiloBotonCat: React.CSSProperties = {
-      minWidth: "90px",
-      padding: "12px 8px",
-      background: isDark ? "#1E1E1E" : "var(--bg-card)",
-      border: isDark
-        ? "1px solid rgba(212,175,55,0.35)"
-        : "1px solid var(--border-subtle)",
-      borderRadius: "14px",
+      width: "82px",
+      padding: "2px 0 4px",
+      background: "transparent",
+      border: "none",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      gap: "6px",
+      gap: "7px",
       cursor: "pointer",
       fontSize: "11px",
+      lineHeight: 1.2,
       fontWeight: 700,
-      color: isDark ? "#D4AF37" : "var(--text-primary)",
+      textAlign: "center",
+      color: isDark ? "#E8E2D0" : "var(--text-primary)",
       flexShrink: 0,
+    };
+    function estiloFichaCat(i: number): React.CSSProperties {
+      const c = ACENTOS_MARCA[i % ACENTOS_MARCA.length];
+      return {
+        width: "62px",
+        height: "62px",
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        fontSize: "28px",
+        background: isDark
+          ? "radial-gradient(circle at 30% 25%, " + c + "40, " + c + "14)"
+          : "radial-gradient(circle at 30% 25%, #ffffff, " + c + "26)",
+        border: "1.5px solid " + c + (isDark ? "88" : "66"),
+        boxShadow: "0 6px 14px " + c + (isDark ? "26" : "30"),
+      };
+    }
+    const estiloFichaBot: React.CSSProperties = {
+      width: "62px",
+      height: "62px",
+      borderRadius: "50%",
+      display: "grid",
+      placeItems: "center",
+      fontSize: "28px",
+      background: "linear-gradient(135deg,#f6c445,#e0a526)",
+      border: "2px solid " + (isDark ? "#f6d77a" : "#fff"),
+      boxShadow: "0 0 0 2px #e0a526, 0 8px 18px rgba(224,165,38,.45)",
     };
     const estiloScrollRow: React.CSSProperties = {
       display: "flex",
       overflowX: "auto",
-      gap: "8px",
-      paddingBottom: "6px",
+      gap: "6px",
+      paddingBottom: "8px",
       scrollbarWidth: "none" as any,
       msOverflowStyle: "none" as any,
       WebkitOverflowScrolling: "touch" as any,
     };
     const estiloBotonChanguiBot: React.CSSProperties = {
       ...estiloBotonCat,
-      background: isDark ? "rgba(212,175,55,0.18)" : "rgba(250,204,21,0.22)",
-      border: isDark
-        ? "1.5px solid rgba(212,175,55,0.65)"
-        : "1.5px solid rgba(250,204,21,0.55)",
-      color: isDark ? "#E5C158" : "#92400e",
+      color: isDark ? "#f6d77a" : "#92400e",
     };
     function irAMandadito(sec: string | null) {
       if (tabActiva !== "mandaditos") {
@@ -2848,75 +3448,46 @@ export default function Dashboard(props: DashboardProps) {
       }
       setTimeout(function () {
         const id = sec ? tituloAId(sec) : "seccion-mandaditos-top";
-        const el = document.getElementById(id);
-        if (el) {
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.scrollY - 120,
-            behavior: "smooth",
-          });
-        }
+        scrollToSectionHeading(id);
       }, 160);
     }
     function irARestaurante(secId: string) {
+      setRestSectionTarget(secId);
       if (tabActiva !== "restaurantes") {
         setTabActiva("restaurantes");
         setSearch("");
         setTimeout(function () {
-          const el = document.getElementById(secId);
-          if (el) {
-            window.scrollTo({
-              top: el.getBoundingClientRect().top + window.scrollY - 120,
-              behavior: "smooth",
-            });
-          }
+          scrollToSectionHeading(secId);
         }, 160);
       } else {
-        const el = document.getElementById(secId);
-        if (el) {
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.scrollY - 120,
-            behavior: "smooth",
-          });
-        }
+        setSearch("");
+        setTimeout(function () { scrollToSectionHeading(secId); }, 160);
       }
     }
     const tituloBloqueStyle: React.CSSProperties = {
-      fontSize: "14px",
-      fontWeight: 700,
-      color: isDark ? "#D4AF37" : "var(--text-primary)",
-      margin: "0 0 5px 0",
+      fontSize: "16px",
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+      color: isDark ? "#E8E2D0" : "var(--text-primary)",
+      margin: "8px 0 8px 0",
     };
-    const bloqueBotones = (
-      <div>
+    const bloqueMandaditos = (
         <div style={{ padding: "4px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Mandaditos</h3>
+          <p style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "12px" }}>Compras y restaurantes por escrito · sin menú, nos dices qué llevar</p>
           <div style={estiloScrollRow}>
-            {[
-              { emoji: "🛒", label: "Supermercados", sec: "Supermercados" },
-              { emoji: "💊", label: "Farmacias", sec: "Farmacias" },
-              {
-                emoji: "🍎",
-                label: "Verdulerías",
-                sec: "Frutas y Verduras",
-              },
-              { emoji: "🥩", label: "Carnicerías", sec: "Carnicerías" },
-              { emoji: "🐓", label: "Pollerías", sec: "Pollerías" },
-              { emoji: "🐟", label: "Pescaderías", sec: "Pescadería" },
-              { emoji: "🧀", label: "Lácteos/Embutidos", sec: "Lácteos" },
-              { emoji: "📚", label: "Papelerías", sec: "Papelerías" },
-              { emoji: "🧺", label: "Lavanderías", sec: "Lavandería" },
-              { emoji: "🐕", label: "Mascotas", sec: "Mascotas" },
-            ].map(function (btn) {
+            {SECCIONES_PEDIDOS_ESCRITOS.map(function (sec, i) {
               return (
                 <button
-                  key={btn.label}
+                  key={sec.titulo}
+                  aria-label={"Mandaditos: " + sec.titulo.trim()}
                   onClick={function () {
-                    irAMandadito(btn.sec);
+                    irAMandadito(sec.titulo);
                   }}
                   style={estiloBotonCat}
                 >
-                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
-                  {btn.label}
+                  <span style={estiloFichaCat(i)}>{sec.emoji}</span>
+                  {sec.titulo.trim()}
                 </button>
               );
             })}
@@ -2926,11 +3497,13 @@ export default function Dashboard(props: DashboardProps) {
               }}
               style={estiloBotonChanguiBot}
             >
-              <span style={{ fontSize: "20px" }}>🐒</span>
+              <span style={estiloFichaBot}>🐒</span>
               ChanguiBot
             </button>
           </div>
         </div>
+    );
+    const bloqueRestaurantes = (
         <div style={{ padding: "3px 16px 0 16px" }}>
           <h3 style={tituloBloqueStyle}>Restaurantes</h3>
           <div style={estiloScrollRow}>
@@ -2990,12 +3563,13 @@ export default function Dashboard(props: DashboardProps) {
               return (
                 <button
                   key={btn.label + i}
+                  aria-label={"Restaurantes: " + btn.label}
                   onClick={function () {
                     irARestaurante(btn.secId);
                   }}
                   style={estiloBotonCat}
                 >
-                  <span style={{ fontSize: "20px" }}>{btn.emoji}</span>
+                  <span style={estiloFichaCat(i)}>{btn.emoji}</span>
                   {btn.label}
                 </button>
               );
@@ -3006,13 +3580,13 @@ export default function Dashboard(props: DashboardProps) {
               }}
               style={estiloBotonChanguiBot}
             >
-              <span style={{ fontSize: "20px" }}>🐒</span>
+              <span style={estiloFichaBot}>🐒</span>
               ChanguiBot
             </button>
           </div>
         </div>
-      </div>
     );
+    const bloqueBotones = <div>{bloqueRestaurantes}{bloqueMandaditos}</div>;
 
     if (tabActiva === "restaurantes") {
       return (
@@ -3025,7 +3599,8 @@ export default function Dashboard(props: DashboardProps) {
           <div id="seccion-restaurantes" style={{ marginTop: "4px" }}>
             {SECCIONES_REST.map(function (sec) {
               const lista = porCats(sec.cats, (sec as any).names);
-              if (!loading && lista.length === 0) return null;
+              const selected = restSectionTarget === ((sec as any).customId ?? tituloAId(sec.titulo));
+              if (!loading && lista.length === 0 && !selected) return null;
               return (
                 <SeccionH
                   key={sec.titulo}
@@ -3035,6 +3610,7 @@ export default function Dashboard(props: DashboardProps) {
                   loading={loading}
                   onSelect={setSelectedMerchant}
                   customId={(sec as any).customId}
+                  forceVisible={selected}
                 />
               );
             })}
@@ -3133,9 +3709,9 @@ export default function Dashboard(props: DashboardProps) {
           {bloqueBotones}
 
           {/* Acordeón de secciones */}
-          {SECCIONES_MAND.map(function (sec) {
+          {SECCIONES_PEDIDOS_ESCRITOS.map(function (sec) {
             const lista = porKeys(sec.keys);
-            if (!loading && lista.length === 0) return null;
+            if (!loading && lista.length === 0 && seccionAbierta !== sec.titulo) return null;
             const abierta = seccionAbierta === sec.titulo;
             return (
               <div
@@ -3211,6 +3787,7 @@ export default function Dashboard(props: DashboardProps) {
                       paddingBottom: "8px",
                     }}
                   >
+                    {lista.length === 0 && !loading && <p style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>Todavía no hay negocios disponibles en esta categoría.</p>}
                     {lista.map(function (m) {
                       return (
                         <TarjetaNegocio
@@ -3285,132 +3862,10 @@ export default function Dashboard(props: DashboardProps) {
 
     if (tabActiva === "tiendita") {
       const lista = merchants.filter(function (m) {
-        return m.category?.toLowerCase() === "tiendita";
+        return ["tiendita", "changui super", "changui súper", "changuito super", "changuito súper"].includes(m.category?.toLowerCase().trim());
       });
       return (
-        <div style={{ padding: "16px 16px 40px" }}>
-          <div
-            style={{
-              background: "linear-gradient(135deg,#facc15,#f59e0b)",
-              borderRadius: "20px",
-              padding: "20px",
-              marginBottom: "20px",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                right: "-10px",
-                top: "-10px",
-                width: "80px",
-                height: "80px",
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.15)",
-              }}
-            />
-            <p
-              style={{
-                fontSize: "9px",
-                fontWeight: 900,
-                color: "rgba(2,6,23,0.5)",
-                textTransform: "uppercase",
-                letterSpacing: "0.2em",
-                margin: "0 0 4px 0",
-              }}
-            >
-              Exclusivo Changuito
-            </p>
-            <h2
-              style={{
-                fontSize: "20px",
-                fontWeight: 900,
-                color: "#020617",
-                margin: "0 0 4px 0",
-              }}
-            >
-              🛒 Tiendita Changuito
-            </h2>
-            <p
-              style={{ fontSize: "12px", color: "rgba(2,6,23,0.6)", margin: 0 }}
-            >
-              Entrega express · Todo lo que necesitas
-            </p>
-          </div>
-          {bloqueBotones}
-          {lista.map(function (m) {
-            return (
-              <div
-                key={m.id}
-                onClick={function () {
-                  setSelectedMerchant(m);
-                }}
-                style={{
-                  background: "var(--bg-card)",
-                  borderRadius: "18px",
-                  padding: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "14px",
-                  border: "1px solid var(--border-subtle)",
-                  cursor: "pointer",
-                  marginBottom: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "14px",
-                    background: "linear-gradient(135deg,#facc15,#f59e0b)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "24px",
-                    flexShrink: 0,
-                  }}
-                >
-                  🛒
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: 800,
-                      color: "var(--text-primary)",
-                      margin: "0 0 3px 0",
-                    }}
-                  >
-                    {m.name}
-                  </p>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--color-yellow)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ★ {(m.rating ?? 4.9).toFixed(1)}
-                  </span>
-                  <span
-                    style={{ fontSize: "11px", color: "var(--text-muted)" }}
-                  >
-                    {" "}
-                    · {m.delivery_time ?? "10-20 min"}
-                  </span>
-                </div>
-                <ChevronRight
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    color: "var(--text-muted)",
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
+        <SuperCatalog merchants={lista} cart={props.carritoGlobal} search={search} onUpdateCart={props.onUpdateCarritoGlobal} loadingMerchants={loading} />
       );
     }
     return null;
@@ -3429,6 +3884,7 @@ export default function Dashboard(props: DashboardProps) {
     >
       {/* Header */}
       <div
+        data-dashboard-header
         style={{
           position: "sticky",
           top: 0,
@@ -3439,6 +3895,7 @@ export default function Dashboard(props: DashboardProps) {
           padding: "14px 16px 12px",
         }}
       >
+        <div className="brand-stripe" aria-hidden="true" style={{ margin: "-14px -16px 14px" }} />
         <div
           style={{
             display: "flex",
@@ -3458,10 +3915,14 @@ export default function Dashboard(props: DashboardProps) {
             }}
           >
             <button
+              ref={menuTriggerRef}
               onClick={function () {
                 setMenuAbierto(true);
               }}
               aria-label="Abrir menú"
+              aria-haspopup="dialog"
+              aria-expanded={menuAbierto}
+              aria-controls="authenticated-navigation-menu"
               style={{
                 flexShrink: 0,
                 width: "40px",
@@ -3581,7 +4042,7 @@ export default function Dashboard(props: DashboardProps) {
           />
           <input
             type="text"
-            placeholder="Buscar negocios o categorías..."
+            placeholder={tabActiva === "tiendita" ? "Buscar productos de Changui Súper..." : "Buscar negocios o categorías..."}
             value={search}
             onChange={function (e) {
               setSearch(e.target.value);
@@ -3686,7 +4147,7 @@ export default function Dashboard(props: DashboardProps) {
               setSearch("");
             }}
           >
-            🛒 Tiendita
+            🛒 Changui Súper
           </button>
         </div>
       </div>
@@ -3708,6 +4169,11 @@ export default function Dashboard(props: DashboardProps) {
             }}
           />
           <div
+            id="authenticated-navigation-menu"
+            ref={menuPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú de navegación"
             className="fade-in"
             style={{
               position: "relative",
@@ -3764,6 +4230,7 @@ export default function Dashboard(props: DashboardProps) {
               <button
                 onClick={function () {
                   setMenuAbierto(false);
+                  menuTriggerRef.current?.focus();
                 }}
                 aria-label="Cerrar menú"
                 style={{
@@ -3813,7 +4280,7 @@ export default function Dashboard(props: DashboardProps) {
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
               >
                 <ShoppingCart style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
-                <span>La Tiendita</span>
+                <span>Changui Súper</span>
               </button>
 
               <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
@@ -3875,6 +4342,118 @@ export default function Dashboard(props: DashboardProps) {
                   <span>God Mode</span>
                 </button>
               )}
+
+              <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
+              <button
+                type="button"
+                onClick={alternarDispositivos}
+                aria-expanded={deviceSessionsOpen}
+                aria-controls="device-sessions-panel"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: deviceSessionsOpen ? "rgba(250,204,21,0.1)" : "transparent",
+                  border: "1px solid var(--border-subtle)",
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  textAlign: "left",
+                }}
+              >
+                <Smartphone style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span style={{ flex: 1 }}>Dispositivos conectados</span>
+                {deviceSessionsOpen ? (
+                  <ChevronUp style={{ width: "16px", height: "16px" }} />
+                ) : (
+                  <ChevronDown style={{ width: "16px", height: "16px" }} />
+                )}
+              </button>
+
+              {deviceSessionsOpen && (
+                <section
+                  id="device-sessions-panel"
+                  aria-label="Dispositivos con sesión iniciada"
+                  style={{ padding: "10px 2px 2px" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+                    <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "11px", lineHeight: 1.4 }}>
+                      Revisá la actividad y cerrá sesiones que no reconozcas.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={function () { void cargarDispositivos(); }}
+                      disabled={loadingDeviceSessions}
+                      aria-label="Actualizar dispositivos"
+                      style={{ background: "transparent", border: "none", color: "var(--color-yellow)", cursor: loadingDeviceSessions ? "wait" : "pointer", padding: "5px", lineHeight: 0, flexShrink: 0 }}
+                    >
+                      <RefreshCw style={{ width: "15px", height: "15px", animation: loadingDeviceSessions ? "spin 1s linear infinite" : undefined }} />
+                    </button>
+                  </div>
+                  {deviceSessionsError && (
+                    <p role="alert" style={{ color: "#ef4444", fontSize: "11px", lineHeight: 1.4, margin: "0 0 8px" }}>
+                      {deviceSessionsError}
+                    </p>
+                  )}
+                  {deviceSessionsNotice && (
+                    <p role="status" aria-live="polite" style={{ color: "var(--color-green)", fontSize: "11px", lineHeight: 1.4, margin: "0 0 8px" }}>
+                      {deviceSessionsNotice}
+                    </p>
+                  )}
+                  {loadingDeviceSessions && deviceSessions.length === 0 ? (
+                    <p role="status" aria-live="polite" style={{ color: "var(--text-muted)", fontSize: "12px", padding: "8px 4px" }}>
+                      Cargando dispositivos...
+                    </p>
+                  ) : deviceSessions.length === 0 ? (
+                    deviceSessionsError ? null : (
+                      <p style={{ color: "var(--text-muted)", fontSize: "12px", lineHeight: 1.4, padding: "4px" }}>
+                        No encontramos otras sesiones activas.
+                      </p>
+                    )
+                  ) : (
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "8px" }}>
+                      {deviceSessions.map(function (device) {
+                        const revoking = revokingDeviceSession === device.session_id;
+                        return (
+                          <li
+                            key={device.session_id}
+                            style={{ padding: "10px", borderRadius: "10px", border: "1px solid var(--border-subtle)", background: "var(--bg-card)" }}
+                          >
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "6px" }}>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ margin: "0 0 4px", color: "var(--text-primary)", fontSize: "12px", fontWeight: 800, overflowWrap: "anywhere" }}>
+                                  {deviceDescription(device.user_agent)}
+                                </p>
+                                <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "10px", lineHeight: 1.4 }}>
+                                  {deviceActivityDate(device.updated_at ?? device.created_at)}
+                                </p>
+                              </div>
+                              {device.is_current ? (
+                                <span style={{ flexShrink: 0, borderRadius: "20px", padding: "3px 7px", background: "rgba(34,197,94,0.12)", color: "var(--color-green)", fontSize: "9px", fontWeight: 800 }}>
+                                  Este dispositivo
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={function () { void revocarDispositivo(device); }}
+                                  disabled={Boolean(revokingDeviceSession)}
+                                  style={{ flexShrink: 0, borderRadius: "7px", padding: "5px 7px", border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "10px", fontWeight: 800, cursor: revokingDeviceSession ? "wait" : "pointer", opacity: revokingDeviceSession && !revoking ? 0.55 : 1 }}
+                                >
+                                  {revoking ? "Cerrando..." : "Cerrar sesión"}
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              )}
             </div>
 
             <div
@@ -3883,6 +4462,23 @@ export default function Dashboard(props: DashboardProps) {
                 borderTop: "1px solid var(--border-subtle)",
               }}
             >
+              {signOutError && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: "10px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    background: "rgba(239,68,68,0.12)",
+                    border: "1px solid rgba(239,68,68,0.4)",
+                    color: "#ef4444",
+                    fontSize: "12px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {signOutError}
+                </div>
+              )}
               <button
                 onClick={cerrarSesion}
                 style={{
@@ -3905,6 +4501,32 @@ export default function Dashboard(props: DashboardProps) {
               >
                 <LogOut style={{ width: "15px", height: "15px" }} />
                 Cerrar sesión
+              </button>
+              <button
+                onClick={cerrarSesionEnTodosLosDispositivos}
+                disabled={signingOutEverywhere}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  marginTop: "8px",
+                  padding: "11px 12px",
+                  borderRadius: "12px",
+                  background: "transparent",
+                  border: "1px solid var(--border-subtle)",
+                  cursor: signingOutEverywhere ? "wait" : "pointer",
+                  color: "var(--text-secondary)",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  opacity: signingOutEverywhere ? 0.65 : 1,
+                }}
+              >
+                <Shield style={{ width: "15px", height: "15px" }} />
+                {signingOutEverywhere
+                  ? "Cerrando todas las sesiones..."
+                  : "Cerrar sesión en todos los dispositivos"}
               </button>
             </div>
           </div>
@@ -4040,7 +4662,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "tiendita",
-              label: "ChanguiSuper",
+              label: "Changui Súper",
               emoji: "🛒",
               onClick: function () {
                 setTabActiva("tiendita");

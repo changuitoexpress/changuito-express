@@ -1,5 +1,12 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   Sun,
@@ -11,26 +18,68 @@ import {
   ShoppingCart,
   User,
   X,
+  Eye,
+  EyeOff,
+  MapPin,
 } from "lucide-react";
-import Dashboard from "./Dashboard";
-import BazarVecinal from "./BazarVecinal";
-import Servicios from "./Servicios";
-import AdminGodMode from "./AdminGodMode";
-import ChanguiShopping from "./ChanguiShopping";
-import DashboardNegocio from "./DashboardNegocio"; // Agregado: Import del Dashboard de Negocio
-import RepasDashboard from "./RepasDashboard";
-import BienesRaices from "./BienesRaices";
-import VentaAutos from "./VentaAutos";
-import ChangoMonedero from "./ChangoMonedero";
+const Dashboard = lazy(function () {
+  return import("./Dashboard");
+});
+const BazarVecinal = lazy(function () {
+  return import("./BazarVecinal");
+});
+const Servicios = lazy(function () {
+  return import("./Servicios");
+});
+const AdminGodMode = lazy(function () {
+  return import("./AdminGodMode");
+});
+const ChanguiShopping = lazy(function () {
+  return import("./ChanguiShopping");
+});
+const DashboardNegocio = lazy(function () {
+  return import("./DashboardNegocio");
+});
+const RepasDashboard = lazy(function () {
+  return import("./RepasDashboard");
+});
+const BienesRaices = lazy(function () {
+  return import("./BienesRaices");
+});
+const VentaAutos = lazy(function () {
+  return import("./VentaAutos");
+});
+const ChangoMonedero = lazy(function () {
+  return import("./ChangoMonedero");
+});
+import {
+  completeProfileSetup,
+  resendConfirmationEmail,
+  startAuthSession,
+  scheduleSessionExpiryWarning,
+  submitAuthForm,
+  validateAuthForm,
+} from "./authFlows";
+import ChanguitoLoader from "./components/ChanguitoLoader";
+import { normalizeSupabaseUrl } from "./supabaseUrl";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
-const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? "";
+const SUPABASE_URL: string = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
 const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const profileRecoveryClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+    storageKey: "changuito-profile-recovery-session",
+  },
+});
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export type Theme = "light" | "dark";
 export interface AppSession {
+  expiresAt?: number;
   user: { id: string; email?: string; nombre?: string; rol?: string };
 }
 export interface Toast {
@@ -49,6 +98,19 @@ type Pantalla =
   | "bienes"
   | "autos"
   | "monedero";
+
+const NOMBRES_PANTALLA: Record<Pantalla, string> = {
+  dashboard: "Inicio",
+  bazar: "Bazar Vecinal",
+  servicios: "Directorio Telefónico",
+  admin: "Panel de Control",
+  shopping: "ChanguiShopping",
+  negocio: "Panel de Negocios",
+  repas: "Panel Repartidor",
+  bienes: "Bienes Raíces",
+  autos: "Venta de Autos",
+  monedero: "ChangoMonedero",
+};
 
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
@@ -144,6 +206,9 @@ function ToastRack(props: { toasts: Toast[] }) {
         return (
           <div
             key={t.id}
+            role={t.kind === "error" ? "alert" : "status"}
+            aria-live={t.kind === "error" ? "assertive" : "polite"}
+            aria-atomic="true"
             className="fade-in"
             style={{
               padding: "12px 16px",
@@ -337,173 +402,218 @@ function AuthScreen(props: {
   theme: Theme;
   onThemeToggle: () => void;
   onToast: (t: string, k: Toast["kind"]) => void;
+  authMonitoringUnavailable: boolean;
+  onRetryAuthMonitoring: () => void;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "recover-profile">(
+    "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [focused, setFocused] = useState("");
   const isDark = props.theme === "dark";
   const isLogin = mode === "login";
 
+  async function handleGuestAccess() {
+    if (guestLoading || loading || resendingConfirmation) return;
+    setGuestLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (error) {
+        const message = error.message ?? "";
+        const anonymousDisabled =
+          /anonymous sign[- ]ins? (?:are )?disabled|anonymous provider.*disabled/i.test(
+            message,
+          );
+        props.onToast(
+          anonymousDisabled
+            ? "El acceso sin registro aún no está activado en Supabase. Activa Anonymous Sign-Ins en Authentication y vuelve a intentarlo."
+            : message || "No pudimos iniciar como invitado. Intenta de nuevo.",
+          "error",
+        );
+        return;
+      }
+      if (!data.session?.user?.id) {
+        props.onToast(
+          "Supabase no devolvió una sesión de invitado. Intenta de nuevo.",
+          "error",
+        );
+      }
+    } catch (error: any) {
+      props.onToast(
+        error?.message ?? "No pudimos iniciar como invitado. Intenta de nuevo.",
+        "error",
+      );
+    } finally {
+      setGuestLoading(false);
+    }
+  }
+
+  async function handleResendConfirmation() {
+    if (loading || resendingConfirmation) return;
+    setResendingConfirmation(true);
+    try {
+      const result = await resendConfirmationEmail(profileRecoveryClient, email);
+      props.onToast(
+        result.message,
+        result.status === "sent" ? "success" : "error",
+      );
+    } finally {
+      setResendingConfirmation(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) {
-      props.onToast("Completá todos los campos.", "error");
-      return;
-    }
-    if (mode === "register" && nombre.trim().length < 2) {
-      props.onToast("Ingresá tu nombre completo.", "error");
-      return;
-    }
-    if (password.length < 6) {
-      props.onToast("Mínimo 6 caracteres.", "error");
+    const values = { mode, email, password, nombre };
+    const validationError = validateAuthForm(values);
+    if (validationError) {
+      props.onToast(validationError, "error");
       return;
     }
     setLoading(true);
     try {
-      if (mode === "register") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.user) {
-          try {
-            await supabase.from("perfiles").upsert(
-              {
-                id: data.user.id,
-                nombre: nombre.trim(),
-                email,
-                rol: "cliente",
-              },
-              { onConflict: "id" },
-            );
-          } catch (e) {}
-        }
-        props.onToast("Revisá tu email para confirmar.", "success");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+      const result =
+        mode === "recover-profile"
+          ? await completeProfileSetup(profileRecoveryClient, values)
+          : await submitAuthForm(supabase, values);
+      if (result.status === "error") {
+        props.onToast(result.message ?? "Error inesperado.", "error");
+      } else if (result.status === "profile-incomplete") {
+        props.onToast(result.message ?? "No pudimos guardar tu perfil.", "error");
+        setMode("recover-profile");
+      } else if (result.status === "profile-completed") {
+        props.onToast(
+          result.message ?? "Tu perfil quedó configurado. Ya podés iniciar sesión.",
+          "success",
+        );
+        setMode("login");
+      } else if (result.status === "registered") {
+        props.onToast(result.message ?? "Revisá tu email para confirmar.", "success");
       }
-    } catch (err: any) {
-      props.onToast(err.message ?? "Error inesperado.", "error");
     } finally {
       setLoading(false);
     }
   }
 
-  const inputBg = isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.04)";
+  const inputBg = isDark ? "rgba(5,26,16,0.56)" : "#f1f7f2";
+  const surface = isDark ? "#162b24" : "#ffffff";
+  const border = isDark ? "rgba(235,241,225,0.12)" : "rgba(33,55,57,0.12)";
+  const fieldStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    background: inputBg,
+    borderRadius: "13px",
+    padding: "14px 14px 14px 44px",
+    color: "var(--text-primary)",
+    fontSize: "14px",
+    outline: "none",
+    minHeight: "52px",
+    transition: "border-color 160ms ease, background 160ms ease",
+  };
   const ib = function (f: string) {
     return focused === f
-      ? "1px solid rgba(250,204,21,0.6)"
+      ? "1px solid var(--color-blue)"
       : isDark
-        ? "1px solid rgba(255,255,255,0.08)"
-        : "1px solid rgba(0,0,0,0.12)";
+        ? "1px solid rgba(235,241,225,0.15)"
+        : "1px solid rgba(33,55,57,0.16)";
   };
 
   return (
     <div
-      className="fade-in"
+      className="auth-screen fade-in"
       style={{
-        minHeight: "100vh",
-        background: "var(--bg-base)",
+        minHeight: "100dvh",
+        background: isDark ? "#0c1b17" : "#f3f8f4",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: "clamp(18px, 4vw, 48px)",
         position: "relative",
+        overflow: "hidden",
+        color: "var(--text-primary)",
       }}
     >
+      <style>{`
+        .auth-screen, .auth-screen * { box-sizing: border-box; }
+        .auth-shell { position: relative; }
+        .auth-shell::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 6px; z-index: 1; background: linear-gradient(90deg,#159447 0% 25%,#F6C945 25% 50%,#E84844 50% 75%,#2979DA 75% 100%); }
+        .auth-screen button { font: inherit; }
+        .auth-screen button:focus-visible, .auth-screen input:focus-visible {
+          outline: 3px solid var(--color-blue) !important;
+          outline-offset: 3px;
+        }
+        .auth-shell { width: 100%; max-width: 1030px; display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(390px, .98fr); border-radius: 30px; overflow: hidden; box-shadow: 0 28px 90px rgba(15,35,39,.18); animation: auth-arrive .55s cubic-bezier(.2,.75,.25,1) both; }
+        .auth-story { position: relative; min-height: 660px; overflow: hidden; }
+        .auth-form-panel { padding: clamp(28px, 5vw, 58px); }
+        .auth-mobile-mark { display: none !important; }
+        .auth-field-label { display: block; margin: 0 0 7px 2px; color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+        @keyframes auth-arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 760px) {
+          .auth-screen { align-items: flex-start !important; padding: 76px 16px 24px !important; }
+          .auth-shell { max-width: 490px; display: flex; flex-direction: column; border-radius: 24px; }
+          .auth-story { display: none !important; }
+          .auth-form-panel { padding: 24px clamp(20px, 6vw, 32px) 26px; }
+          .auth-mobile-mark { display: flex !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .auth-shell { animation: none; }
+          .auth-screen * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+        }
+      `}</style>
       <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: isDark ? 0.03 : 0.06,
-          backgroundImage:
-            "radial-gradient(circle, var(--text-primary) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{ position: "absolute", top: "16px", right: "16px", zIndex: 10 }}
+        style={{ position: "absolute", top: "18px", right: "20px", zIndex: 10 }}
       >
         <ThemeToggle theme={props.theme} onToggle={props.onThemeToggle} />
       </div>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "380px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "68px",
-              height: "68px",
-              borderRadius: "22px",
-              background: "#facc15",
-              boxShadow: "0 8px 24px rgba(250,204,21,0.4)",
-              marginBottom: "16px",
-            }}
-          >
-            <ShoppingCart
-              style={{ width: "32px", height: "32px", color: "#020617" }}
-              strokeWidth={2.5}
-            />
+      <main className="auth-shell" style={{ position: "relative", zIndex: 1, border: `1px solid ${border}` }}>
+        <section className="auth-story" aria-label="Changuito Express en Lomas y Puebla" style={{ background: "#F6C945", color: "#18353a", padding: "clamp(34px, 5vw, 58px)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div style={{ position: "absolute", inset: 0, opacity: .12, backgroundImage: "radial-gradient(circle, #18353a 1px, transparent 1.2px)", backgroundSize: "17px 17px", maskImage: "linear-gradient(135deg, black, transparent 74%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", width: "330px", height: "330px", border: "1px solid rgba(24,53,58,.2)", borderRadius: "50%", right: "-126px", top: "104px", boxShadow: "0 0 0 34px rgba(24,53,58,.045), 0 0 0 68px rgba(24,53,58,.035)" }} />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ width: "48px", height: "48px", display: "grid", placeItems: "center", borderRadius: "15px", background: "#18353a", color: "#f4c85b" }}>
+                <ShoppingCart size={24} strokeWidth={2.2} />
+              </div>
+              <div style={{ fontSize: "13px", lineHeight: 1.1, fontWeight: 900, letterSpacing: ".11em" }}>CHANGUITO<br /><span style={{ fontWeight: 600, letterSpacing: ".2em" }}>EXPRESS</span></div>
+            </div>
+            <div style={{ marginTop: "clamp(65px, 10vh, 112px)", maxWidth: "400px" }}>
+              <p style={{ margin: "0 0 18px", textTransform: "uppercase", fontSize: "11px", letterSpacing: ".19em", fontWeight: 900 }}>Tu barrio, a un pedido de distancia</p>
+              <h1 style={{ margin: 0, fontSize: "clamp(38px, 5vw, 58px)", lineHeight: .98, letterSpacing: "-.055em", fontWeight: 900 }}>Lo de aquí,<br />llega contigo.</h1>
+              <p style={{ margin: "22px 0 0", maxWidth: "330px", fontSize: "15px", lineHeight: 1.65, color: "rgba(24,53,58,.84)" }}>Comida de tus lugares favoritos y mandados de confianza, cerca de casa.</p>
+            </div>
           </div>
-          <h1
-            style={{
-              fontSize: "26px",
-              fontWeight: 900,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.04em",
-              lineHeight: 1,
-              margin: 0,
-            }}
-          >
-            CHANGUITO
-            <br />
-            <span style={{ color: "#facc15" }}>EXPRESS</span>
-          </h1>
-          <p
-            style={{
-              fontSize: "10px",
-              letterSpacing: "0.35em",
-              color: "var(--text-muted)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              marginTop: "8px",
-            }}
-          >
-            • Lomas • 1 • 2 • 3 • La Vista •
-          </p>
-        </div>
-        <div
-          style={{
-            background: isDark ? "#16161e" : "#ffffff",
-            border: isDark
-              ? "1px solid rgba(255,255,255,0.07)"
-              : "1px solid rgba(0,0,0,0.08)",
-            borderRadius: "28px",
-            padding: "28px",
-            boxShadow: "var(--shadow-float)",
-          }}
-        >
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "9px", marginBottom: "16px", fontSize: "12px", fontWeight: 800 }}>
+              <MapPin size={16} /> LOMAS · PUEBLA
+            </div>
+            <div style={{ width: "100%", height: "1px", background: "rgba(24,53,58,.22)", marginBottom: "14px" }} />
+            <p style={{ margin: 0, fontSize: "12px", color: "rgba(24,53,58,.76)" }}>Hecho para moverse como se mueve tu comunidad.</p>
+          </div>
+        </section>
+        <section className="auth-form-panel" style={{ background: surface }}>
+          <div className="auth-mobile-mark" style={{ alignItems: "center", gap: "11px", marginBottom: "26px" }}>
+            <div style={{ width: "42px", height: "42px", display: "grid", placeItems: "center", borderRadius: "14px", background: "#d99a25", color: "#18353a" }}><ShoppingCart size={21} /></div>
+            <div style={{ fontSize: "12px", lineHeight: 1.15, fontWeight: 900, letterSpacing: ".1em" }}>CHANGUITO<br /><span style={{ letterSpacing: ".19em", fontWeight: 600 }}>EXPRESS</span></div>
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "5px", color: "var(--text-muted)", fontSize: "10px", fontWeight: 800, letterSpacing: ".1em" }}><MapPin size={13} /> LOMAS</span>
+          </div>
+          <div style={{ marginBottom: "25px" }}>
+            <p style={{ margin: "0 0 8px", color: "#b87c13", fontSize: "11px", fontWeight: 900, letterSpacing: ".15em", textTransform: "uppercase" }}>{mode === "recover-profile" ? "Recupera tu perfil" : isLogin ? "Qué bueno verte" : "Una cuenta para tu barrio"}</p>
+            <h2 style={{ margin: 0, color: "var(--text-primary)", fontSize: "clamp(25px, 3vw, 31px)", letterSpacing: "-.045em", lineHeight: 1.1, fontWeight: 850 }}>{mode === "recover-profile" ? "Completa tus datos" : isLogin ? "Entra a Changuito" : "Crea tu cuenta"}</h2>
+            <p style={{ margin: "9px 0 0", color: "var(--text-muted)", fontSize: "13px", lineHeight: 1.5 }}>{mode === "recover-profile" ? "Confirma tu email y completa el perfil de tu cuenta." : isLogin ? "Pide lo que necesitas. Nosotros lo acercamos." : "Empieza con tus restaurantes y servicios favoritos."}</p>
+          </div>
           <div
             style={{
               display: "flex",
-              background: isDark ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.05)",
-              borderRadius: "16px",
+              background: isDark ? "rgba(5,16,26,.55)" : "#f1eddf",
+              borderRadius: "14px",
               padding: "4px",
-              marginBottom: "24px",
+              marginBottom: "22px",
             }}
           >
             {(["login", "register"] as const).map(function (m) {
@@ -520,27 +630,29 @@ function AuthScreen(props: {
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "6px",
-                    padding: "10px",
-                    borderRadius: "12px",
-                    fontSize: "11px",
+                    padding: "11px 9px",
+                    minHeight: "44px",
+                    borderRadius: "11px",
+                    fontSize: "12px",
                     fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    background: active ? "#facc15" : "transparent",
-                    color: active ? "#020617" : "var(--text-muted)",
+                    letterSpacing: "0.01em",
+                    background: active ? "var(--color-yellow)" : "transparent",
+                    color: active ? "#18353a" : "var(--text-muted)",
                     boxShadow: active
-                      ? "0 4px 12px rgba(250,204,21,0.3)"
+                      ? "0 3px 9px rgba(112,76,14,.15)"
                       : "none",
+                    cursor: "pointer",
                   }}
+                  aria-pressed={active}
                 >
                   {m === "login" ? (
                     <>
-                      <LogIn style={{ width: "12px", height: "12px" }} /> Entrar
+                      <LogIn style={{ width: "15px", height: "15px" }} /> Entrar
                     </>
                   ) : (
                     <>
-                      <UserPlus style={{ width: "12px", height: "12px" }} />{" "}
-                      Registro
+                      <UserPlus style={{ width: "15px", height: "15px" }} />{" "}
+                      Crear cuenta
                     </>
                   )}
                 </button>
@@ -549,10 +661,62 @@ function AuthScreen(props: {
           </div>
           <form
             onSubmit={handleSubmit}
-            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "15px" }}
           >
+            {isLogin && props.authMonitoringUnavailable && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+                style={{
+                  padding: "12px",
+                  borderRadius: "14px",
+                  background: "var(--color-yellow-dim)",
+                  border: "1px solid var(--color-yellow)",
+                  color: "var(--text-primary)",
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                }}
+              >
+                <p style={{ margin: "0 0 8px" }}>
+                  No podemos comprobar el inicio de sesión en este momento.
+                  Aunque tus credenciales sean correctas, no podremos abrir tu
+                  cuenta hasta que se restablezca la conexión. Podés reintentar
+                  ahora.
+                </p>
+                <button
+                  type="button"
+                  onClick={props.onRetryAuthMonitoring}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "10px",
+                    background: "#facc15",
+                    color: "#020617",
+                    fontWeight: 800,
+                    fontSize: "12px",
+                  }}
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+            {mode === "recover-profile" && (
+              <p
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                  margin: "0 0 3px",
+                }}
+              >
+                Confirmá tu email y completá estos datos para guardar tu perfil
+                en la cuenta existente.
+              </p>
+            )}
             {!isLogin && (
-              <div style={{ position: "relative" }}>
+              <div>
+                <label className="auth-field-label" htmlFor="auth-name">Nombre completo</label>
+                <div style={{ position: "relative" }}>
                 <User
                   style={{
                     position: "absolute",
@@ -562,13 +726,16 @@ function AuthScreen(props: {
                     width: "15px",
                     height: "15px",
                     color:
-                      focused === "nombre" ? "#facc15" : "var(--text-muted)",
+                      focused === "nombre" ? "#b87c13" : "var(--text-muted)",
                     pointerEvents: "none",
                   }}
                 />
                 <input
                   type="text"
-                  placeholder="Nombre o Alias"
+                  id="auth-name"
+                  placeholder="Cómo te llamamos"
+                  aria-label="Nombre completo"
+                  required
                   autoComplete="name"
                   value={nombre}
                   onChange={function (e) {
@@ -581,20 +748,16 @@ function AuthScreen(props: {
                     setFocused("");
                   }}
                   style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    background: inputBg,
+                    ...fieldStyle,
                     border: ib("nombre"),
-                    borderRadius: "14px",
-                    padding: "14px 14px 14px 40px",
-                    color: "var(--text-primary)",
-                    fontSize: "14px",
-                    outline: "none",
                   }}
                 />
+                </div>
               </div>
             )}
-            <div style={{ position: "relative" }}>
+            <div>
+              <label className="auth-field-label" htmlFor="auth-email">Correo electrónico</label>
+              <div style={{ position: "relative" }}>
               <Mail
                 style={{
                   position: "absolute",
@@ -603,13 +766,16 @@ function AuthScreen(props: {
                   transform: "translateY(-50%)",
                   width: "15px",
                   height: "15px",
-                  color: focused === "email" ? "#facc15" : "var(--text-muted)",
+                  color: focused === "email" ? "#b87c13" : "var(--text-muted)",
                   pointerEvents: "none",
                 }}
               />
               <input
                 type="email"
-                placeholder="tu@email.com"
+                id="auth-email"
+                placeholder="nombre@correo.com"
+                aria-label="Correo electrónico"
+                required
                 autoComplete="email"
                 value={email}
                 onChange={function (e) {
@@ -622,19 +788,15 @@ function AuthScreen(props: {
                   setFocused("");
                 }}
                 style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: inputBg,
+                  ...fieldStyle,
                   border: ib("email"),
-                  borderRadius: "14px",
-                  padding: "14px 14px 14px 40px",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  outline: "none",
                 }}
               />
+              </div>
             </div>
-            <div style={{ position: "relative" }}>
+            <div>
+              <label className="auth-field-label" htmlFor="auth-password">Contraseña</label>
+              <div style={{ position: "relative" }}>
               <Lock
                 style={{
                   position: "absolute",
@@ -643,14 +805,17 @@ function AuthScreen(props: {
                   transform: "translateY(-50%)",
                   width: "15px",
                   height: "15px",
-                  color: focused === "pass" ? "#facc15" : "var(--text-muted)",
+                  color: focused === "pass" ? "#b87c13" : "var(--text-muted)",
                   pointerEvents: "none",
                 }}
               />
               <input
-                type="password"
-                placeholder="Contraseña (mín. 6 caracteres)"
-                autoComplete={isLogin ? "current-password" : "new-password"}
+                type={showPassword ? "text" : "password"}
+                id="auth-password"
+                placeholder="Mínimo 6 caracteres"
+                aria-label="Contraseña"
+                required
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
                 value={password}
                 onChange={function (e) {
                   setPassword(e.target.value);
@@ -662,40 +827,43 @@ function AuthScreen(props: {
                   setFocused("");
                 }}
                 style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: inputBg,
+                  ...fieldStyle,
                   border: ib("pass"),
-                  borderRadius: "14px",
-                  padding: "14px 14px 14px 40px",
-                  color: "var(--text-primary)",
-                  fontSize: "14px",
-                  outline: "none",
+                  paddingRight: "54px",
                 }}
               />
+              <button type="button" onClick={function () { setShowPassword(function (visible) { return !visible; }); }} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword} style={{ position: "absolute", right: "5px", top: "5px", width: "42px", height: "42px", display: "grid", placeItems: "center", border: 0, borderRadius: "10px", background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+              </div>
+              <p style={{ margin: "7px 0 0 2px", color: "var(--text-muted)", fontSize: "11px" }}>Usa al menos 6 caracteres.</p>
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || resendingConfirmation}
               style={{
                 width: "100%",
-                background: loading ? "rgba(250,204,21,0.5)" : "#facc15",
-                color: "#020617",
+                background:
+                  loading || resendingConfirmation
+                    ? "rgba(250,204,21,0.5)"
+                    : "var(--color-green)",
+                color: "#ffffff",
                 fontWeight: 900,
-                fontSize: "13px",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
+                fontSize: "14px",
+                letterSpacing: "0.01em",
                 padding: "15px",
-                borderRadius: "14px",
+                minHeight: "54px",
+                borderRadius: "13px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                boxShadow: loading
+                boxShadow: loading || resendingConfirmation
                   ? "none"
-                  : "0 6px 20px rgba(250,204,21,0.35)",
+                  : "0 8px 18px rgba(112,76,14,0.17)",
                 marginTop: "4px",
-                cursor: loading ? "not-allowed" : "pointer",
+                cursor:
+                  loading || resendingConfirmation ? "not-allowed" : "pointer",
               }}
             >
               {loading ? (
@@ -708,19 +876,127 @@ function AuthScreen(props: {
                 />
               ) : isLogin ? (
                 <>
-                  <LogIn style={{ width: "15px", height: "15px" }} /> Entrar a
-                  la App
+                  <LogIn style={{ width: "16px", height: "16px" }} /> Entrar
                 </>
               ) : (
                 <>
-                  <UserPlus style={{ width: "15px", height: "15px" }} /> Crear
-                  Cuenta
+                  {mode === "recover-profile" ? (
+                    <>
+                      <User style={{ width: "15px", height: "15px" }} /> Completar
+                      Perfil
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus style={{ width: "16px", height: "16px" }} /> Crear
+                      cuenta
+                    </>
+                  )}
                 </>
               )}
             </button>
           </form>
-        </div>
-      </div>
+          <button
+            type="button"
+            onClick={handleGuestAccess}
+            disabled={guestLoading || loading || resendingConfirmation}
+            aria-busy={guestLoading}
+            style={{
+              display: "block",
+              width: "100%",
+              margin: "14px 0 0",
+              padding: "12px",
+              minHeight: "48px",
+              borderRadius: "12px",
+              border: `1px solid ${border}`,
+              background: guestLoading
+                ? isDark
+                  ? "rgba(235,241,225,.04)"
+                  : "rgba(33,55,57,.04)"
+                : "transparent",
+              color: "var(--text-primary)",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor:
+                guestLoading || loading || resendingConfirmation
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            {guestLoading ? "Entrando como invitado…" : "Entrar sin registro"}
+          </button>
+          {mode === "recover-profile" && (
+            <>
+              <button
+                type="button"
+                disabled={loading || resendingConfirmation}
+                aria-busy={resendingConfirmation}
+                onClick={handleResendConfirmation}
+                style={{
+                  display: "block",
+                  margin: "12px auto 0",
+                   padding: "8px",
+                   minHeight: "40px",
+                  background: "transparent",
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  textDecoration: "underline",
+                  cursor:
+                    loading || resendingConfirmation ? "not-allowed" : "pointer",
+                }}
+              >
+                {resendingConfirmation
+                  ? "Reenviando email..."
+                  : "Reenviar email de confirmación"}
+              </button>
+              {resendingConfirmation && (
+                <p role="status" aria-live="polite" aria-atomic="true">
+                  Reenviando email de confirmación...
+                </p>
+              )}
+            </>
+          )}
+          {isLogin && (
+            <button
+              type="button"
+              onClick={function () {
+                setMode("recover-profile");
+              }}
+              style={{
+                display: "block",
+                margin: "16px auto 0",
+                 padding: "8px",
+                 minHeight: "40px",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              ¿Confirmaste tu email y te falta el perfil? Completalo acá
+            </button>
+          )}
+          {mode === "recover-profile" && (
+            <button
+              type="button"
+              onClick={function () {
+                setMode("login");
+              }}
+              style={{
+                display: "block",
+                margin: "12px auto 0",
+                padding: "8px",
+                minHeight: "40px",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              Volver a iniciar sesión
+            </button>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
@@ -728,6 +1004,10 @@ function AuthScreen(props: {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState<AppSession | null>(null);
+  const [authMonitoringRetry, setAuthMonitoringRetry] = useState<
+    (() => void) | null
+  >(null);
+  const [sessionExpiryWarning, setSessionExpiryWarning] = useState(false);
   const [booting, setBooting] = useState<boolean>(true);
   const [pantalla, setPantalla] = useState<Pantalla>("dashboard");
   const { theme, toggle } = useTheme();
@@ -762,128 +1042,51 @@ export default function App() {
     return function () { window.removeEventListener('popstate', handlePop); };
   }, [pantalla]);
 
-  async function cargarPerfil(userId: string, email: string | undefined) {
-    try {
-      const { data } = await supabase
-        .from("perfiles")
-        .select("nombre,rol")
-        .eq("id", userId)
-        .maybeSingle();
-      const nombre = data?.nombre ?? (email ? email.split("@")[0] : "usuario");
-      const rol =
-        data?.rol ?? (email === "uliseseven.7@gmail.com" ? "admin" : "cliente");
-      return { nombre, rol };
-    } catch (e) {
-      return {
-        nombre: email ? email.split("@")[0] : "usuario",
-        rol: "cliente",
-      };
-    }
-  }
-
   useEffect(function () {
-    let mounted = true;
-    async function init() {
-      try {
-        const {
-          data: { session: s },
-        } = await supabase.auth.getSession();
-        if (mounted && s) {
-          const p = await cargarPerfil(s.user.id, s.user.email);
-          if (mounted)
-            setSession({
-              user: {
-                id: s.user.id,
-                email: s.user.email,
-                nombre: p.nombre,
-                rol: p.rol,
-              },
-            });
-        }
-      } catch {
-      } finally {
-        if (mounted) setBooting(false);
-      }
-    }
-    init();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(function (_ev, s) {
-      if (!mounted) return;
-      if (s) {
-        cargarPerfil(s.user.id, s.user.email).then(function (p) {
-          if (mounted)
-            setSession({
-              user: {
-                id: s.user.id,
-                email: s.user.email,
-                nombre: p.nombre,
-                rol: p.rol,
-              },
-            });
+    return startAuthSession(
+      supabase,
+      function (s) {
+        setSession(s);
+      },
+      function () {
+        setBooting(false);
+      },
+      undefined,
+      function (available, retry) {
+        setAuthMonitoringRetry(function () {
+          return available ? null : retry;
         });
-      } else setSession(null);
-    });
-    return function () {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+      },
+    );
   }, []);
 
+  useEffect(
+    function () {
+      setSessionExpiryWarning(false);
+      return scheduleSessionExpiryWarning(session?.expiresAt, function () {
+        setSessionExpiryWarning(true);
+      });
+    },
+    [session?.user.id, session?.expiresAt],
+  );
+
   if (booting) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg-base)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "16px",
-          }}
-        >
-          <div
-            style={{
-              width: "52px",
-              height: "52px",
-              borderRadius: "18px",
-              background: "#facc15",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 0 28px rgba(250,204,21,0.4)",
-            }}
-          >
-            <ShoppingCart
-              style={{ width: "26px", height: "26px", color: "#020617" }}
-            />
-          </div>
-          <span
-            className="spinner"
-            style={{
-              borderColor: "var(--border-subtle)",
-              borderTopColor: "#facc15",
-              width: "22px",
-              height: "22px",
-            }}
-          />
-        </div>
-      </div>
-    );
+    return <ChanguitoLoader />;
   }
 
   if (!session) {
     return (
       <>
         <ToastRack toasts={toasts} />
-        <AuthScreen theme={theme} onThemeToggle={toggle} onToast={push} />
+        <AuthScreen
+          theme={theme}
+          onThemeToggle={toggle}
+          onToast={push}
+          authMonitoringUnavailable={authMonitoringRetry !== null}
+          onRetryAuthMonitoring={function () {
+            authMonitoringRetry?.();
+          }}
+        />
       </>
     );
   }
@@ -891,11 +1094,59 @@ export default function App() {
   // ── Navegación entre pantallas ───────────────────────────────────────────────
   return (
     <>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          width: "1px",
+          height: "1px",
+          padding: 0,
+          margin: "-1px",
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {NOMBRES_PANTALLA[pantalla]}
+      </div>
       <ToastRack toasts={toasts} />
+      {sessionExpiryWarning && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          style={{
+            position: "fixed",
+            zIndex: 10001,
+            top: "16px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(680px, calc(100% - 32px))",
+            boxSizing: "border-box",
+            padding: "14px 18px",
+            borderRadius: "14px",
+            background: "var(--color-yellow-dim)",
+            border: "1px solid var(--color-yellow)",
+            color: "var(--text-primary)",
+            fontSize: "14px",
+            fontWeight: 600,
+            boxShadow: "var(--shadow-float)",
+          }}
+        >
+          Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas
+          que iniciar sesión nuevamente.
+        </div>
+      )}
       {pwa.mostrar && (
         <PWABanner onInstalar={pwa.instalar} onDescartar={pwa.descartar} />
       )}
 
+      <Suspense
+        fallback={<ChanguitoLoader />}
+      >
       {pantalla === "dashboard" && (
         <Dashboard
           session={session}
@@ -1073,6 +1324,7 @@ export default function App() {
           }}
         />
       )}
+      </Suspense>
     </>
   );
 }

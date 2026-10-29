@@ -7,6 +7,11 @@ import {
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
+import AdminResumen from './admin/AdminResumen';
+import AdminCatalogo from './admin/AdminCatalogo';
+import AdminNegocios from './admin/AdminNegocios';
+import AdminTablas from './admin/AdminTablas';
+import AdminMandaditos from './admin/AdminMandaditos';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
@@ -38,7 +43,6 @@ interface Metricas {
   pedidosPendientes: number;
 }
 
-const RESTAURANTES_CASHBACK = ['cubiertos', 'atomica', 'tripoli'];
 const COMISION_PCT = 0.15;
 
 function estaAbiertoAhora(m: any): boolean {
@@ -63,7 +67,7 @@ interface AdminProps {
 const ADMIN_EMAIL = 'uliseseven.7@gmail.com';
 
 const ESTATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pendiente:   { label: 'Pendiente',   color: '#facc15', bg: 'rgba(250,204,21,0.15)'  },
+  pendiente:   { label: 'En proceso',  color: '#facc15', bg: 'rgba(250,204,21,0.15)'  },
   en_camino:   { label: 'En camino',   color: '#3b82f6', bg: 'rgba(59,130,246,0.15)'  },
   entregado:   { label: 'Entregado',   color: '#22c55e', bg: 'rgba(34,197,94,0.15)'   },
   cancelado:   { label: 'Cancelado',   color: '#ef4444', bg: 'rgba(239,68,68,0.15)'   },
@@ -90,7 +94,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [error, setError]           = useState('');
   const [filtroEstatus, setFiltro]  = useState('todos');
   const [pedidoAbierto, setPedAbi]  = useState<string | null>(null);
-  const [tab, setTab]               = useState<'pedidos'|'negocios'|'clientes'>('pedidos');
+  const [tab, setTab]               = useState<'resumen'|'pedidos'|'catalogo'|'negocios'|'otros'|'clientes'>('resumen');
   const [merchants, setMerchants]         = useState<any[]>([]);
   const [repartidores, setRepartidores]   = useState<any[]>([]);
   const [selRep, setSelRep]               = useState<Record<string, string>>({});
@@ -207,16 +211,9 @@ export default function AdminGodMode(props: AdminProps) {
     try {
       const { data: rpcData, error: rpcErr } = await supabase
         .rpc('resolver_solicitud_rol', { p_solicitud_id: solId, p_decision: decision });
-      if (rpcErr || !rpcData?.ok) {
-        // Fallback directo
-        await supabase.from('solicitudes_rol').update({ estado: decision }).eq('id', solId);
-        if (decision === 'aprobado') {
-          const sol = solicitudes.find(function(s) { return s.id === solId; });
-          if (sol) {
-            await supabase.from('perfiles')
-              .upsert({ id: sol.user_id, rol: sol.rol_pedido }, { onConflict: 'id' });
-          }
-        }
+      if (rpcErr) throw rpcErr;
+      if (!rpcData?.ok) {
+        throw new Error(rpcData?.error ?? 'No se pudo resolver la solicitud.');
       }
       fetchSolicitudes();
     } catch(e: any) { alert('Error: ' + e.message); }
@@ -231,6 +228,14 @@ export default function AdminGodMode(props: AdminProps) {
       .rpc('cambiar_estatus_pedido', { p_id: pedidoId, p_estatus: nuevoEstatus });
 
     if (rpcErr || !rpcData?.ok) {
+      if (nuevoEstatus === 'entregado') {
+        const detalle = rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.';
+        const siguientePaso = rpcErr
+          ? 'Ejecuta supabase_fix_cambiar_estatus_pedido.sql en el SQL Editor de Supabase.'
+          : 'Confirma que iniciaste sesión con la cuenta del administrador general.';
+        alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\n' + siguientePaso + '\n\n' + detalle);
+        return;
+      }
       // Fallback: actualización directa
       const { error: err, data: upData } = await supabase
         .from('pedidos')
@@ -240,24 +245,6 @@ export default function AdminGodMode(props: AdminProps) {
       if (err || !upData?.length) {
         alert('⚠️ No se pudo cambiar el estatus.\n\nEjecuta supabase_setup.sql en el SQL Editor de Supabase para habilitar los permisos.\n\n' + (err?.message ?? 'Sin filas afectadas.'));
         return;
-      }
-    }
-
-    // Si se marca entregado → acreditar cashback ChangoMonedero (Los Cubiertos / La Atómica / Tacos Trípoli)
-    if (nuevoEstatus === 'entregado') {
-      const pedido = pedidos.find(function(p) { return p.id === pedidoId; });
-      if (pedido && pedido.cliente_id) {
-        const negNombre = (pedido.negocio_nombre ?? '').toLowerCase();
-        const aplica = RESTAURANTES_CASHBACK.some(function(r) { return negNombre.includes(r); });
-        if (aplica) {
-          const cashback = Math.round((pedido.total_pagar ?? 0) * 0.05 * 100) / 100;
-          const { data: mon } = await supabase
-            .from('monedero_cliente').select('saldo_cashback')
-            .eq('user_id', pedido.cliente_id).maybeSingle();
-          const nuevoSaldo = (mon?.saldo_cashback ?? 0) + cashback;
-          await supabase.from('monedero_cliente')
-            .upsert({ user_id: pedido.cliente_id, saldo_cashback: nuevoSaldo }, { onConflict: 'user_id' });
-        }
       }
     }
 
@@ -284,6 +271,11 @@ export default function AdminGodMode(props: AdminProps) {
     setAsignando(null);
   }
 
+  function confirmarEntregaAdmin(pedidoId: string, negocio: string | null) {
+    if (!window.confirm('¿Confirmas que el pedido de ' + (negocio ?? 'este negocio') + ' ya fue entregado? El cashback se acreditará si aplica.')) return;
+    cambiarEstatus(pedidoId, 'entregado');
+  }
+
   async function toggleMerchant(id: string, actual: boolean) {
     await supabase.from('merchants').update({ is_open: !actual }).eq('id', id);
     fetchMerchants(); fetchMetricas();
@@ -296,11 +288,11 @@ export default function AdminGodMode(props: AdminProps) {
 
   const tabStyle = function(t: string): React.CSSProperties {
     const active = tab === t;
-    return { flex:1, padding:'10px 4px', border:'none', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:active?900:600, background:active?'var(--color-yellow)':'transparent', color:active?'#020617':'var(--text-muted)' };
+    return { flex:'1 0 auto', padding:'10px 14px', whiteSpace:'nowrap', border:'none', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:active?900:600, background:active?'var(--color-yellow)':'transparent', color:active?'#020617':'var(--text-muted)' };
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', fontFamily:'system-ui,sans-serif', maxWidth:'480px', margin:'0 auto' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', fontFamily:'system-ui,sans-serif', maxWidth:'1100px', margin:'0 auto' }}>
 
       {/* Header */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border-subtle)', padding:'14px 16px 12px' }}>
@@ -323,10 +315,13 @@ export default function AdminGodMode(props: AdminProps) {
         </div>
 
         {/* Tabs */}
-        <div style={{ display:'flex', background:isDark?'rgba(0,0,0,0.4)':'rgba(0,0,0,0.05)', borderRadius:'14px', padding:'3px', gap:'3px' }}>
+        <div style={{ display:'flex', overflowX:'auto', scrollbarWidth:'none', background:isDark?'rgba(0,0,0,0.4)':'rgba(0,0,0,0.05)', borderRadius:'14px', padding:'3px', gap:'3px' }}>
+          <button style={tabStyle('resumen')}  onClick={function(){ setTab('resumen');  }}>📈 Resumen</button>
           <button style={tabStyle('pedidos')}  onClick={function(){ setTab('pedidos');  }}>📦 Pedidos</button>
-          <button style={tabStyle('negocios')} onClick={function(){ setTab('negocios'); }}>🏪 Negocios</button>
-          <button style={tabStyle('clientes')} onClick={function(){ setTab('clientes'); }}>👥 Métricas</button>
+          <button style={tabStyle('catalogo')} onClick={function(){ setTab('catalogo'); }}>🛵 Mandaditos</button>
+          <button style={tabStyle('negocios')} onClick={function(){ setTab('negocios'); }}>🍽️ Restaurantes</button>
+          <button style={tabStyle('otros')}    onClick={function(){ setTab('otros');    }}>🛍️ Otros</button>
+          <button style={tabStyle('clientes')} onClick={function(){ setTab('clientes'); }}>👥 Gestión</button>
         </div>
       </div>
 
@@ -337,6 +332,12 @@ export default function AdminGodMode(props: AdminProps) {
             <p style={{ fontSize:'12px', color:'var(--color-red)', margin:0 }}>{error}</p>
           </div>
         )}
+
+        {tab === 'resumen' && (
+          <AdminResumen totalClientes={metricas?.totalClientes ?? 0} negociosAbiertos={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} totalNegocios={merchants.length} />
+        )}
+        {tab === 'catalogo' && <AdminMandaditos merchants={merchants} onCambio={fetchMerchants} />}
+        {tab === 'otros' && <AdminTablas />}
 
         {/* ── TAB PEDIDOS ── */}
         {tab === 'pedidos' && (
@@ -405,6 +406,17 @@ export default function AdminGodMode(props: AdminProps) {
                       <p style={{ fontSize:'14px', fontWeight:900, color:'var(--color-yellow)', margin:'0 0 3px 0' }}>${(pedido.total_pagar ?? 0).toFixed(0)}</p>
                       <span style={{ fontSize:'9px', fontWeight:800, padding:'2px 8px', borderRadius:'8px', background:cfg.bg, color:cfg.color, textTransform:'uppercase' }}>{cfg.label}</span>
                     </div>
+                    {pedido.estatus !== 'entregado' && pedido.estatus !== 'cancelado' && (
+                      <button
+                        type="button"
+                        aria-label={'Marcar pedido de ' + (pedido.negocio_nombre ?? 'negocio') + ' como entregado'}
+                        title="Marcar entregado como administrador"
+                        onClick={function(e){ e.stopPropagation(); confirmarEntregaAdmin(pedido.id, pedido.negocio_nombre); }}
+                        style={{ width:'34px', height:'34px', borderRadius:'11px', border:'1px solid rgba(34,197,94,.32)', background:'rgba(34,197,94,.13)', color:'var(--color-green)', display:'grid', placeItems:'center', cursor:'pointer', flexShrink:0 }}
+                      >
+                        <CheckCircle style={{ width:'17px', height:'17px' }} />
+                      </button>
+                    )}
                     {abierto ? <ChevronUp style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} /> : <ChevronDown style={{ width:'14px', height:'14px', color:'var(--text-muted)', flexShrink:0 }} />}
                   </div>
 
@@ -455,7 +467,7 @@ export default function AdminGodMode(props: AdminProps) {
                               return (
                                 <button key={s} onClick={function(){ cambiarEstatus(pedido.id, s); }}
                                   style={{ padding:'6px 12px', borderRadius:'10px', border:activo?'none':'1px solid var(--border-subtle)', background:activo?c.bg:'transparent', color:activo?c.color:'var(--text-muted)', fontSize:'11px', fontWeight:activo?800:600, cursor:'pointer' }}>
-                                  {activo && '✓ '}{c.label}
+                                  {activo ? '✓ ' + c.label : s === 'entregado' ? 'Marcar como entregado' : c.label}
                                 </button>
                               );
                             })}
@@ -548,34 +560,18 @@ export default function AdminGodMode(props: AdminProps) {
               <MetricaCard emoji="🏪" titulo="Total negocios"  valor={merchants.length} />
               <MetricaCard emoji="✅" titulo="Abiertos ahora"  valor={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} color="var(--color-green)" />
             </div>
-            {merchants.map(function(m){
-              const computadoAbierto = estaAbiertoAhora(m);
-              return (
-                <div key={m.id} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px 14px', borderRadius:'14px', background:'var(--bg-card)', border:'1px solid var(--border-subtle)', marginBottom:'8px', boxShadow:'var(--shadow-card)' }}>
-                  <div style={{ width:'40px', height:'40px', borderRadius:'12px', background:'linear-gradient(135deg,#1a1a2e,#2d2d44)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', flexShrink:0 }}>
-                    🏪
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 2px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</p>
-                    <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>{m.category} · ★ {(m.rating ?? 4.5).toFixed(1)}</p>
-                  </div>
-                  {/* Toggle abierto/cerrado (basado en horario calculado) */}
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px', flexShrink:0 }}>
-                    <button onClick={function(){ toggleMerchant(m.id, m.is_open); }}
-                      style={{ padding:'6px 12px', borderRadius:'10px', border:'none', background:computadoAbierto?'var(--color-green-dim)':'var(--color-red-dim)', color:computadoAbierto?'var(--color-green)':'var(--color-red)', fontSize:'11px', fontWeight:800, cursor:'pointer', whiteSpace:'nowrap' }}>
-                      {computadoAbierto ? '● Abierto' : '○ Cerrado'}
-                    </button>
-                    {(m.hora_apertura && m.hora_cierre) ? (
-                      <span style={{ fontSize:'9px', color:computadoAbierto?'var(--color-green)':'var(--text-muted)', fontWeight:700 }}>
-                        {m.hora_apertura}–{m.hora_cierre}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize:'9px', color:'var(--text-muted)', fontWeight:600 }}>Manual</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            <p style={{ fontSize:'12px', color:'var(--text-muted)', margin:'0 0 12px' }}>
+              Negocios con catálogo de productos. Desde aquí puedes editar sus datos y administrar nombre, precio, fotos y disponibilidad de cada producto.
+            </p>
+            <AdminNegocios
+              merchants={merchants.filter(function(m){ return String(m.category ?? '').toLowerCase().trim() !== 'mandaditos'; })}
+              onCambio={function(){ fetchMerchants(); fetchMetricas(); }}
+              abiertoAhora={estaAbiertoAhora}
+              onToggle={toggleMerchant}
+            />
+            <div style={{ marginTop:'22px' }}>
+              <AdminCatalogo merchants={merchants.filter(function(m){ return String(m.category ?? '').toLowerCase().trim() !== 'mandaditos'; })} />
+            </div>
           </div>
         )}
 

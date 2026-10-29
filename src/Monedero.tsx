@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Wallet } from 'lucide-react';
 import { supabase } from './App';
 import type { AppSession, Theme } from './App';
+import { getFreeShippingProgress } from './freeShippingProgress';
 
 interface Props {
   session: AppSession;
@@ -11,40 +12,94 @@ interface Props {
 
 export default function Monedero(props: Props) {
   const [monedero, setMonedero] = useState<any>(null);
+  const [pedidosEntregados, setPedidosEntregados] = useState<number | null>(null);
   const [loading,  setLoading]  = useState(true);
   const isDark = props.theme === 'dark';
+  const userId = props.session.user?.id;
 
   useEffect(function() {
-    cargarMonedero();
-  }, [props.session.user?.id]);
-
-  async function cargarMonedero() {
-    if (!props.session.user?.id) return;
-
-    let { data } = await supabase
-      .from('monedero_cliente')
-      .select('*')
-      .eq('user_id', props.session.user.id)
-      .single();
-
-    if (!data) {
-      const { data: newData } = await supabase
-        .from('monedero_cliente')
-        .insert([{ user_id: props.session.user.id }])
-        .select()
-        .single();
-      data = newData;
+    if (!userId) {
+      setLoading(false);
+      return;
     }
 
-    setMonedero(data);
-    setLoading(false);
-  }
+    setLoading(true);
+    setMonedero(null);
+    setPedidosEntregados(null);
+    let activo = true;
+    let solicitud = 0;
+    const cargarMonedero = async function() {
+      const solicitudActual = ++solicitud;
+      try {
+        let { data, error } = await supabase
+          .from('monedero_cliente')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (error) throw error;
+
+        if (!data) {
+          const { data: nuevo, error: errorCreacion } = await supabase
+            .from('monedero_cliente')
+            .insert([{ user_id: userId }])
+            .select()
+            .single();
+          if (errorCreacion) throw errorCreacion;
+          data = nuevo;
+        }
+
+        const { count, error: errorPedidos } = await supabase
+          .from('pedidos')
+          .select('id', { count: 'exact', head: true })
+          .eq('cliente_id', userId)
+          .eq('estatus', 'entregado');
+
+        if (!activo || solicitudActual !== solicitud) return;
+        setMonedero(data);
+        setPedidosEntregados(errorPedidos || count === null ? null : count);
+      } catch (error) {
+        console.error(error);
+        if (activo && solicitudActual === solicitud) {
+          setMonedero(null);
+          setPedidosEntregados(null);
+        }
+      } finally {
+        if (activo && solicitudActual === solicitud) setLoading(false);
+      }
+    };
+    const refrescarMonedero = function() {
+      if (document.visibilityState === 'visible') cargarMonedero();
+    };
+
+    cargarMonedero();
+    window.addEventListener('focus', refrescarMonedero);
+    document.addEventListener('visibilitychange', refrescarMonedero);
+    const channel = supabase
+      .channel('monedero-progreso-' + userId)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'pedidos',
+        filter: 'cliente_id=eq.' + userId,
+      }, refrescarMonedero)
+      .subscribe();
+
+    return function() {
+      activo = false;
+      window.removeEventListener('focus', refrescarMonedero);
+      document.removeEventListener('visibilitychange', refrescarMonedero);
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   if (loading || !monedero) return null;
 
-  const modulo = monedero.pedidos_realizados % 10;
-  const pedidosFalta = modulo === 0 ? 10 : 10 - modulo;
-  const progreso = Math.round((modulo / 10) * 100);
+  const envioGratis = pedidosEntregados === null
+    ? null
+    : getFreeShippingProgress(
+      pedidosEntregados,
+      monedero.envios_gratis_usados ?? 0,
+    );
 
   return (
     <div style={{
@@ -89,10 +144,10 @@ export default function Monedero(props: Props) {
             🚚 Envío gratis
           </p>
           <p style={{ fontSize:'14px', fontWeight:800, color:'#22C55E', margin:'0 0 2px 0', lineHeight:1.2 }}>
-            {modulo === 0 && monedero.pedidos_realizados > 0 ? '¡Disponible!' : pedidosFalta + ' pedidos'}
+            {envioGratis === null ? 'No disponible' : envioGratis.available ? '¡Disponible!' : envioGratis.remainingOrders + ' pedido' + (envioGratis.remainingOrders === 1 ? '' : 's')}
           </p>
           <p style={{ fontSize:'10px', color:'var(--text-muted)', margin:0 }}>
-            {monedero.pedidos_realizados} de cada 10
+            {envioGratis === null ? '—' : envioGratis.cycleCount} de cada 10
           </p>
         </div>
       </div>
@@ -101,14 +156,14 @@ export default function Monedero(props: Props) {
       <div style={{ marginBottom:'8px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
           <span style={{ fontSize:'10px', color:'var(--text-muted)', fontWeight:600 }}>
-            Progreso al próximo envío gratis
+            {envioGratis === null ? 'Progreso no disponible' : envioGratis.available ? 'Envío gratis disponible' : 'Progreso al próximo envío gratis'}
           </span>
-          <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{progreso}%</span>
+          <span style={{ fontSize:'10px', color:'#22C55E', fontWeight:800 }}>{envioGratis === null ? '—' : envioGratis.progressPercent + '%'}</span>
         </div>
         <div style={{ height:'5px', borderRadius:'3px', background:'var(--border-subtle)', overflow:'hidden' }}>
           <div style={{
             height:'100%',
-            width: progreso + '%',
+            width: (envioGratis === null ? 0 : envioGratis.progressPercent) + '%',
             borderRadius:'3px',
             background:'linear-gradient(90deg,#22c55e,#16a34a)',
             transition:'width 0.6s ease',
@@ -117,7 +172,7 @@ export default function Monedero(props: Props) {
       </div>
 
       <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0, lineHeight:1.4 }}>
-        🎁 Cada 10 pedidos = envío gratis · 💎 Compras seleccionadas = 5-10% cashback
+        🎁 Cada 10 pedidos entregados = envío gratis · 💎 Compras seleccionadas = 5-10% cashback
       </p>
     </div>
   );

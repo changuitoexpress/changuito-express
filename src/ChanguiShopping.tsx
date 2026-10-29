@@ -1,6 +1,6 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Search, X, ShoppingBag, Star, Clock, Package, WifiOff, RefreshCw, ChevronRight, Truck } from 'lucide-react';
+import { ArrowLeft, Search, X, ShoppingBag, Star, Clock, Package, WifiOff, RefreshCw, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
 
@@ -38,6 +38,51 @@ const CATEGORIAS = [
   { id:'mascotas',    label:'Mascotas',   emoji:'🐾' },
 ];
 
+// Convierte image_url (null, vacío, 'null' o varias URLs separadas por coma) en una lista de URLs.
+export function parseImageUrls(value: string | null | undefined): string[] {
+  if (!value) return [];
+  const text = value.trim();
+  if (text === '' || text.toLowerCase() === 'null') return [];
+  return text.split(',').map(function(u){ return u.trim(); }).filter(function(u){ return u !== '' && u.toLowerCase() !== 'null'; });
+}
+
+// Muestra recuadro 🐒 (sin fotos), imagen simple (1 foto) o carrusel (varias).
+export function ProductImageCarousel(props: { urls: string[]; alt: string }) {
+  const [index, setIndex] = useState(0);
+  const urls = props.urls;
+  const actual = Math.min(index, Math.max(urls.length - 1, 0));
+  if (urls.length === 0) {
+    return (
+      <div data-testid="product-image-empty" style={{ width:'100%', aspectRatio:'1 / 1', maxHeight:'260px', borderRadius:'18px', background:'#F5F5F5', marginBottom:'16px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'64px' }}>🐒</div>
+    );
+  }
+  const btn = { position:'absolute' as const, top:'50%', transform:'translateY(-50%)', width:'38px', height:'38px', borderRadius:'50%', border:'none', background:'rgba(0,0,0,0.58)', color:'white', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' };
+  return (
+    <div style={{ position:'relative', height:'200px', borderRadius:'18px', background:'#F5F5F5', marginBottom:'16px', overflow:'hidden' }}>
+      <img src={urls[actual]} alt={props.alt + ' - foto ' + (actual + 1)} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+      {urls.length > 1 && (
+        <>
+          <button type="button" aria-label="Foto anterior" onClick={function(){ setIndex((actual - 1 + urls.length) % urls.length); }} style={{ ...btn, left:'10px' }}>
+            <ChevronLeft style={{ width:'20px', height:'20px' }} />
+          </button>
+          <button type="button" aria-label="Foto siguiente" onClick={function(){ setIndex((actual + 1) % urls.length); }} style={{ ...btn, right:'10px' }}>
+            <ChevronRight style={{ width:'20px', height:'20px' }} />
+          </button>
+          <div aria-label="Indicadores de fotos" style={{ position:'absolute', left:0, right:0, bottom:'10px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+            {urls.map(function(_, i){ return (
+              <button key={i} type="button" aria-label={'Mostrar foto ' + (i + 1)} aria-pressed={actual === i} onClick={function(){ setIndex(i); }}
+                style={{ width:actual === i ? '18px' : '8px', height:'8px', padding:0, border:0, borderRadius:'999px', background:actual === i ? '#fff' : 'rgba(255,255,255,0.65)', cursor:'pointer' }} />
+            ); })}
+          </div>
+          <span aria-live="polite" style={{ position:'absolute', top:'10px', right:'10px', padding:'4px 8px', borderRadius:'999px', background:'rgba(0,0,0,0.58)', color:'white', fontSize:'11px', fontWeight:800 }}>
+            {actual + 1} / {urls.length}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ChanguiShopping(props: Props) {
   const [productos, setProductos]   = useState<Producto[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -45,6 +90,15 @@ export default function ChanguiShopping(props: Props) {
   const [search, setSearch]         = useState('');
   const [detalle, setDetalle]       = useState<Producto | null>(null);
   const isDark = props.theme === 'dark';
+  const fotosDetalle = parseImageUrls(detalle?.fotos?.join(','));
+
+  function abrirDetalle(producto: Producto) {
+    setDetalle(producto);
+  }
+
+  function cerrarDetalle() {
+    setDetalle(null);
+  }
 
   const fetchProductos = useCallback(async function() {
     setLoading(true);
@@ -146,7 +200,7 @@ export default function ChanguiShopping(props: Props) {
           <div style={{ marginBottom:'20px' }}>
             <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 12px 0' }}>⭐ Más vendidos</p>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
-              {destacados.map(function(p){ return <TarjetaProducto key={p.id} producto={p} card={card} onClick={function(){ setDetalle(p); }} descuento={descuento(p)} />; })}
+              {destacados.map(function(p){ return <TarjetaProducto key={p.id} producto={p} card={card} onClick={function(){ abrirDetalle(p); }} descuento={descuento(p)} />; })}
             </div>
           </div>
         )}
@@ -156,7 +210,7 @@ export default function ChanguiShopping(props: Props) {
           <div>
             <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 12px 0' }}>Todos los productos</p>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
-              {normales.map(function(p){ return <TarjetaProducto key={p.id} producto={p} card={card} onClick={function(){ setDetalle(p); }} descuento={descuento(p)} />; })}
+              {normales.map(function(p){ return <TarjetaProducto key={p.id} producto={p} card={card} onClick={function(){ abrirDetalle(p); }} descuento={descuento(p)} />; })}
             </div>
           </div>
         )}
@@ -191,18 +245,12 @@ export default function ChanguiShopping(props: Props) {
 
       {/* Modal detalle producto */}
       {detalle && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:400, display:'flex', alignItems:'flex-end' }} onClick={function(){ setDetalle(null); }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:400, display:'flex', alignItems:'flex-end' }} onClick={cerrarDetalle}>
           <div style={{ width:'100%', maxWidth:'480px', margin:'0 auto', background:'var(--bg-card)', borderRadius:'28px 28px 0 0', padding:'24px 20px 40px', maxHeight:'85vh', overflowY:'auto' }}
             onClick={function(e){ e.stopPropagation(); }}>
             <div style={{ width:'40px', height:'4px', borderRadius:'2px', background:'var(--border-medium)', margin:'0 auto 20px' }} />
 
-            {/* Imagen */}
-            <div style={{ height:'200px', borderRadius:'18px', background:'linear-gradient(135deg,#7f1d1d,#dc2626)', marginBottom:'16px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'60px', overflow:'hidden' }}>
-              {detalle.fotos && detalle.fotos.length > 0
-                ? <img src={detalle.fotos[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                : '🛍️'
-              }
-            </div>
+            <ProductImageCarousel key={detalle.id} urls={fotosDetalle} alt={detalle.nombre} />
 
             {detalle.subcategoria && <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'20px', background:'var(--color-red-dim)', color:'var(--color-red)', fontWeight:700 }}>{detalle.subcategoria}</span>}
             <h2 style={{ fontSize:'20px', fontWeight:900, color:'var(--text-primary)', margin:'10px 0 8px 0' }}>{detalle.nombre}</h2>

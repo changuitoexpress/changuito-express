@@ -1,3 +1,15 @@
-- [Build shell env](build-shell-env.md) — agent shell has no npm/node on PATH; run vite build via explicit nodejs-20 bin path.
 - [ChanguitoAI integration](changuitoai-integration.md) — keep controlled abierto/onCerrar props; cart items must match CartItem shape (negocio/negocio_id/phone_number) or checkout crashes.
-- [Project rules](project-rules.md) — flat Vite+React+TS, inline styles only, `function(){}` syntax (NO arrow functions in runtime), `/* DO NOT TRANSLATE */` headers, git push manual por el usuario (GitHub → Vercel). Supabase `pedidos` has no `total`/`subtotal`/`detalle`/`costo_envio` — use `total_pagar`. Extra fields (recámaras/baños/transmisión) stored in `descripcion` text, no schema change needed.
+- [Project rules](project-rules.md) — preserve the user's coding conventions and manual GitHub → Vercel publishing process.
+- [Admin access status](admin-access-status.md) — the user reports the Supabase SQL is applied and their account now has the admin role.
+- [Premium redesign direction](premium-redesign.md) — redesign Changuito Express one screen at a time, using the agent's visual judgment and preserving behavior.
+- [Isolated auth recovery](isolated-auth-recovery.md) — password verification for recovery flows must not mutate the app’s active session or trigger its auth listener.
+- [Signup confirmation responses](signup-confirmation-responses.md) — require a real Supabase user ID; the SDK may normalize a missing user into a truthy response object.
+- [Supabase count pagination fixtures](supabase-count-pagination.md) — browser mocks must expose `content-range` for Supabase exact counts to be visible to the client.
+- [Browser fixture response shapes](browser-fixture-response-shapes.md) — authenticated browser mocks must match the data shapes the destination screen consumes.
+- [Supabase session management](supabase-session-management.md) — per-device operations must stay JWT-scoped; revoked access tokens can work until expiry.
+- [Supabase cross-tab auth tests](supabase-cross-tab-auth-tests.md) — simulate sign-ins through the auth BroadcastChannel; changing local storage alone does not notify the app listener.
+- [Free-shipping redemption](free-shipping-redemption.md) — calculate rewards from delivered orders minus uses; create a discounted order and record redemption atomically through a protected RPC.
+- [Supabase URL format](supabase-url-format.md) — use the project origin; the user enabled anonymous sign-ins and confirmed guest access works.
+- [AI ordering safety](ai-ordering-safety.md) — conversational orders are validated proposals; confirm before cart changes and verify model latency with live requests.
+- [Customer navigation](customer-navigation.md) — Changui Súper opens products directly; restaurant shortcuts precede Mandaditos, including written restaurant orders.
+- [God Mode admin scope](god-mode-admin.md) — modular admin under src/admin; DB changes only in additive supabase_admin_upgrade.sql; one order row per business.

@@ -128,11 +128,19 @@ export default function RepasDashboard(props: Props) {
   const [textoChat, setTextoChat] = useState("");
   const [textoCorrecto, setTextoCorrecto] = useState("");
   const [enviandoMsg, setEnviandoMsg] = useState(false);
+  const [accessRevoked, setAccessRevoked] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const accessRevokedRef = useRef(false);
   const isDark = props.theme === "dark";
   const miId = props.session.user.id;
+  const puedeAcceder =
+    props.session.user.rol === "admin" ||
+    props.session.user.rol === "repartidor" ||
+    props.session.user.email === "uliseseven.7@gmail.com";
+  const hasAccess = puedeAcceder && !accessRevoked;
 
   const fetchPedidos = useCallback(async function () {
+    if (!puedeAcceder || accessRevokedRef.current) return;
     setLoading(true);
     try {
       const { data } = await supabase
@@ -140,19 +148,75 @@ export default function RepasDashboard(props: Props) {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
+      if (!puedeAcceder || accessRevokedRef.current) return;
       setPedidos(data ?? []);
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (puedeAcceder && !accessRevokedRef.current) setLoading(false);
     }
-  }, []);
+  }, [puedeAcceder]);
 
   useEffect(
     function () {
-      fetchPedidos();
+      if (puedeAcceder) {
+        accessRevokedRef.current = false;
+        setAccessRevoked(false);
+        fetchPedidos();
+      } else {
+        accessRevokedRef.current = true;
+        setAccessRevoked(true);
+        setPedidos([]);
+        setMensajes([]);
+        setChatPedido(null);
+        setLoading(false);
+      }
     },
-    [fetchPedidos],
+    [fetchPedidos, puedeAcceder],
+  );
+
+  useEffect(
+    function () {
+      const channel = supabase
+        .channel("delivery-access-" + miId)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "perfiles",
+            filter: "id=eq." + miId,
+          },
+          function (payload: any) {
+            const role =
+              payload.eventType === "DELETE" ? null : payload.new?.rol;
+            const nextAccess =
+              role === "admin" ||
+              role === "repartidor" ||
+              props.session.user.email === "uliseseven.7@gmail.com";
+            accessRevokedRef.current = !nextAccess;
+            if (!nextAccess) {
+              setAccessRevoked(true);
+              setPedidos([]);
+              setMensajes([]);
+              setChatPedido(null);
+              setTextoChat("");
+              setTextoCorrecto("");
+              setTab("mis");
+              setLoading(false);
+              return;
+            }
+            setAccessRevoked(false);
+            fetchPedidos();
+          },
+        )
+        .subscribe();
+
+      return function () {
+        void supabase.removeChannel(channel);
+      };
+    },
+    [fetchPedidos, miId, props.session.user.email],
   );
 
   // Auto-scroll chat
@@ -180,6 +244,7 @@ export default function RepasDashboard(props: Props) {
   });
 
   async function tomarPedido(pedidoId: string) {
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     // Intentar vía RPC primero (bypasa RLS — requiere supabase_setup.sql ejecutado)
     const { data: rpcData, error: rpcErr } = await supabase
       .rpc('tomar_pedido_repartidor', { p_pedido_id: pedidoId, p_repartidor_id: miId });
@@ -195,11 +260,13 @@ export default function RepasDashboard(props: Props) {
       }
     }
 
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     await fetchPedidos();
     setTab("mis");
   }
 
   async function avanzarEstatus(pedido: Pedido) {
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     const cfg = ESTATUS_CONFIG[pedido.estatus];
     if (!cfg?.next) return;
     await supabase
@@ -210,6 +277,7 @@ export default function RepasDashboard(props: Props) {
   }
 
   async function cargarMensajes(pedidoId: string) {
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     try {
       const { data, error } = await supabase
         .from('mensajes_chat')
@@ -217,6 +285,7 @@ export default function RepasDashboard(props: Props) {
         .eq('pedido_id', pedidoId)
         .order('created_at', { ascending: true });
       if (error) {
+        if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
         // tabla puede no existir aún — mostrar mensaje de setup
         setMensajes([{ id: 'setup', pedido_id: pedidoId, autor: 'sistema', texto: '⚠️ Para activar el chat, crea la tabla "mensajes_chat" en Supabase con columnas: id (uuid pk), pedido_id (uuid), autor_id (uuid), autor_rol (text), texto (text), created_at (timestamptz).', hora: new Date().toISOString() }]);
         return;
@@ -226,6 +295,7 @@ export default function RepasDashboard(props: Props) {
         const rol: MensajeChat['autor'] = m.autor_rol === 'repartidor' ? 'repartidor' : m.autor_rol === 'cliente' ? 'cliente' : 'sistema';
         return { id: m.id, pedido_id: m.pedido_id, autor: m.autor_id === uid ? 'repartidor' : rol, texto: m.texto, hora: m.created_at };
       });
+      if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
       if (mapped.length === 0) {
         setMensajes([{ id: 'inicio', pedido_id: pedidoId, autor: 'sistema', texto: '🛵 Chat iniciado. Escríbele al cliente sobre su pedido.', hora: new Date().toISOString() }]);
       } else {
@@ -237,6 +307,7 @@ export default function RepasDashboard(props: Props) {
   }
 
   function abrirChat(pedido: Pedido) {
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     setChatPedido(pedido);
     setTab("chat");
     setMensajes([]);
@@ -244,7 +315,7 @@ export default function RepasDashboard(props: Props) {
   }
 
   async function enviarMensaje() {
-    if (!textoCorrecto.trim() || !chatPedido) return;
+    if (!puedeAcceder || accessRevokedRef.current || !hasAccess || !textoCorrecto.trim() || !chatPedido) return;
     setEnviandoMsg(true);
     const texto = textoCorrecto.trim();
     try {
@@ -300,6 +371,60 @@ export default function RepasDashboard(props: Props) {
       color: activo ? "#020617" : "var(--text-muted)",
     };
   };
+
+  if (!hasAccess) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg-base)",
+          color: "var(--text-primary)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          textAlign: "center",
+        }}
+      >
+        <AlertCircle
+          style={{
+            width: "40px",
+            height: "40px",
+            color: "var(--text-muted)",
+            marginBottom: "16px",
+          }}
+        />
+        <p style={{ fontSize: "15px", fontWeight: 800, margin: "0 0 8px 0" }}>
+          Acceso restringido
+        </p>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--text-muted)",
+            margin: "0 0 20px 0",
+            maxWidth: "300px",
+          }}
+        >
+          Esta sección está disponible únicamente para repartidores autorizados.
+        </p>
+        <button
+          onClick={props.onVolver}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "12px",
+            background: "var(--border-subtle)",
+            border: "none",
+            color: "var(--text-muted)",
+            fontSize: "13px",
+            cursor: "pointer",
+          }}
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
 
   // ── PANTALLA CHAT ──────────────────────────────────────────────────────────
   if (tab === "chat" && chatPedido) {

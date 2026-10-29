@@ -5,21 +5,21 @@
 ═══════════════════════════════════════ */
 :root {
   color-scheme: light;
-  --bg-base:          #f4f4f8;
+  --bg-base:          #f3f8f4;
   --bg-card:          #ffffff;
   --bg-card-hover:    #f0f0f5;
   --bg-nav:           rgba(255,255,255,0.95);
-  --text-primary:     #0a0a0f;
-  --text-secondary:   #5a5a72;
-  --text-muted:       #9999b0;
+  --text-primary:     #14291f;
+  --text-secondary:   #50645c;
+  --text-muted:       #687970;
   --text-inverse:     #ffffff;
-  --color-yellow:     #facc15;
+  --color-yellow:     #F6C945;
   --color-yellow-dim: rgba(250,204,21,0.15);
-  --color-red:        #ef4444;
+  --color-red:        #E84844;
   --color-red-dim:    rgba(239,68,68,0.15);
-  --color-green:      #22c55e;
+  --color-green:      #159447;
   --color-green-dim:  rgba(34,197,94,0.15);
-  --color-blue:       #3b82f6;
+  --color-blue:       #2979DA;
   --color-blue-dim:   rgba(59,130,246,0.15);
   --border-subtle:    rgba(0,0,0,0.08);
   --border-medium:    rgba(0,0,0,0.14);
@@ -33,28 +33,28 @@
 }
 
 /* ═══════════════════════════════════════
-   MODO OSCURO PREMIUM — NEGRO + ORO
+   MODO OSCURO — COLORES DE MARCA
 ═══════════════════════════════════════ */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg-base:          #0A0A0A;
-  --bg-card:          #1E1E1E;
-  --bg-card-hover:    #2A2A2A;
-  --bg-nav:           rgba(10,10,10,0.98);
+  --bg-base:          #0c1b17;
+  --bg-card:          #162b24;
+  --bg-card-hover:    #203a30;
+  --bg-nav:           rgba(12,27,23,0.98);
   --text-primary:     #FFFFFF;
-  --text-secondary:   #D4AF37;
-  --text-muted:       #888888;
+  --text-secondary:   #c2d5c9;
+  --text-muted:       #9ab3a4;
   --text-inverse:     #0A0A0A;
-  --color-yellow:     #D4AF37;
+  --color-yellow:     #F6C945;
   --color-yellow-dim: rgba(212,175,55,0.15);
-  --color-red:        #ef4444;
+  --color-red:        #f36b66;
   --color-red-dim:    rgba(239,68,68,0.12);
-  --color-green:      #22c55e;
+  --color-green:      #21ad5a;
   --color-green-dim:  rgba(34,197,94,0.12);
-  --color-blue:       #3b82f6;
+  --color-blue:       #4a95ed;
   --color-blue-dim:   rgba(59,130,246,0.12);
-  --border-subtle:    rgba(212,175,55,0.14);
-  --border-medium:    rgba(212,175,55,0.30);
+  --border-subtle:    rgba(139,193,159,0.16);
+  --border-medium:    rgba(139,193,159,0.32);
   --shadow-card:      0 2px 16px rgba(0,0,0,0.65);
   --shadow-float:     0 8px 40px rgba(0,0,0,0.85);
   --neon-tl: #D4AF37;
@@ -102,6 +102,16 @@ body {
 input, button, select, textarea { font-family: inherit; font-size: inherit; }
 button { cursor: pointer; border: none; background: none; }
 img { display: block; max-width: 100%; }
+
+.brand-stripe {
+  height: 5px;
+  background: linear-gradient(90deg, #159447 0% 25%, #F6C945 25% 50%, #E84844 50% 75%, #2979DA 75% 100%);
+}
+
+button:focus-visible, a:focus-visible {
+  outline: 3px solid var(--color-blue);
+  outline-offset: 3px;
+}
 
 /* ═══════════════════════════════════════
    NEON FRAME

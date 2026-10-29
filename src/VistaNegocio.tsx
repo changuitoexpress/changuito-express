@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
+import { parseImageUrls, ProductImageCarousel } from "./ChanguiShopping";
 import type { Theme } from "./App";
 import type { Merchant, CartItem } from "./Dashboard";
 
@@ -245,6 +246,7 @@ export default function VistaNegocio(props: VistaNegocioProps) {
   const [error, setError] = useState<string>("");
   const [filtroCategoria, setFiltro] = useState<string>("Todos");
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [productoDetalle, setProductoDetalle] = useState<Product | null>(null);
   const [enviando, setEnviando] = useState<boolean>(false);
   const [errorPedido, setErrorPedido] = useState<string>("");
 
@@ -959,14 +961,16 @@ export default function VistaNegocio(props: VistaNegocioProps) {
               >
                 {/* Imagen/emoji */}
                 <div
+                  onClick={function () {
+                    setProductoDetalle(product);
+                  }}
                   style={{
+                    cursor: "pointer",
                     width: "64px",
                     height: "64px",
                     borderRadius: "14px",
                     flexShrink: 0,
-                    background: isDark
-                      ? "rgba(255,255,255,0.05)"
-                      : "rgba(0,0,0,0.04)",
+                    background: "#F5F5F5",
                     border: "1px solid var(--border-subtle)",
                     display: "flex",
                     alignItems: "center",
@@ -975,22 +979,18 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                     fontSize: "28px",
                   }}
                 >
-                  {product.image_url ? (
+                  {parseImageUrls(product.image_url).length > 0 ? (
                     <img
-                      src={product.image_url}
+                      src={parseImageUrls(product.image_url)[0]}
                       alt={product.name}
                       style={{
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
                       }}
-                      onError={function (e) {
-                        (e.currentTarget as HTMLImageElement).style.display =
-                          "none";
-                      }}
                     />
                   ) : (
-                    emoji
+                    "🐒"
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1496,6 +1496,43 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal detalle de producto */}
+      {productoDetalle && (
+        <div
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:400, display:"flex", alignItems:"flex-end" }}
+          onClick={function () { setProductoDetalle(null); }}
+        >
+          <div
+            style={{ width:"100%", maxWidth:"480px", margin:"0 auto", background:"var(--bg-card)", borderRadius:"28px 28px 0 0", padding:"24px 20px 32px", maxHeight:"85vh", overflowY:"auto" }}
+            onClick={function (e) { e.stopPropagation(); }}
+          >
+            <ProductImageCarousel key={productoDetalle.id} urls={parseImageUrls(productoDetalle.image_url)} alt={productoDetalle.name} />
+            <h2 style={{ fontSize:"20px", fontWeight:900, color:"var(--text-primary)", margin:"0 0 8px 0" }}>{productoDetalle.name}</h2>
+            {productoDetalle.description && (
+              <p style={{ fontSize:"13px", color:"var(--text-muted)", lineHeight:1.6, margin:"0 0 12px 0" }}>{productoDetalle.description}</p>
+            )}
+            <div style={{ fontSize:"24px", fontWeight:900, color:"var(--color-yellow)", marginBottom:"16px" }}>${productoDetalle.price.toFixed(2)}</div>
+            {!isClosed && productoDetalle.is_available ? (
+              <button
+                type="button"
+                onClick={function () { agregar(productoDetalle); setProductoDetalle(null); }}
+                style={{ width:"100%", padding:"14px", borderRadius:"14px", border:"none", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", cursor:"pointer" }}
+              >
+                Agregar al carrito
+              </button>
+            ) : (
+              <p style={{ fontSize:"12px", color:"var(--text-muted)", textAlign:"center", margin:0 }}>
+                {isClosed ? "El negocio está cerrado." : "Producto no disponible."}
+              </p>
+            )}
+            <button type="button" onClick={function () { setProductoDetalle(null); }}
+              style={{ display:"block", margin:"12px auto 0", background:"transparent", border:"none", color:"var(--text-muted)", fontSize:"12px", cursor:"pointer" }}>
+              Cerrar
+            </button>
           </div>
         </div>
       )}

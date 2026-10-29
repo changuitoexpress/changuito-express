@@ -1,5 +1,5 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, RefreshCw, WifiOff, Plus, Trash2, Edit3,
   Check, X, Package, ToggleLeft, ToggleRight, Star, Clock,
@@ -45,11 +45,14 @@ export default function DashboardNegocio(props: Props) {
   const [productos, setProductos]     = useState<Producto[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
+  const [accessDenied, setAccessDenied] = useState(false);
   const [tab, setTab]                 = useState<'info'|'menu'|'stats'>('info');
   const [editandoInfo, setEditInfo]   = useState(false);
   const [modalProducto, setModalProd] = useState<Partial<Producto> | null>(null);
   const [guardando, setGuardando]     = useState(false);
   const [catAbierta, setCatAbierta]   = useState<string | null>(null);
+  const hasAccessRef = useRef(false);
+  const accessRequestRef = useRef(0);
   const isDark = props.theme === 'dark';
 
   // Campos editables del negocio
@@ -63,6 +66,10 @@ export default function DashboardNegocio(props: Props) {
 
   // Cargar negocio del usuario actual
   const fetchMerchant = useCallback(async function() {
+    const requestId = ++accessRequestRef.current;
+    const isCurrentRequest = function() {
+      return requestId === accessRequestRef.current;
+    };
     setLoading(true); setError('');
     try {
       // Buscar en merchant_admins primero
@@ -84,18 +91,24 @@ export default function DashboardNegocio(props: Props) {
         merchantId = ownerRow?.id;
       }
 
+      if (!isCurrentRequest()) return;
       if (!merchantId) {
-        setError('Tu cuenta no está vinculada a ningún negocio. Contacta a Changuito Express.');
+        hasAccessRef.current = false;
+        setMerchant(null);
+        setProductos([]);
+        setAccessDenied(true);
         setLoading(false);
         return;
       }
 
+      hasAccessRef.current = true;
       const { data: m, error: err } = await supabase
         .from('merchants')
         .select('*')
         .eq('id', merchantId)
         .single();
 
+      if (!isCurrentRequest()) return;
       if (err) throw err;
       setMerchant(m);
       setEditName(m.name ?? '');
@@ -111,19 +124,60 @@ export default function DashboardNegocio(props: Props) {
         .eq('merchant_id', merchantId)
         .order('category').order('name');
 
+      if (!isCurrentRequest()) return;
       setProductos(prods ?? []);
     } catch(e: any) {
-      setError(e.message ?? 'Error al cargar tu negocio.');
+      if (isCurrentRequest()) {
+        hasAccessRef.current = false;
+        setMerchant(null);
+        setProductos([]);
+        setError(e.message ?? 'Error al cargar tu negocio.');
+      }
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   }, [userId]);
 
   useEffect(function(){ fetchMerchant(); }, [fetchMerchant]);
 
+  useEffect(function() {
+    function revalidateAccess() {
+      // Hide previously loaded data while the membership check is in flight.
+      hasAccessRef.current = false;
+      accessRequestRef.current += 1;
+      setMerchant(null);
+      setProductos([]);
+      setModalProd(null);
+      setEditInfo(false);
+      setAccessDenied(false);
+      setLoading(true);
+      fetchMerchant();
+    }
+
+    const channel = supabase
+      .channel('business-access-' + userId)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'merchant_admins',
+        filter: 'user_id=eq.' + userId,
+      }, revalidateAccess)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'merchants',
+        filter: 'owner_id=eq.' + userId,
+      }, revalidateAccess)
+      .subscribe();
+
+    return function() {
+      void supabase.removeChannel(channel);
+    };
+  }, [fetchMerchant, userId]);
+
   // Guardar info del negocio
   async function guardarInfo() {
-    if (!merchant) return;
+    if (!hasAccessRef.current || !merchant) return;
     setGuardando(true);
     try {
       const { error: err } = await supabase.from('merchants').update({
@@ -145,7 +199,7 @@ export default function DashboardNegocio(props: Props) {
 
   // Toggle abierto/cerrado
   async function toggleAbierto() {
-    if (!merchant) return;
+    if (!hasAccessRef.current || !merchant) return;
     const nuevo = !merchant.is_open;
     await supabase.from('merchants').update({ is_open: nuevo }).eq('id', merchant.id);
     setMerchant(function(prev){ return prev ? { ...prev, is_open: nuevo } : prev; });
@@ -153,6 +207,7 @@ export default function DashboardNegocio(props: Props) {
 
   // Toggle disponibilidad producto
   async function toggleProducto(prod: Producto) {
+    if (!hasAccessRef.current) return;
     const nuevo = !prod.is_available;
     await supabase.from('products').update({ is_available: nuevo }).eq('id', prod.id);
     setProductos(function(prev){ return prev.map(function(p){ return p.id===prod.id ? {...p, is_available:nuevo} : p; }); });
@@ -160,7 +215,7 @@ export default function DashboardNegocio(props: Props) {
 
   // Guardar producto (nuevo o edición)
   async function guardarProducto() {
-    if (!merchant || !modalProducto) return;
+    if (!hasAccessRef.current || !merchant || !modalProducto) return;
     if (!modalProducto.name?.trim()) { setError('El nombre es obligatorio.'); return; }
     if (!modalProducto.price || modalProducto.price <= 0) { setError('El precio debe ser mayor a 0.'); return; }
     setGuardando(true); setError('');
@@ -198,7 +253,9 @@ export default function DashboardNegocio(props: Props) {
 
   // Eliminar producto
   async function eliminarProducto(id: string) {
+    if (!hasAccessRef.current) return;
     if (!window.confirm('¿Eliminar este producto?')) return;
+    if (!hasAccessRef.current) return;
     await supabase.from('products').delete().eq('id', id);
     setProductos(function(prev){ return prev.filter(function(p){ return p.id !== id; }); });
   }
@@ -223,6 +280,23 @@ export default function DashboardNegocio(props: Props) {
           <span className="spinner" style={{ borderColor:'var(--border-subtle)', borderTopColor:'var(--color-yellow)', width:'28px', height:'28px' }} />
           <p style={{ fontSize:'13px', color:'var(--text-muted)' }}>Cargando tu negocio...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px', textAlign:'center' }}>
+        <WifiOff style={{ width:'40px', height:'40px', color:'var(--text-muted)', marginBottom:'16px' }} />
+        <p style={{ fontSize:'15px', fontWeight:800, margin:'0 0 8px 0' }}>Acceso restringido</p>
+        <p style={{ fontSize:'13px', color:'var(--text-muted)', margin:'0 0 20px 0', maxWidth:'300px' }}>Tu cuenta no está vinculada a ningún negocio.</p>
+        <a href="https://wa.me/522223339999?text=Quiero%20acceso%20al%20dashboard%20de%20mi%20negocio"
+          style={{ padding:'12px 24px', borderRadius:'14px', background:'#25D366', color:'white', fontWeight:800, fontSize:'13px', textDecoration:'none' }}>
+          💬 Contactar Changuito
+        </a>
+        <button onClick={props.onVolver} style={{ padding:'10px 20px', borderRadius:'12px', background:'var(--border-subtle)', border:'none', color:'var(--text-muted)', fontSize:'13px', cursor:'pointer' }}>
+          Volver
+        </button>
       </div>
     );
   }
