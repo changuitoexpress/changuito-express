@@ -770,6 +770,73 @@ describe("sesión y cierre de sesión", function () {
     assert.deepEqual(startupEvents, ["session", "ready"]);
   });
 
+  it("restaura la sesión guardada y aplica valores alternativos si no existe un perfil", async function () {
+    let profileLookupCalls = 0;
+    const { client } = createClientFixture({
+      getSession: async function () {
+        return {
+          data: {
+            session: {
+              user: {
+                id: "saved-account",
+                email: "uliseseven.7@gmail.com",
+              },
+            },
+          },
+        };
+      },
+    });
+    client.from = function () {
+      return {
+        select: function () {
+          return {
+            eq: function () {
+              return {
+                maybeSingle: async function () {
+                  profileLookupCalls += 1;
+                  return { data: null, error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    };
+
+    const observed: any[] = [];
+    const startupEvents: string[] = [];
+    let markReady: Function = function () {};
+    const startupReady = new Promise<void>(function (resolve) {
+      markReady = resolve;
+    });
+
+    startAuthSession(
+      client,
+      function (session) {
+        observed.push(session);
+        startupEvents.push("session");
+      },
+      function () {
+        startupEvents.push("ready");
+        markReady();
+      },
+    );
+    await startupReady;
+
+    assert.equal(profileLookupCalls, 1);
+    assert.deepEqual(observed, [
+      {
+        user: {
+          id: "saved-account",
+          email: "uliseseven.7@gmail.com",
+          nombre: "uliseseven.7",
+          rol: "cliente",
+        },
+      },
+    ]);
+    assert.deepEqual(startupEvents, ["session", "ready"]);
+  });
+
   it("termina el inicio y conserva la sesión si la consulta del perfil no responde", async function () {
     const { client } = createClientFixture({
       getSession: async function () {

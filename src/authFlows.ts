@@ -296,7 +296,9 @@ async function createAppSession(
           (session.user.email ? session.user.email.split("@")[0] : "usuario"),
         rol:
           data?.rol ??
-          (session.user.email === "uliseseven.7@gmail.com" ? "admin" : "cliente"),
+          (data && session.user.email === "uliseseven.7@gmail.com"
+            ? "admin"
+            : "cliente"),
       },
     };
   } catch (e) {
