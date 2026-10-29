@@ -1252,7 +1252,64 @@ function ModalCheckout(props: {
       // Un solo pedido para todo el carrito
       const negocioNombres = Array.from(new Set(props.carrito.map(function(i) { return i.negocio; }))).join(', ');
       const primerNegocioId = props.carrito[0]?.negocio_id ?? '';
-      if (usarEnvioGratis) {
+      const idsNegocios = Object.keys(porNegocio);
+      if (idsNegocios.length > 1) {
+        // Un pedido por negocio: cada comercio y repartidor ve solo lo suyo.
+        // El envío completo se asigna al primer pedido; la suma iguala al total.
+        const ordenes = idsNegocios.map(function (id, indice) {
+          const items = porNegocio[id];
+          const sub = items.reduce(function (a, i) {
+            return a + i.precio * i.cantidad;
+          }, 0);
+          return {
+            negocio_id: id,
+            negocio_nombre: items[0].negocio,
+            total_pagar: Math.round((sub + (indice === 0 ? totalEnvio : 0)) * 100) / 100,
+          };
+        });
+        const direccionTexto = dir ? dir.calle + " " + dir.numero_casa : "";
+        const { data: multi, error: errorMulti } = await supabase.rpc(
+          "crear_pedidos_multinegocio",
+          {
+            p_pedidos: ordenes,
+            p_cliente_email: props.clienteEmail,
+            p_forma_pago: formaPago,
+            p_direccion: direccionTexto,
+            p_usar_envio_gratis: usarEnvioGratis,
+          },
+        );
+        if (errorMulti) {
+          const funcionAusente =
+            errorMulti.code === "PGRST202" || errorMulti.code === "42883";
+          if (funcionAusente && !usarEnvioGratis) {
+            const { error: errFilas } = await supabase.from("pedidos").insert(
+              ordenes.map(function (o) {
+                return {
+                  cliente_id: props.clienteId,
+                  negocio_id: o.negocio_id,
+                  negocio_nombre: o.negocio_nombre,
+                  total_pagar: o.total_pagar,
+                  estatus: "pendiente",
+                  canal: "webapp",
+                  cliente_email: props.clienteEmail,
+                  forma_pago: formaPago,
+                  direccion: direccionTexto,
+                };
+              }),
+            );
+            if (errFilas) throw new Error("Error al guardar pedido: " + errFilas.message);
+          } else {
+            console.error("[Changuito] Error creando pedidos por negocio:", errorMulti);
+            throw new Error(
+              "No pudimos crear tus pedidos y no se guardó ninguno. Intenta de nuevo.",
+            );
+          }
+        } else if (!multi?.ok) {
+          throw new Error(
+            multi?.error ?? "No se pudieron crear los pedidos. No se guardó ninguno.",
+          );
+        }
+      } else if (usarEnvioGratis) {
         const { data, error: errorPedido } = await supabase.rpc(
           "crear_pedido_con_envio_gratis",
           {
