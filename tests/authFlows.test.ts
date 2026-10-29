@@ -909,6 +909,7 @@ describe("sesión y cierre de sesión", function () {
     let authListener: Function = function () {};
     const retryTimers: Array<{ callback: () => void; delayMs: number }> = [];
     const observed: any[] = [];
+    const monitoringStatuses: boolean[] = [];
     let readyCalls = 0;
     const { client } = createClientFixture({
       getSession: async function () {
@@ -955,6 +956,9 @@ describe("sesión y cierre de sesión", function () {
         },
         cancel: function () {},
       },
+      function (available) {
+        monitoringStatuses.push(available);
+      },
     );
 
     await new Promise<void>(function (resolve) {
@@ -974,6 +978,7 @@ describe("sesión y cierre de sesión", function () {
     });
 
     assert.equal(registrationCalls, 3);
+    assert.deepEqual(monitoringStatuses, [false, false, true]);
     assert.deepEqual(observed, [
       {
         user: {
@@ -989,6 +994,51 @@ describe("sesión y cierre de sesión", function () {
     authListener("SIGNED_IN", {
       user: { id: "signed-in-during-retry", email: "retry@example.test" },
     });
+    cleanup();
+  });
+
+  it("permite reintentar el listener de autenticación de inmediato", async function () {
+    let registrationCalls = 0;
+    let retryAction: (() => void) | null = null;
+    let cancelCalls = 0;
+    const retryTimers: Array<() => void> = [];
+    const monitoringStatuses: boolean[] = [];
+    const { client } = createClientFixture({
+      onAuthStateChange: function () {
+        registrationCalls += 1;
+        if (registrationCalls === 1) {
+          throw new Error("Temporary auth listener registration failure");
+        }
+        return { data: { subscription: { unsubscribe: function () {} } } };
+      },
+    });
+    const cleanup = startAuthSession(
+      client,
+      function () {},
+      function () {},
+      {
+        schedule: function (callback) {
+          retryTimers.push(callback);
+          return retryTimers.length;
+        },
+        cancel: function () {
+          cancelCalls += 1;
+        },
+      },
+      function (available, retry) {
+        monitoringStatuses.push(available);
+        retryAction = retry;
+      },
+    );
+
+    assert.deepEqual(monitoringStatuses, [false]);
+    assert.equal(retryTimers.length, 1);
+    assert.ok(retryAction);
+    retryAction();
+
+    assert.equal(registrationCalls, 2);
+    assert.equal(cancelCalls, 1);
+    assert.deepEqual(monitoringStatuses, [false, true]);
     cleanup();
   });
 

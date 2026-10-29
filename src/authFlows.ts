@@ -373,6 +373,7 @@ export function startAuthSession(
       clearTimeout(timer as ReturnType<typeof setTimeout>);
     },
   },
+  onMonitoringStatus?: (available: boolean, retry: () => void) => void,
 ) {
   let mounted = true;
   let latestAuthEvent = 0;
@@ -391,6 +392,16 @@ export function startAuthSession(
       retryTimer = null;
       registerListener(true);
     }, delayMs);
+  }
+
+  function retryNow() {
+    if (!mounted) return;
+    if (retryPending) {
+      retryPending = false;
+      retryScheduler.cancel(retryTimer);
+      retryTimer = null;
+    }
+    registerListener(true);
   }
 
   function restoreCurrentSession() {
@@ -416,9 +427,11 @@ export function startAuthSession(
         },
       );
       retryAttempt = 0;
+      if (onMonitoringStatus) onMonitoringStatus(true, retryNow);
       if (isRetry) void restoreCurrentSession();
       return true;
     } catch (e) {
+      if (onMonitoringStatus) onMonitoringStatus(false, retryNow);
       scheduleRetry();
       return false;
     }

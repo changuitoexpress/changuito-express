@@ -402,6 +402,8 @@ function AuthScreen(props: {
   theme: Theme;
   onThemeToggle: () => void;
   onToast: (t: string, k: Toast["kind"]) => void;
+  authMonitoringUnavailable: boolean;
+  onRetryAuthMonitoring: () => void;
 }) {
   const [mode, setMode] = useState<"login" | "register" | "recover-profile">(
     "login",
@@ -661,6 +663,43 @@ function AuthScreen(props: {
             onSubmit={handleSubmit}
             style={{ display: "flex", flexDirection: "column", gap: "15px" }}
           >
+            {isLogin && props.authMonitoringUnavailable && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+                style={{
+                  padding: "12px",
+                  borderRadius: "14px",
+                  background: "var(--color-yellow-dim)",
+                  border: "1px solid var(--color-yellow)",
+                  color: "var(--text-primary)",
+                  fontSize: "12px",
+                  lineHeight: 1.5,
+                }}
+              >
+                <p style={{ margin: "0 0 8px" }}>
+                  No podemos comprobar el inicio de sesión en este momento.
+                  Aunque tus credenciales sean correctas, no podremos abrir tu
+                  cuenta hasta que se restablezca la conexión. Podés reintentar
+                  ahora.
+                </p>
+                <button
+                  type="button"
+                  onClick={props.onRetryAuthMonitoring}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "10px",
+                    background: "#facc15",
+                    color: "#020617",
+                    fontWeight: 800,
+                    fontSize: "12px",
+                  }}
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
             {mode === "recover-profile" && (
               <p
                 style={{
@@ -965,6 +1004,9 @@ function AuthScreen(props: {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState<AppSession | null>(null);
+  const [authMonitoringRetry, setAuthMonitoringRetry] = useState<
+    (() => void) | null
+  >(null);
   const [sessionExpiryWarning, setSessionExpiryWarning] = useState(false);
   const [booting, setBooting] = useState<boolean>(true);
   const [pantalla, setPantalla] = useState<Pantalla>("dashboard");
@@ -1009,6 +1051,12 @@ export default function App() {
       function () {
         setBooting(false);
       },
+      undefined,
+      function (available, retry) {
+        setAuthMonitoringRetry(function () {
+          return available ? null : retry;
+        });
+      },
     );
   }, []);
 
@@ -1030,7 +1078,15 @@ export default function App() {
     return (
       <>
         <ToastRack toasts={toasts} />
-        <AuthScreen theme={theme} onThemeToggle={toggle} onToast={push} />
+        <AuthScreen
+          theme={theme}
+          onThemeToggle={toggle}
+          onToast={push}
+          authMonitoringUnavailable={authMonitoringRetry !== null}
+          onRetryAuthMonitoring={function () {
+            authMonitoringRetry?.();
+          }}
+        />
       </>
     );
   }
