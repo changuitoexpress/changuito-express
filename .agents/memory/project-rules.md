@@ -11,9 +11,8 @@ Use inline styles, `function(){}` rather than runtime arrow functions, and prese
 **How to apply:** Follow these constraints when editing app code; do not translate
 the existing Spanish UI as part of setup or unrelated changes.
 
-The user manually pushes to GitHub for Vercel publishing.
+The user wants Replit Agent to handle project changes through GitHub and Vercel, and Supabase SQL once that connection is available.
 
-**Why:** The existing project context assigns the publishing push to the user.
+**Why:** The user asked to connect these services so the agent can make the necessary changes directly.
 
-**How to apply:** Do not push or replace the existing deployment process as part
-of local Replit setup.
+**How to apply:** Prefer the connected GitHub and Vercel APIs for the project's code and deployments. Keep Supabase access scoped to this project and review SQL before applying it.
