@@ -26,3 +26,9 @@ Committed npm lockfiles for external hosting must not contain Replit-internal pa
 **Why:** A Vercel build failed during dependency installation because an internal registry hostname could not be resolved outside Replit.
 
 **How to apply:** After dependency changes, check all resolved lockfile URLs for external portability and validate equivalent public-registry package integrity before publishing.
+
+Generated Vercel deployment URLs can require Vercel sign-in even when the application's production alias is public.
+
+**Why:** Successful production deployments redirected their generated URLs to Vercel SSO, while the user's public production domain served the updated application.
+
+**How to apply:** Keep deployment protection intact. Confirm the exact commit's production status, then check the user's verified public domain and its application assets; a Vercel login page alone does not indicate an application failure.
