@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, ImagePlus, LoaderCircle, Send, X } from "lucide-react";
 import { supabase } from "../App";
 import type { AppSession, Theme } from "../App";
+import { clearFormDraft, readFormDraft, writeFormDraft } from "../formDrafts";
 
 type ChatRole = "cliente" | "repartidor" | "admin";
 
@@ -35,9 +36,20 @@ const CHAT_BUCKET = "chat-pedidos";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
+function courierChatDraftId(orderId: string): string {
+  return "courier-chat:" + encodeURIComponent(orderId);
+}
+
 export default function PedidoChat(props: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(function () {
+    if (props.role !== "repartidor") return "";
+    const savedMessage = readFormDraft<unknown>(
+      props.session.user.id,
+      courierChatDraftId(props.pedido.id),
+    );
+    return typeof savedMessage === "string" ? savedMessage : "";
+  });
   const [image, setImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -155,6 +167,9 @@ export default function PedidoChat(props: Props) {
       });
       if (insertError) throw insertError;
 
+      if (props.role === "repartidor") {
+        clearFormDraft(ownId, courierChatDraftId(props.pedido.id));
+      }
       setText("");
       setImage(null);
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -244,7 +259,21 @@ export default function PedidoChat(props: Props) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={function (event) { seleccionarImagen(event.target.files?.[0]); }} style={{ display: "none" }} />
           <button type="button" onClick={function () { imageInputRef.current?.click(); }} disabled={sending} aria-label="Adjuntar foto" title="Adjuntar foto" style={{ width: 42, height: 42, flexShrink: 0, border: "1px solid var(--border-subtle)", borderRadius: 13, background: "var(--bg-card)", color: "var(--text-primary)", display: "grid", placeItems: "center", cursor: "pointer" }}><ImagePlus size={19} /></button>
-          <textarea value={text} onChange={function (event) { setText(event.target.value); }} onKeyDown={function (event) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void enviarMensaje(); } }} rows={1} maxLength={1000} placeholder="Escribe un mensaje…" aria-label="Escribe un mensaje" style={{ flex: 1, minWidth: 0, resize: "none", padding: "12px", borderRadius: 14, border: "1px solid var(--border-subtle)", outline: "none", background: isDark ? "rgba(255,255,255,0.05)" : "white", color: "var(--text-primary)", font: "inherit", fontSize: 13 }} />
+          <textarea value={text} onChange={function (event) {
+            const nextText = event.target.value;
+            setText(nextText);
+            if (props.role === "repartidor") {
+              if (nextText) {
+                writeFormDraft(
+                  ownId,
+                  courierChatDraftId(props.pedido.id),
+                  nextText,
+                );
+              } else {
+                clearFormDraft(ownId, courierChatDraftId(props.pedido.id));
+              }
+            }
+          }} onKeyDown={function (event) { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void enviarMensaje(); } }} rows={1} maxLength={1000} disabled={sending} placeholder="Escribe un mensaje…" aria-label="Escribe un mensaje" style={{ flex: 1, minWidth: 0, resize: "none", padding: "12px", borderRadius: 14, border: "1px solid var(--border-subtle)", outline: "none", background: isDark ? "rgba(255,255,255,0.05)" : "white", color: "var(--text-primary)", font: "inherit", fontSize: 13 }} />
           <button type="button" onClick={function () { void enviarMensaje(); }} disabled={sending || (!text.trim() && !image)} aria-label="Enviar mensaje" style={{ width: 44, height: 44, flexShrink: 0, border: 0, borderRadius: 14, background: sending || (!text.trim() && !image) ? "var(--border-subtle)" : "var(--color-yellow)", color: "#111827", display: "grid", placeItems: "center", cursor: sending || (!text.trim() && !image) ? "not-allowed" : "pointer" }}>
             {sending ? <LoaderCircle size={19} className="spin" /> : <Send size={18} />}
           </button>

@@ -17,7 +17,6 @@ import {
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
 import PedidoChat from "./components/PedidoChat";
-
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
   id: string;
@@ -301,6 +300,7 @@ export default function RepasDashboard(props: Props) {
   if (tab === "chat" && chatPedido) {
     return (
       <PedidoChat
+        key={chatPedido.id}
         session={props.session}
         theme={props.theme}
         pedido={chatPedido}

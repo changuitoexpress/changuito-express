@@ -76,6 +76,9 @@ async function mockSupabase(
   email = "uliseseven.7@gmail.com",
   requestLog?: string[],
   requestDetails?: Array<{ method: string; path: string }>,
+  courierOrders: Array<{ id: string; name: string }> = [
+    { id: "browser-fixture-order", name: "Browser Fixture Delivery Order" },
+  ],
 ) {
   const mockState = {
     role,
@@ -174,10 +177,10 @@ async function mockSupabase(
       request.method() === "GET" &&
       mockState.role === "repartidor"
     ) {
-      data = [
-        {
-          id: "browser-fixture-order",
-          negocio_nombre: "Browser Fixture Delivery Order",
+      data = courierOrders.map(function (order) {
+        return {
+          id: order.id,
+          negocio_nombre: order.name,
           cliente_email: "customer@example.test",
           detalle: "Delivery-only customer order details",
           direccion: "Delivery-only street address",
@@ -187,8 +190,8 @@ async function mockSupabase(
           canal: "web",
           created_at: "2026-10-27T10:00:00.000Z",
           repartidor_id: userId,
-        },
-      ];
+        };
+      });
     } else if (
       url.pathname === "/rest/v1/pedidos" &&
       request.method() === "HEAD" &&
@@ -963,6 +966,193 @@ it("renders every authenticated screen and returns to the dashboard", async func
 
   await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");
+});
+
+it("restores courier chat drafts by order and clears them after sending or sign-out", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  const courierId = "browser-fixture-courier-drafts";
+  const courierEmail = "courier-drafts@example.test";
+  const firstOrder = {
+    id: "browser-fixture-order-first",
+    name: "First Courier Draft Order",
+  };
+  const secondOrder = {
+    id: "browser-fixture-order-second",
+    name: "Second Courier Draft Order",
+  };
+  const firstDraft = "Voy en camino y llegaré en cinco minutos.";
+  const secondDraft = "Dejaré el pedido en recepción.";
+  const context = await browser.newContext();
+  await context.addInitScript(
+    function (storedSession) {
+      if (!sessionStorage.getItem("courier-draft-session-initialized")) {
+        localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+        sessionStorage.setItem("courier-draft-session-initialized", "1");
+      }
+      localStorage.setItem("changuito-theme", "light");
+    },
+    createFixtureSession(courierId, courierEmail),
+  );
+  const page = await context.newPage();
+  const pageErrors: string[] = [];
+  page.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+  await mockSupabase(
+    page,
+    "repartidor",
+    courierId,
+    courierEmail,
+    undefined,
+    undefined,
+    [firstOrder, secondOrder],
+  );
+  await page.goto(appUrl);
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /Panel Repartidor/ }).click();
+  await page.getByText(firstOrder.name, { exact: true }).waitFor();
+  await page.getByText(secondOrder.name, { exact: true }).waitFor();
+
+  const draftKey = function (orderId: string) {
+    return (
+      "changuito-form-draft:" +
+      encodeURIComponent(courierId) +
+      ":courier-chat:" +
+      encodeURIComponent(orderId)
+    );
+  };
+  const messageBox = function () {
+    return page.getByRole("textbox", { name: "Escribe un mensaje" });
+  };
+  const openOrderChat = async function (orderName: string) {
+    await page.getByText(orderName, { exact: true }).click();
+    await page.getByRole("button", { name: "Chat" }).click();
+    await messageBox().waitFor();
+  };
+  const returnToOrders = async function () {
+    await page.locator("button").first().click();
+    await page.getByText(firstOrder.name, { exact: true }).waitFor();
+  };
+
+  await openOrderChat(firstOrder.name);
+  await messageBox().fill(firstDraft);
+  await returnToOrders();
+  await openOrderChat(secondOrder.name);
+  await messageBox().fill(secondDraft);
+
+  assert.deepEqual(
+    await page.evaluate(function (keys) {
+      return keys.map(function (key) {
+        return JSON.parse(localStorage.getItem(key) ?? "null")?.values ?? null;
+      });
+    }, [draftKey(firstOrder.id), draftKey(secondOrder.id)]),
+    [firstDraft, secondDraft],
+    "Each courier's unsent message should be saved separately for its order.",
+  );
+
+  await page.evaluate(function () {
+    localStorage.removeItem("sb-fixture-auth-token");
+  });
+  await page.reload();
+  await page.getByRole("heading", { name: "Entra a Changuito" }).waitFor();
+  await page.getByLabel("Correo electrónico").fill(courierEmail);
+  await page.getByRole("textbox", { name: "Contraseña" }).fill("fixture-password");
+  await page.locator("form").getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /Panel Repartidor/ }).click();
+  await page.getByText(firstOrder.name, { exact: true }).waitFor();
+
+  await openOrderChat(firstOrder.name);
+  assert.equal(
+    await messageBox().inputValue(),
+    firstDraft,
+    "Reopening the same order after reauthentication should restore its draft.",
+  );
+  await returnToOrders();
+  await openOrderChat(secondOrder.name);
+  assert.equal(
+    await messageBox().inputValue(),
+    secondDraft,
+    "A different order should restore only its own draft.",
+  );
+
+  await returnToOrders();
+  await openOrderChat(firstOrder.name);
+  await page.getByRole("button", { name: "Enviar mensaje" }).click();
+  await page.waitForFunction(function () {
+    return (
+      document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Escribe un mensaje"]',
+      )?.value === ""
+    );
+  });
+  assert.equal(
+    await messageBox().inputValue(),
+    "",
+    "A successfully sent message should clear the chat input.",
+  );
+  assert.equal(
+    await page.evaluate(function (key) {
+      return localStorage.getItem(key);
+    }, draftKey(firstOrder.id)),
+    null,
+    "A successfully sent message should remove its saved draft.",
+  );
+
+  await returnToOrders();
+  await page.locator("button").first().click();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: "Cerrar sesión", exact: true }).click();
+  await page.getByRole("heading", { name: "Entra a Changuito" }).waitFor();
+  assert.equal(
+    await page.evaluate(function (key) {
+      return localStorage.getItem(key);
+    }, draftKey(secondOrder.id)),
+    null,
+    "Explicit sign-out should clear remaining courier chat drafts.",
+  );
+  assert.deepEqual(pageErrors, [], "Courier chat recovery should not throw in the browser.");
+  await context.close();
 });
 
 it("restores handwritten delivery requests after reauthentication", async function (t) {
