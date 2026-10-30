@@ -377,11 +377,33 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   const expiryWarning = page.getByRole("alert");
   await expiryWarning.waitFor({ state: "visible" });
+  const originalViewport = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 700 });
   assert.equal(
     await expiryWarning.innerText(),
     "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
     "The signed-in session expiry warning should clearly explain the upcoming expiry.",
   );
+  const expiryWarningBounds = await expiryWarning.evaluate(function (element) {
+    const bounds = element.getBoundingClientRect();
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      viewportWidth: window.innerWidth,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    };
+  });
+  assert.ok(
+    expiryWarningBounds.left >= 0 &&
+      expiryWarningBounds.right <= expiryWarningBounds.viewportWidth &&
+      expiryWarningBounds.scrollWidth <= expiryWarningBounds.clientWidth &&
+      expiryWarningBounds.scrollHeight <= expiryWarningBounds.clientHeight,
+    "The session expiry alert and its text should fit without clipping at 320px.",
+  );
+  if (originalViewport) await page.setViewportSize(originalViewport);
 
   const refreshedExpiry = await page.evaluate(async function () {
     const app = await import("/src/App.tsx");
