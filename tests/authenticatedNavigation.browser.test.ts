@@ -83,6 +83,7 @@ async function mockSupabase(
   const mockState = {
     role,
     businessMembership: true,
+    refreshFails: false,
   };
   const deviceSessions = [
     {
@@ -117,6 +118,16 @@ async function mockSupabase(
       url.pathname === "/auth/v1/token" &&
       url.searchParams.get("grant_type") === "refresh_token"
     ) {
+      if (mockState.refreshFails) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "Temporary session refresh failure.",
+          }),
+        });
+        return;
+      }
       data = {
         ...createFixtureSession(userId, email),
         access_token: "browser-fixture-refreshed-access-token",
@@ -371,7 +382,7 @@ it("renders every authenticated screen and returns to the dashboard", async func
   page.on("pageerror", function (error) {
     pageErrors.push(error.message);
   });
-  await mockSupabase(page);
+  const authMockState = await mockSupabase(page);
   await page.goto(appUrl);
 
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
@@ -405,6 +416,24 @@ it("renders every authenticated screen and returns to the dashboard", async func
   );
   if (originalViewport) await page.setViewportSize(originalViewport);
 
+  authMockState.refreshFails = true;
+  const refreshFailure = await page.evaluate(async function () {
+    const app = await import("/src/App.tsx");
+    const { error } = await app.supabase.auth.refreshSession();
+    return error?.message ?? null;
+  });
+  assert.ok(
+    refreshFailure,
+    "The fixture should make session refresh fail before expiry is resolved.",
+  );
+  await expiryWarning.waitFor({ state: "visible" });
+  assert.equal(
+    await expiryWarning.innerText(),
+    "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
+    "The accessible session expiry warning should remain visible after a failed refresh.",
+  );
+
+  authMockState.refreshFails = false;
   const refreshedExpiry = await page.evaluate(async function () {
     const app = await import("/src/App.tsx");
     const { data, error } = await app.supabase.auth.refreshSession();
