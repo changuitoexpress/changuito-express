@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, ImagePlus, Mic, Paperclip, ShieldCheck, Sparkles, X } from 'lucide-react';
 import type { YarvisHistoryEntry, YarvisPendingAction, YarvisReply } from '../yarvisTypes';
+import { useVoiceConversation } from '../../hooks/useVoiceConversation';
 
 type Props = {
   theme: 'light' | 'dark';
@@ -46,6 +47,7 @@ export default function YarvisPanel(props: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null; onend: (() => void) | null } | null>(null);
+  const conversationRef = useRef<ReturnType<typeof useVoiceConversation> | null>(null);
 
   const dark = props.theme === 'dark';
   const colors = {
@@ -74,6 +76,17 @@ export default function YarvisPanel(props: Props) {
     border: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
     justifyContent: 'center', transition: 'transform .16s ease, opacity .16s ease, background .16s ease',
   };
+  const conversation = useVoiceConversation({
+    open: true,
+    busy: busy || !!pendingAction,
+    assistantName: 'YARVIS',
+    onTurn: async function (text) {
+      const spokenReply = await sendMessage(text);
+      if (spokenReply) conversationRef.current?.speak(spokenReply);
+    },
+    onNotice: function (text) { setVoiceError(text); },
+  });
+  conversationRef.current = conversation;
 
   useEffect(function () {
     bottomRef.current?.scrollIntoView({ behavior: pendingAction ? 'auto' : 'smooth', block: 'end' });
@@ -95,9 +108,9 @@ export default function YarvisPanel(props: Props) {
     };
   }, []);
 
-  async function sendMessage() {
-    const text = draft.trim();
-    if (!text || busy || pendingAction) return;
+  async function sendMessage(messageOverride?: string): Promise<string> {
+    const text = (messageOverride ?? draft).trim();
+    if (!text || busy || pendingAction) return '';
     setError('');
     setVoiceError('');
     setResult('');
@@ -116,10 +129,16 @@ export default function YarvisPanel(props: Props) {
       });
       setPendingAction(reply.action);
       setExecutionAttempted(false);
+      if (reply.action) {
+        return reply.reply + ' ' + reply.action.summary + ' Para aplicarlo, toca «Confirmar cambio». No ejecutaré ningún cambio solo por escucharlo.';
+      }
+      return reply.reply;
     } catch (err) {
       const detail = err instanceof Error ? err.message : '';
       setDraft(text);
-      setError(detail ? 'No se pudo enviar. ' + detail : 'No se pudo enviar el mensaje. Revisa tu conexión e inténtalo de nuevo.');
+      const message = detail ? 'No se pudo enviar. ' + detail : 'No se pudo enviar el mensaje. Revisa tu conexión e inténtalo de nuevo.';
+      setError(message);
+      return message;
     } finally {
       setBusy(false);
     }
@@ -182,6 +201,7 @@ export default function YarvisPanel(props: Props) {
   }
 
   function toggleVoice() {
+    if (conversation.enabled) conversation.stop();
     if (listening && recognitionRef.current) {
       recognitionRef.current.stop();
       return;
@@ -307,16 +327,45 @@ export default function YarvisPanel(props: Props) {
           </div>
         )}
         {voiceError && <p role="status" style={{ margin: '0 0 8px', color: colors.red, fontSize: 11, lineHeight: 1.4 }}>{voiceError}</p>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9, padding: '9px 10px', borderRadius: 14, border: '1px solid ' + colors.border, background: colors.surface }}>
+          <div style={{ display: 'grid', placeItems: 'center', width: 32, height: 32, flexShrink: 0, borderRadius: 11, color: conversation.enabled ? colors.green : colors.muted, background: conversation.enabled ? colors.greenSoft : 'transparent' }}>
+            <Mic size={17} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 800 }}>Conversación hablada</div>
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, color: colors.muted, fontSize: 10 }}>
+              {conversation.transcript ? 'Te escuché: ' + conversation.transcript : conversation.status}
+            </div>
+          </div>
+          {conversation.enabled && conversation.status.includes('te está hablando') && (
+            <button type="button" aria-label="Interrumpir a YARVIS" onClick={conversation.interrupt} style={{ ...buttonBase, minHeight: 34, padding: '0 10px', borderRadius: 10, background: colors.surface, color: colors.text, fontSize: 10, fontWeight: 750 }}>
+              Interrumpir
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label={conversation.enabled ? 'Terminar conversación hablada con YARVIS' : 'Iniciar conversación hablada con YARVIS'}
+            title={conversation.enabled ? 'Terminar conversación' : 'Habla con YARVIS; las acciones siempre requieren confirmación manual'}
+            disabled={!conversation.enabled && (busy || !!pendingAction || listening)}
+            onClick={function () {
+              if (conversation.enabled) conversation.stop();
+              else conversation.start();
+            }}
+            style={{ ...buttonBase, minHeight: 36, gap: 6, padding: '0 12px', borderRadius: 11, background: conversation.enabled ? colors.redSoft : colors.accent, color: conversation.enabled ? colors.red : colors.accentText, fontSize: 10, fontWeight: 850, opacity: !conversation.enabled && (busy || !!pendingAction || listening) ? .48 : 1 }}
+          >
+            <Mic size={15} /> {conversation.enabled ? 'Terminar' : 'Conversar'}
+          </button>
+        </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, padding: 7, borderRadius: 18, border: '1px solid ' + colors.border, background: colors.surface, boxShadow: 'inset 0 1px 2px rgba(50,40,20,.025)' }}>
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" aria-label="Adjuntar imagen" onChange={chooseImage} style={{ display: 'none' }} />
           <button type="button" aria-label="Adjuntar imagen" title="Adjuntar imagen" disabled={busy || !!pendingAction} onClick={function () { fileInputRef.current?.click(); }} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: 'transparent', color: colors.muted, opacity: busy || pendingAction ? .45 : 1 }}>
             <ImagePlus size={18} />
           </button>
           <textarea value={draft} onChange={function (event) { setDraft(event.target.value); }} onKeyDown={onComposerKeyDown} disabled={busy || !!pendingAction} placeholder={pendingAction ? 'Confirma o cancela la acción pendiente' : 'Escribe o dicta tu solicitud…'} rows={1} aria-label="Mensaje para YARVIS" style={{ flex: 1, minWidth: 0, resize: 'none', maxHeight: 100, padding: '8px 2px', border: 0, outline: 0, background: 'transparent', color: colors.text, font: 'inherit', fontSize: 13, lineHeight: 1.4, opacity: pendingAction ? .55 : 1 }} />
-          <button type="button" aria-label={listening ? 'Detener dictado' : 'Dictar por voz'} title={listening ? 'Detener dictado' : 'Dictar por voz'} disabled={busy || !!pendingAction} onClick={toggleVoice} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: listening ? colors.redSoft : 'transparent', color: listening ? colors.red : colors.muted, opacity: busy || pendingAction ? .45 : 1 }}>
+          <button type="button" aria-label={listening ? 'Detener dictado' : 'Dictar por voz'} title={listening ? 'Detener dictado' : 'Dictar por voz'} disabled={busy || !!pendingAction || conversation.enabled} onClick={toggleVoice} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: listening ? colors.redSoft : 'transparent', color: listening ? colors.red : colors.muted, opacity: busy || pendingAction || conversation.enabled ? .45 : 1 }}>
             <Mic size={17} />
           </button>
-          <button type="button" aria-label="Enviar mensaje" disabled={busy || !!pendingAction || !draft.trim()} onClick={sendMessage} style={{ ...buttonBase, width: 36, height: 36, borderRadius: 12, flexShrink: 0, background: colors.accent, color: colors.accentText, opacity: busy || pendingAction || !draft.trim() ? .48 : 1 }}>
+          <button type="button" aria-label="Enviar mensaje" disabled={busy || !!pendingAction || !draft.trim()} onClick={function () { void sendMessage(); }} style={{ ...buttonBase, width: 36, height: 36, borderRadius: 12, flexShrink: 0, background: colors.accent, color: colors.accentText, opacity: busy || pendingAction || !draft.trim() ? .48 : 1 }}>
             <ArrowUp size={18} strokeWidth={2.6} />
           </button>
         </div>

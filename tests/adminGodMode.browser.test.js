@@ -7,6 +7,28 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
+    await page.addInitScript(function () {
+      window.__yarvisSpoken = [];
+      window.__yarvisRecognition = null;
+      class FixtureRecognition {
+        start() { window.__yarvisRecognition = this; }
+        stop() { this.onend?.(); }
+        abort() {}
+      }
+      window.SpeechRecognition = FixtureRecognition;
+      window.webkitSpeechRecognition = FixtureRecognition;
+      window.SpeechSynthesisUtterance = class {
+        constructor(text) { this.text = text; }
+      };
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          getVoices: function () { return []; },
+          cancel: function () {},
+          speak: function (utterance) { window.__yarvisSpoken.push(utterance.text); },
+        },
+      });
+    });
     const pageErrors = [];
     page.on("pageerror", function (e) { pageErrors.push(e.message); });
     const writes = [];
@@ -126,6 +148,26 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
 
     await page.getByRole("button", { name: "Abrir asistente YARVIS" }).click();
     const yarvis = page.getByRole("dialog", { name: "Asistente YARVIS" });
+    await page.setViewportSize({ width: 402, height: 874 });
+    assert.ok(await yarvis.evaluate(function (element) { return element.getBoundingClientRect().right <= window.innerWidth; }));
+    await yarvis.getByRole("button", { name: "Iniciar conversación hablada con YARVIS" }).click();
+    await page.evaluate(function () {
+      const recognition = window.__yarvisRecognition;
+      recognition.onresult?.({ results: [{ 0: { transcript: "Marca el pedido de Domino como entregado" } }] });
+      recognition.onend?.();
+    });
+    await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).waitFor();
+    await yarvis.getByRole("button", { name: "Interrumpir a YARVIS" }).waitFor();
+    const spokenProposal = await page.evaluate(function () { return window.__yarvisSpoken.at(-1); });
+    assert.match(spokenProposal, /Marcar el pedido de Domino Prueba como entregado/);
+    assert.match(spokenProposal, /toca «Confirmar cambio»/);
+    assert.equal(yarvisCalls.filter(function (call) { return call.operation === "execute"; }).length, 0);
+    await yarvis.getByRole("button", { name: "Interrumpir a YARVIS" }).click();
+    await yarvis.getByRole("button", { name: "Terminar conversación hablada con YARVIS" }).click();
+    assert.equal(yarvisCalls.filter(function (call) { return call.operation === "execute"; }).length, 0);
+    await yarvis.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+
     await yarvis.getByLabel("Mensaje para YARVIS").fill("Marca el pedido de Domino como entregado");
     await yarvis.getByRole("button", { name: "Enviar mensaje", exact: true }).click();
     await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).waitFor();
