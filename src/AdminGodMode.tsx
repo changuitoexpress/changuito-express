@@ -1,5 +1,5 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, ShoppingBag, Users, Store, TrendingUp, Clock,
   CheckCircle, XCircle, RefreshCw, WifiOff, Phone, MessageCircle, Bot,
@@ -114,6 +114,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [resolviendoSol, setResolviendoSol] = useState<string | null>(null);
   const [syncMsg, setSyncMsg]             = useState('');
   const [yarvisAbierto, setYarvisAbierto] = useState(false);
+  const yarvisUploads = useRef(new Map<string, string>());
   const isDark = props.theme === 'dark';
 
   // Verificar que sea admin
@@ -348,7 +349,6 @@ export default function AdminGodMode(props: AdminProps) {
       throw new Error('Esta propuesta no incluye la foto adjunta. Cancela y solicita el cambio de foto por separado.');
     }
 
-    let uploadedPath: string | null = null;
     let imageUrl: string | null = null;
     if (image && requiereFoto) {
       const extensions: Record<string, string> = {
@@ -374,33 +374,33 @@ export default function AdminGodMode(props: AdminProps) {
         if (!merchantId || !productId) throw new Error('No encontré el producto de la propuesta.');
         folder = 'productos/' + merchantId + '/yarvis/' + productId;
       }
-      const safeFileId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now());
-      uploadedPath = folder + '/' + safeFileId + '.' + extension;
-      const upload = await supabase.storage.from('changuito-fotos').upload(uploadedPath, image, {
-        cacheControl: '3600',
-        contentType: image.type,
-        upsert: false,
-      });
-      if (upload.error) throw new Error('No se pudo subir la imagen: ' + upload.error.message);
-      imageUrl = supabase.storage.from('changuito-fotos').getPublicUrl(uploadedPath).data.publicUrl;
+      imageUrl = yarvisUploads.current.get(action.confirmationToken) ?? null;
+      if (!imageUrl) {
+        const safeFileId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now());
+        const uploadedPath = folder + '/' + safeFileId + '.' + extension;
+        const upload = await supabase.storage.from('changuito-fotos').upload(uploadedPath, image, {
+          cacheControl: '3600',
+          contentType: image.type,
+          upsert: false,
+        });
+        if (upload.error) throw new Error('No se pudo subir la imagen: ' + upload.error.message);
+        imageUrl = supabase.storage.from('changuito-fotos').getPublicUrl(uploadedPath).data.publicUrl;
+        yarvisUploads.current.set(action.confirmationToken, imageUrl);
+      }
     }
 
-    try {
-      const result = await solicitarYarvis('execute', {
-        confirmationToken: action.confirmationToken,
-        imageUrl,
-      });
-      if (result?.ok !== true || typeof result.message !== 'string') {
-        throw new Error('El servidor no confirmó el cambio.');
-      }
-      return result.message;
-    } catch (error) {
-      if (uploadedPath) {
-        const cleanup = await supabase.storage.from('changuito-fotos').remove([uploadedPath]);
-        if (cleanup.error) console.error('YARVIS could not remove the unused uploaded image.');
-      }
-      throw error;
+    // A lost response may occur after the database commits. Never delete a photo
+    // on an unknown outcome, or a saved product could point to a deleted object.
+    // Keep its URL for a safe retry instead of uploading the file twice.
+    const result = await solicitarYarvis('execute', {
+      confirmationToken: action.confirmationToken,
+      imageUrl,
+    });
+    if (result?.ok !== true || typeof result.message !== 'string') {
+      throw new Error('El servidor no confirmó el cambio.');
     }
+    yarvisUploads.current.delete(action.confirmationToken);
+    return result.message;
   };
 
   async function actualizarPanelDesdeYarvis() {
@@ -444,7 +444,7 @@ export default function AdminGodMode(props: AdminProps) {
 
       {/* Header */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border-subtle)', padding:'14px 16px 12px' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px', marginBottom:'12px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
             <button onClick={props.onVolver} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
               <ArrowLeft style={{ width:'18px', height:'18px', color:'var(--text-primary)' }} />

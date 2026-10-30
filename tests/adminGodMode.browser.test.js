@@ -10,6 +10,8 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     const pageErrors = [];
     page.on("pageerror", function (e) { pageErrors.push(e.message); });
     const writes = [];
+    const yarvisCalls = [];
+    let imageUploads = 0;
     const merchants = [
       { id: "m1", name: "Burger Prueba", category: "hamburguesas", is_open: true, rating: 5, cashback_pct: null },
       { id: "m2", name: "Domino Prueba", category: "mandaditos", is_open: true, rating: 5, cashback_pct: 3 },
@@ -82,6 +84,34 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
         body: request.method() === "OPTIONS" ? "" : JSON.stringify(rpcResponse ?? (acceptsObject ? data[0] ?? null : data)),
       });
     });
+    await page.route("**/api/admin-yarvis", async function (route) {
+      const request = route.request();
+      const body = request.postDataJSON();
+      yarvisCalls.push(body);
+      assert.match(request.headers().authorization, /^Bearer /);
+      const photo = !!body.imageName;
+      const response = body.operation === "execute"
+        ? { ok: true, message: "Cambio confirmado en la prueba de YARVIS." }
+        : {
+          reply: "Revisa esta propuesta antes de confirmar.",
+          action: {
+            type: photo ? "upload_product_photo" : "change_order_status",
+            payload: photo ? { merchantId: "m1", productId: "p1" } : { orderId: "o2", estatus: "entregado" },
+            summary: photo ? "Agregar la foto a Hamburguesa clásica." : "Marcar el pedido de Domino Prueba como entregado.",
+            confirmationToken: photo ? "fixture-photo-approval" : "fixture-order-approval",
+          },
+        };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
+    });
+    await page.route("**/storage/v1/object/changuito-fotos/**", async function (route) {
+      const isOptions = route.request().method() === "OPTIONS";
+      if (!isOptions) imageUploads += 1;
+      await route.fulfill({
+        status: isOptions ? 204 : 200,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" },
+        body: isOptions ? "" : JSON.stringify({ Key: "changuito-fotos/fixture-photo", Id: "fixture-image" }),
+      });
+    });
     const baseUrl = process.env.REPLIT_DEV_DOMAIN ? "https://" + process.env.REPLIT_DEV_DOMAIN : "http://127.0.0.1:5173";
     await page.goto(baseUrl);
     await page.getByLabel("Correo electrónico", { exact: true }).fill(user.email);
@@ -93,6 +123,42 @@ test("God Mode: resumen, productos, negocios, otros y pedido por negocio", async
     await page.getByText("Tendencia de ventas").waitFor();
     assert.match(await page.locator("body").innerText(), /\$300/);
     await page.screenshot({ path: "/tmp/god-resumen.jpg" });
+
+    await page.getByRole("button", { name: "Abrir asistente YARVIS" }).click();
+    const yarvis = page.getByRole("dialog", { name: "Asistente YARVIS" });
+    await yarvis.getByLabel("Mensaje para YARVIS").fill("Marca el pedido de Domino como entregado");
+    await yarvis.getByRole("button", { name: "Enviar mensaje", exact: true }).click();
+    await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).waitFor();
+    assert.equal(yarvisCalls.filter(function (call) { return call.operation === "execute"; }).length, 0);
+    await yarvis.getByRole("button", { name: "Cancelar", exact: true }).click();
+    assert.equal(yarvisCalls.filter(function (call) { return call.operation === "execute"; }).length, 0);
+
+    await yarvis.getByLabel("Mensaje para YARVIS").fill("Vuelve a preparar la entrega");
+    await yarvis.getByRole("button", { name: "Enviar mensaje", exact: true }).click();
+    await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).click();
+    await yarvis.getByText("Cambio confirmado. La información del panel se actualizará.", { exact: true }).waitFor();
+    assert.match(await yarvis.innerText(), /Cambio confirmado en la prueba de YARVIS\./);
+    assert.equal(yarvisCalls.filter(function (call) { return call.operation === "execute"; }).length, 1);
+
+    await page.setViewportSize({ width: 402, height: 874 });
+    await yarvis.locator('input[type="file"]').setInputFiles({
+      name: "prueba.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jI1sAAAAASUVORK5CYII=", "base64"),
+    });
+    await yarvis.getByLabel("Mensaje para YARVIS").fill("Agrega esta foto a Hamburguesa clásica");
+    await yarvis.getByRole("button", { name: "Enviar mensaje", exact: true }).click();
+    await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).waitFor();
+    assert.equal(imageUploads, 0);
+    await page.screenshot({ path: "/tmp/yarvis-mobile.jpg" });
+    assert.ok(await yarvis.evaluate(function (element) { return element.getBoundingClientRect().right <= window.innerWidth; }));
+    await yarvis.getByRole("button", { name: "Confirmar cambio", exact: true }).click();
+    await page.waitForFunction(function () { return !document.querySelector('textarea[disabled]'); });
+    assert.equal(imageUploads, 1);
+    const photoExecution = yarvisCalls.find(function (call) { return call.confirmationToken === "fixture-photo-approval"; });
+    assert.match(photoExecution.imageUrl, /\/storage\/v1\/object\/public\/changuito-fotos\/productos\/m1\/yarvis\/p1\//);
+    await yarvis.getByRole("button", { name: "Cerrar YARVIS" }).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
 
     await page.getByRole("button", { name: /Pedidos/ }).click();
     page.once("dialog", function (dialog) { dialog.accept(); });

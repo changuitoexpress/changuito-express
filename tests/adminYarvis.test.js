@@ -29,6 +29,14 @@ function createHarness(options = {}) {
       estatus: "pendiente",
       repartidor_id: null,
     },
+    product: {
+      id: ids.product,
+      merchant_id: ids.merchant,
+      name: "Torta de prueba",
+      price: 50,
+      is_available: true,
+      image_url: null,
+    },
     patches: [],
     modelCalls: [],
     protectedCalls: 0,
@@ -54,6 +62,9 @@ function createHarness(options = {}) {
       state.patches.push({ path: url.pathname, query: url.searchParams, body: JSON.parse(init.body) });
       if (url.pathname === "/rest/v1/pedidos") {
         state.order = { ...state.order, ...JSON.parse(init.body) };
+      }
+      if (url.pathname === "/rest/v1/products") {
+        state.product = { ...state.product, ...JSON.parse(init.body) };
       }
       return new Response(JSON.stringify([{ id: ids.order }]), { status: 200 });
     }
@@ -89,13 +100,7 @@ function createHarness(options = {}) {
       }]), { status: 200 });
     }
     if (url.pathname === "/rest/v1/products") {
-      return new Response(JSON.stringify([{
-        id: ids.product,
-        merchant_id: ids.merchant,
-        name: "Torta de prueba",
-        price: 50,
-        is_available: true,
-      }]), { status: 200 });
+      return new Response(JSON.stringify([state.product]), { status: 200 });
     }
     if (url.hostname === "generativelanguage.googleapis.com") {
       state.modelCalls.push({ url: String(input), init });
@@ -182,7 +187,7 @@ test("a signed order assignment runs only after a separate confirmation request"
   assert.equal(state.patches[0].query.get("repartidor_id"), "is.null");
 });
 
-test("tampered or expired action approvals never write to Supabase", async function () {
+test("tampered action approvals never write to Supabase", async function () {
   const state = createHarness();
   const proposal = await invoke({ operation: "chat", message: "Asigna el pedido de Tortas de prueba al repartidor de prueba" });
   const token = proposal.body.action.confirmationToken;
@@ -217,5 +222,43 @@ test("YARVIS never accepts arbitrary SQL or unsupported operations", async funct
   assert.equal(result.body.action, null);
   const unsupported = await invoke({ operation: "sql", query: "DROP TABLE pedidos" });
   assert.equal(unsupported.status, 400);
+  assert.equal(state.patches.length, 0);
+});
+
+test("photo confirmation accepts only the target product folder and safely deduplicates retries", async function () {
+  const state = createHarness({
+    model: {
+      reply: "Revisa la foto.",
+      action: { type: "upload_product_photo", targetId: ids.product, targetName: "Torta de prueba", replaceExisting: false },
+    },
+  });
+  const proposal = await invoke({ operation: "chat", message: "Agrega esta foto a Torta de prueba", imageName: "foto.png" });
+  assert.equal(proposal.body.action.type, "upload_product_photo");
+  assert.equal(state.patches.length, 0);
+  const token = proposal.body.action.confirmationToken;
+  const wrongFolder = await invoke({
+    operation: "execute",
+    confirmationToken: token,
+    imageUrl: "https://fixture.supabase.co/storage/v1/object/public/changuito-fotos/productos/otro/photo.png",
+  });
+  assert.equal(wrongFolder.status, 400);
+  assert.equal(state.patches.length, 0);
+
+  const imageUrl = "https://fixture.supabase.co/storage/v1/object/public/changuito-fotos/productos/"
+    + ids.merchant + "/yarvis/" + ids.product + "/foto.png";
+  const first = await invoke({ operation: "execute", confirmationToken: token, imageUrl });
+  assert.equal(first.status, 200);
+  assert.equal(state.product.image_url, imageUrl);
+  const retry = await invoke({ operation: "execute", confirmationToken: token, imageUrl });
+  assert.equal(retry.status, 200);
+  assert.equal(state.product.image_url, imageUrl);
+});
+
+test("confirmation rechecks admin access even after an authorized proposal", async function () {
+  const state = createHarness();
+  const proposal = await invoke({ operation: "chat", message: "Asigna el pedido al repartidor de prueba" });
+  state.admin = false;
+  const result = await invoke({ operation: "execute", confirmationToken: proposal.body.action.confirmationToken });
+  assert.equal(result.status, 403);
   assert.equal(state.patches.length, 0);
 });

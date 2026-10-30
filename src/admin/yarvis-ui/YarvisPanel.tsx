@@ -41,6 +41,7 @@ export default function YarvisPanel(props: Props) {
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
   const [result, setResult] = useState('');
+  const [executionAttempted, setExecutionAttempted] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +76,7 @@ export default function YarvisPanel(props: Props) {
   };
 
   useEffect(function () {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    bottomRef.current?.scrollIntoView({ behavior: pendingAction ? 'auto' : 'smooth', block: 'end' });
   }, [messages, busy, pendingAction]);
 
   useEffect(function () {
@@ -114,6 +115,7 @@ export default function YarvisPanel(props: Props) {
         return current.concat({ id: Date.now() + 1, role: 'assistant', text: reply.reply });
       });
       setPendingAction(reply.action);
+      setExecutionAttempted(false);
     } catch (err) {
       const detail = err instanceof Error ? err.message : '';
       setDraft(text);
@@ -126,6 +128,7 @@ export default function YarvisPanel(props: Props) {
   async function confirmAction() {
     if (!pendingAction || busy) return;
     setBusy(true);
+    setExecutionAttempted(true);
     setError('');
     setResult('');
     try {
@@ -139,7 +142,7 @@ export default function YarvisPanel(props: Props) {
       props.onRefresh();
     } catch (err) {
       const detail = err instanceof Error ? err.message : '';
-      setError(detail ? 'No se aplicó el cambio. ' + detail : 'No se pudo aplicar el cambio. Sigue pendiente; puedes revisar e intentar de nuevo.');
+      setError(detail ? 'No pude confirmar el resultado. ' + detail : 'No pude confirmar el resultado. Revisa el panel antes de reintentar.');
     } finally {
       setBusy(false);
     }
@@ -151,16 +154,27 @@ export default function YarvisPanel(props: Props) {
     setError('');
     setResult('');
     setMessages(function (current) {
-      return current.concat({ id: Date.now(), role: 'assistant', text: 'Acción cancelada. No se realizó ningún cambio.' });
+      return current.concat({
+        id: Date.now(),
+        role: 'assistant',
+        text: executionAttempted
+          ? 'Propuesta descartada. Como intentaste aplicarla, revisa el estado del panel; puede haberse completado antes de perder la respuesta.'
+          : 'Acción cancelada. No se realizó ningún cambio.',
+      });
     });
+    setExecutionAttempted(false);
   }
 
   function chooseImage(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('El archivo debe ser una imagen.');
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type)) {
+      setError('Usa una imagen JPG, PNG, WebP o HEIC.');
+      return;
+    }
+    if (file.size <= 0 || file.size > 5 * 1024 * 1024) {
+      setError('La imagen debe pesar menos de 5 MB.');
       return;
     }
     setError('');
@@ -209,7 +223,7 @@ export default function YarvisPanel(props: Props) {
   }
 
   return (
-    <section aria-label="Asistente YARVIS" style={panelStyle}>
+    <section role="dialog" aria-modal="false" aria-label="Asistente YARVIS" aria-busy={busy} style={panelStyle}>
       <header style={{ padding: '18px 18px 15px', background: dark ? 'linear-gradient(135deg, rgba(241,189,57,.12), rgba(67,138,96,.08))' : 'linear-gradient(135deg, #fff4d5, #f5f3e5)', borderBottom: '1px solid ' + colors.border }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -224,7 +238,7 @@ export default function YarvisPanel(props: Props) {
               <p style={{ margin: '4px 0 0', color: colors.muted, fontSize: 11 }}>Asistencia operativa, con tu aprobación</p>
             </div>
           </div>
-          <button type="button" aria-label="Cerrar YARVIS" onClick={props.onClose} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 12, background: colors.surface, color: colors.muted }}>
+          <button type="button" aria-label="Cerrar YARVIS" disabled={busy && !!pendingAction} onClick={props.onClose} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 12, background: colors.surface, color: colors.muted }}>
             <X size={17} />
           </button>
         </div>
@@ -287,14 +301,14 @@ export default function YarvisPanel(props: Props) {
               <div style={{ fontSize: 11, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.name}</div>
               <div style={{ fontSize: 10, color: colors.muted }}>Adjunta en este dispositivo; aún no se ha enviado</div>
             </div>
-            <button type="button" aria-label="Quitar imagen adjunta" onClick={function () { setImage(null); }} style={{ ...buttonBase, width: 28, height: 28, borderRadius: 9, background: 'transparent', color: colors.muted }}>
+            <button type="button" aria-label="Quitar imagen adjunta" disabled={busy || !!pendingAction} onClick={function () { setImage(null); }} style={{ ...buttonBase, width: 28, height: 28, borderRadius: 9, background: 'transparent', color: colors.muted, opacity: busy || pendingAction ? .45 : 1 }}>
               <X size={15} />
             </button>
           </div>
         )}
         {voiceError && <p role="status" style={{ margin: '0 0 8px', color: colors.red, fontSize: 11, lineHeight: 1.4 }}>{voiceError}</p>}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, padding: 7, borderRadius: 18, border: '1px solid ' + colors.border, background: colors.surface, boxShadow: 'inset 0 1px 2px rgba(50,40,20,.025)' }}>
-          <input ref={fileInputRef} type="file" accept="image/*" aria-label="Adjuntar imagen" onChange={chooseImage} style={{ display: 'none' }} />
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" aria-label="Adjuntar imagen" onChange={chooseImage} style={{ display: 'none' }} />
           <button type="button" aria-label="Adjuntar imagen" title="Adjuntar imagen" disabled={busy || !!pendingAction} onClick={function () { fileInputRef.current?.click(); }} style={{ ...buttonBase, width: 34, height: 34, borderRadius: 11, flexShrink: 0, background: 'transparent', color: colors.muted, opacity: busy || pendingAction ? .45 : 1 }}>
             <ImagePlus size={18} />
           </button>

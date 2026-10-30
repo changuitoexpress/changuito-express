@@ -15,3 +15,4 @@
 - [God Mode admin scope](god-mode-admin.md) — modular admin under src/admin; DB changes only in additive supabase_admin_upgrade.sql; one order row per business.
 - [Order communication](order-communication.md) — customers and assigned couriers should exchange messages and product photos directly, with admin supervision.
 - [Supabase live verification](supabase-live-verification.md) — connector readiness and table row estimates do not establish real project access or deployed schema state.
+- [YARVIS approvals](yarvis-approvals.md) — the embedded admin assistant must request explicit confirmation before every change.
