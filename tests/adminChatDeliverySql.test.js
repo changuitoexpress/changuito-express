@@ -17,12 +17,15 @@ test("installs the database-side admin check before the delivery RPC", function 
 });
 
 test("keeps customer/courier conversations scoped to their own assigned order", function () {
-  assert.match(sql, /p\.cliente_id = auth\.uid\(\) AND p\.repartidor_id IS NOT NULL/);
-  assert.match(sql, /p\.repartidor_id = auth\.uid\(\)/);
-  assert.match(sql, /autor_id = auth\.uid\(\)/);
-  assert.match(sql, /AS RESTRICTIVE FOR SELECT/);
-  assert.match(sql, /AS RESTRICTIVE FOR INSERT/);
-  assert.doesNotMatch(sql, /USING\s*\(\s*true\s*\)/i);
+  const policies = sql.match(/CREATE POLICY \S+ ON public\.mensajes_chat[\s\S]*?;/g) ?? [];
+  assert.ok(policies.length >= 4);
+  const chatSql = policies.join("\n");
+  assert.match(chatSql, /p\.cliente_id = auth\.uid\(\) AND p\.repartidor_id IS NOT NULL/);
+  assert.match(chatSql, /p\.repartidor_id = auth\.uid\(\)/);
+  assert.match(chatSql, /autor_id = auth\.uid\(\)/);
+  assert.match(chatSql, /AS RESTRICTIVE FOR SELECT/);
+  assert.match(chatSql, /AS RESTRICTIVE FOR INSERT/);
+  assert.doesNotMatch(chatSql, /USING\s*\(\s*true\s*\)/i);
 });
 
 test("stores chat photos in a private, participant-scoped bucket", function () {
