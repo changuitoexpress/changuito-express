@@ -20,3 +20,9 @@ Connection readiness does not establish access to the intended Vercel project.
 **Why:** The attached Vercel connection listed another project, while the intended application's existing GitHub-to-Vercel deployment link still worked.
 
 **How to apply:** Verify project access explicitly. If using the existing GitHub integration to publish, confirm Vercel's status for that exact commit and check the published application; do not report success from a GitHub update alone.
+
+Committed npm lockfiles for external hosting must not contain Replit-internal package download URLs. Keep package versions and integrity hashes unchanged when normalizing verified equivalent public URLs.
+
+**Why:** A Vercel build failed during dependency installation because an internal registry hostname could not be resolved outside Replit.
+
+**How to apply:** After dependency changes, check all resolved lockfile URLs for external portability and validate equivalent public-registry package integrity before publishing.
