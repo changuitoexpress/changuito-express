@@ -1,8 +1,8 @@
 /* DO NOT TRANSLATE THIS FILE - CHANGUITO EXPRESS */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, ShoppingBag, Users, Store, TrendingUp, Clock,
-  CheckCircle, XCircle, RefreshCw, WifiOff, Phone, MessageCircle,
+  CheckCircle, XCircle, RefreshCw, WifiOff, Phone, MessageCircle, Bot,
   ChevronDown, ChevronUp, LogOut, Star, Package
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
@@ -12,6 +12,16 @@ import AdminCatalogo from './admin/AdminCatalogo';
 import AdminNegocios from './admin/AdminNegocios';
 import AdminTablas from './admin/AdminTablas';
 import AdminMandaditos from './admin/AdminMandaditos';
+import PedidoChat from './components/PedidoChat';
+import YarvisPanel from './admin/yarvis-ui/YarvisPanel';
+import type {
+  YarvisActionType,
+  YarvisConfirmAction,
+  YarvisHistoryEntry,
+  YarvisPendingAction,
+  YarvisReply,
+  YarvisSendMessage,
+} from './admin/yarvisTypes';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
@@ -94,6 +104,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [error, setError]           = useState('');
   const [filtroEstatus, setFiltro]  = useState('todos');
   const [pedidoAbierto, setPedAbi]  = useState<string | null>(null);
+  const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
   const [tab, setTab]               = useState<'resumen'|'pedidos'|'catalogo'|'negocios'|'otros'|'clientes'>('resumen');
   const [merchants, setMerchants]         = useState<any[]>([]);
   const [repartidores, setRepartidores]   = useState<any[]>([]);
@@ -102,6 +113,8 @@ export default function AdminGodMode(props: AdminProps) {
   const [solicitudes, setSolicitudes]     = useState<any[]>([]);
   const [resolviendoSol, setResolviendoSol] = useState<string | null>(null);
   const [syncMsg, setSyncMsg]             = useState('');
+  const [yarvisAbierto, setYarvisAbierto] = useState(false);
+  const yarvisUploads = useRef(new Map<string, string>());
   const isDark = props.theme === 'dark';
 
   // Verificar que sea admin
@@ -231,7 +244,7 @@ export default function AdminGodMode(props: AdminProps) {
       if (nuevoEstatus === 'entregado') {
         const detalle = rpcErr?.message ?? rpcData?.error ?? 'No se pudo completar la operación.';
         const siguientePaso = rpcErr
-          ? 'Ejecuta supabase_fix_cambiar_estatus_pedido.sql en el SQL Editor de Supabase.'
+          ? 'Ejecuta supabase_admin_upgrade.sql en el SQL Editor de Supabase.'
           : 'Confirma que iniciaste sesión con la cuenta del administrador general.';
         alert('⚠️ No se pudo marcar como entregado ni acreditar cashback.\n\n' + siguientePaso + '\n\n' + detalle);
         return;
@@ -281,6 +294,128 @@ export default function AdminGodMode(props: AdminProps) {
     fetchMerchants(); fetchMetricas();
   }
 
+  async function obtenerTokenYarvis(): Promise<string> {
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (sessionError || !token) throw new Error('Tu sesión venció. Vuelve a entrar.');
+    if (data.session?.user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      throw new Error('Solo el administrador general puede usar YARVIS.');
+    }
+    return token;
+  }
+
+  async function solicitarYarvis(
+    operation: 'chat' | 'execute',
+    payload: Record<string, unknown>,
+  ): Promise<any> {
+    const token = await obtenerTokenYarvis();
+    const response = await fetch('/api/admin-yarvis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ operation, ...payload }),
+    });
+    const body = await response.json().catch(function () { return null; });
+    if (!response.ok) throw new Error(body?.error ?? 'No se pudo completar la solicitud.');
+    return body;
+  }
+
+  const enviarMensajeYarvis: YarvisSendMessage = async function (
+    message: string,
+    history: YarvisHistoryEntry[],
+    imageName: string | null,
+  ): Promise<YarvisReply> {
+    const result = await solicitarYarvis('chat', { message, history, imageName });
+    if (typeof result?.reply !== 'string') throw new Error('La respuesta del asistente no es válida.');
+    const action = result.action;
+    if (action && (
+      typeof action !== 'object'
+      || typeof action.summary !== 'string'
+      || typeof action.confirmationToken !== 'string'
+    )) {
+      throw new Error('La propuesta de cambio no es válida.');
+    }
+    return { reply: result.reply, action: action ?? null };
+  };
+
+  const confirmarAccionYarvis: YarvisConfirmAction = async function (
+    action: YarvisPendingAction,
+    image: File | null,
+  ): Promise<string> {
+    if (!action.confirmationToken) throw new Error('La propuesta venció. Pídele a YARVIS que la prepare otra vez.');
+    const tiposFoto: YarvisActionType[] = ['upload_merchant_photo', 'upload_product_photo'];
+    const requiereFoto = tiposFoto.includes(action.type);
+    if (requiereFoto && !image) throw new Error('Adjunta la foto antes de confirmar este cambio.');
+    if (image && !requiereFoto) {
+      throw new Error('Esta propuesta no incluye la foto adjunta. Cancela y solicita el cambio de foto por separado.');
+    }
+
+    let imageUrl: string | null = null;
+    if (image && requiereFoto) {
+      const extensions: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/heic': 'heic',
+      };
+      const extension = extensions[image.type];
+      if (!extension) throw new Error('Usa una imagen JPG, PNG, WebP o HEIC.');
+      if (image.size <= 0 || image.size > 5 * 1024 * 1024) {
+        throw new Error('La imagen debe pesar menos de 5 MB.');
+      }
+
+      const merchantId = String(action.payload.merchantId ?? '');
+      let folder = '';
+      if (action.type === 'upload_merchant_photo') {
+        const merchantTarget = String(action.payload.merchantId ?? '');
+        if (!merchantTarget) throw new Error('No encontré el negocio de la propuesta.');
+        folder = 'negocios/yarvis/' + merchantTarget;
+      } else {
+        const productId = String(action.payload.productId ?? '');
+        if (!merchantId || !productId) throw new Error('No encontré el producto de la propuesta.');
+        folder = 'productos/' + merchantId + '/yarvis/' + productId;
+      }
+      imageUrl = yarvisUploads.current.get(action.confirmationToken) ?? null;
+      if (!imageUrl) {
+        const safeFileId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now());
+        const uploadedPath = folder + '/' + safeFileId + '.' + extension;
+        const upload = await supabase.storage.from('changuito-fotos').upload(uploadedPath, image, {
+          cacheControl: '3600',
+          contentType: image.type,
+          upsert: false,
+        });
+        if (upload.error) throw new Error('No se pudo subir la imagen: ' + upload.error.message);
+        imageUrl = supabase.storage.from('changuito-fotos').getPublicUrl(uploadedPath).data.publicUrl;
+        yarvisUploads.current.set(action.confirmationToken, imageUrl);
+      }
+    }
+
+    // A lost response may occur after the database commits. Never delete a photo
+    // on an unknown outcome, or a saved product could point to a deleted object.
+    // Keep its URL for a safe retry instead of uploading the file twice.
+    const result = await solicitarYarvis('execute', {
+      confirmationToken: action.confirmationToken,
+      imageUrl,
+    });
+    if (result?.ok !== true || typeof result.message !== 'string') {
+      throw new Error('El servidor no confirmó el cambio.');
+    }
+    yarvisUploads.current.delete(action.confirmationToken);
+    return result.message;
+  };
+
+  async function actualizarPanelDesdeYarvis() {
+    const [merchantResult, courierResult] = await Promise.all([
+      supabase.from('merchants').select('*').order('name'),
+      supabase.from('perfiles').select('id, nombre').eq('rol', 'repartidor'),
+    ]);
+    if (merchantResult.error) setError('No pude actualizar los negocios: ' + merchantResult.error.message);
+    else setMerchants(merchantResult.data ?? []);
+    if (courierResult.error) setError('No pude actualizar los repartidores: ' + courierResult.error.message);
+    else setRepartidores(courierResult.data ?? []);
+    fetchPedidos();
+    fetchMetricas();
+  }
+
   function formatFecha(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleDateString('es-MX', { day:'2-digit', month:'short' }) + ' ' + d.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
@@ -291,12 +426,25 @@ export default function AdminGodMode(props: AdminProps) {
     return { flex:'1 0 auto', padding:'10px 14px', whiteSpace:'nowrap', border:'none', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:active?900:600, background:active?'var(--color-yellow)':'transparent', color:active?'#020617':'var(--text-muted)' };
   };
 
+  if (chatPedido) {
+    return (
+      <PedidoChat
+        session={props.session}
+        theme={props.theme}
+        pedido={chatPedido}
+        role="admin"
+        onBack={function () { setChatPedido(null); }}
+      />
+    );
+  }
+
   return (
+    <>
     <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', fontFamily:'system-ui,sans-serif', maxWidth:'1100px', margin:'0 auto' }}>
 
       {/* Header */}
       <div style={{ position:'sticky', top:0, zIndex:50, background:'var(--bg-nav)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border-subtle)', padding:'14px 16px 12px' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px', marginBottom:'12px' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
             <button onClick={props.onVolver} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
               <ArrowLeft style={{ width:'18px', height:'18px', color:'var(--text-primary)' }} />
@@ -307,6 +455,11 @@ export default function AdminGodMode(props: AdminProps) {
             </div>
           </div>
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+            <button type="button" onClick={function () { setYarvisAbierto(true); }} aria-label="Abrir asistente YARVIS"
+              style={{ height:'36px', padding:'0 11px', borderRadius:'12px', background:'var(--color-yellow-dim)', color:'var(--color-yellow)', border:'1px solid rgba(250,204,21,.24)', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', cursor:'pointer', fontSize:'11px', fontWeight:850 }}>
+              <Bot style={{ width:'16px', height:'16px' }} />
+              <span>YARVIS</span>
+            </button>
             <button onClick={function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchSolicitudes(); }} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
               <RefreshCw style={{ width:'16px', height:'16px', color:'var(--text-muted)' }} />
             </button>
@@ -530,14 +683,20 @@ export default function AdminGodMode(props: AdminProps) {
                           )}
                         </div>
 
-                        {/* Chat interno */}
+                        {/* Chat cliente–repartidor con acceso de supervisión para admin */}
                         <div style={{ padding:'10px 12px', borderRadius:'12px', background:'var(--border-subtle)' }}>
                           <p style={{ fontSize:'11px', fontWeight:700, color:'var(--text-muted)', margin:'0 0 2px 0' }}>
-                            💬 Chat interno
+                            💬 Chat del pedido
                           </p>
                           <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:0 }}>
-                            El repartidor asignado puede chatear con el cliente desde su panel 🛵
+                            Cliente y repartidor pueden enviarse mensajes y fotos.
                           </p>
+                          {pedido.repartidor_id && (
+                            <button type="button" onClick={function () { setChatPedido(pedido); }}
+                              style={{ marginTop:'8px', padding:'7px 11px', border:'none', borderRadius:'9px', background:'var(--color-yellow)', color:'#020617', fontSize:'11px', fontWeight:800, cursor:'pointer' }}>
+                              Supervisar conversación
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -705,5 +864,15 @@ export default function AdminGodMode(props: AdminProps) {
         )}
       </div>
     </div>
+    {yarvisAbierto && (
+      <YarvisPanel
+        theme={props.theme}
+        onClose={function () { setYarvisAbierto(false); }}
+        onSendMessage={enviarMensajeYarvis}
+        onConfirmAction={confirmarAccionYarvis}
+        onRefresh={actualizarPanelDesdeYarvis}
+      />
+    )}
+    </>
   );
 }

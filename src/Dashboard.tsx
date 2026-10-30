@@ -149,6 +149,15 @@ type CheckoutDraft = {
 };
 
 const CHECKOUT_DRAFT_ID = "customer-checkout";
+const WRITTEN_ORDER_ACTIVE_DRAFT_ID = "customer-written-order-active";
+
+type ActiveWrittenOrderDraft = {
+  merchantId: string;
+};
+
+function writtenOrderDraftId(merchantId: string): string {
+  return "customer-written-order:" + encodeURIComponent(merchantId);
+}
 
 function checkoutCartSignature(carrito: CartItem[]): string {
   return carrito
@@ -867,10 +876,11 @@ function Banner() {
 // ─── Modal Mandadito ──────────────────────────────────────────────────────────
 function ModalMandadito(props: {
   merchant: Merchant;
+  texto: string;
   onClose: () => void;
+  onTextoChange: (texto: string) => void;
   onAgregar: (texto: string) => void;
 }) {
-  const [texto, setTexto] = useState("");
   const cerrado = props.merchant.horario_apertura && props.merchant.horario_cierre
     ? !esAbierto(props.merchant.horario_apertura, props.merchant.horario_cierre)
     : !props.merchant.is_open;
@@ -952,10 +962,10 @@ function ModalMandadito(props: {
         <textarea
           aria-label="Tu pedido por escrito"
           autoFocus
-          value={texto}
+          value={props.texto}
           onChange={function (e) {
             if (cerrado) return;
-            setTexto(e.target.value);
+            props.onTextoChange(e.target.value);
           }}
           disabled={cerrado}
           placeholder={
@@ -984,14 +994,14 @@ function ModalMandadito(props: {
         {!cerrado && (
           <button
             onClick={function () {
-              if (texto.trim() === "") return;
-              props.onAgregar(texto.trim());
+              if (props.texto.trim() === "") return;
+              props.onAgregar(props.texto.trim());
             }}
-            disabled={texto.trim() === ""}
+            disabled={props.texto.trim() === ""}
             style={{
               width: "100%",
               background:
-                texto.trim() === ""
+                props.texto.trim() === ""
                   ? "rgba(250,204,21,0.4)"
                   : "var(--color-yellow)",
               color: "#020617",
@@ -1002,7 +1012,7 @@ function ModalMandadito(props: {
               padding: "14px",
               borderRadius: "14px",
               border: "none",
-              cursor: texto.trim() === "" ? "not-allowed" : "pointer",
+              cursor: props.texto.trim() === "" ? "not-allowed" : "pointer",
             }}
           >
             Agregar al carrito
@@ -2831,6 +2841,7 @@ export default function Dashboard(props: DashboardProps) {
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   const [restSectionTarget, setRestSectionTarget] = useState("");
   const [modalMandadito, setModalMandadito] = useState<Merchant | null>(null);
+  const [textoMandadito, setTextoMandadito] = useState("");
   const [modalCheckout, setModalCheckout] = useState<boolean>(function () {
     return Boolean(getCheckoutDraft(props.session.user.id, props.carritoGlobal));
   });
@@ -3055,6 +3066,38 @@ export default function Dashboard(props: DashboardProps) {
 
   useEffect(
     function () {
+      if (loading || modalMandadito) return;
+      const draft = readFormDraft<ActiveWrittenOrderDraft>(
+        props.session.user.id,
+        WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+      );
+      if (!draft) return;
+      if (typeof draft.merchantId !== "string") {
+        clearFormDraft(props.session.user.id, WRITTEN_ORDER_ACTIVE_DRAFT_ID);
+        return;
+      }
+      const merchant = merchants.find(function (candidate) {
+        return (
+          candidate.id === draft.merchantId &&
+          candidate.category?.toLowerCase() === "mandaditos"
+        );
+      });
+      if (!merchant) return;
+      const savedText = readFormDraft<unknown>(
+        props.session.user.id,
+        writtenOrderDraftId(merchant.id),
+      );
+      if (savedText !== null && typeof savedText !== "string") {
+        clearFormDraft(props.session.user.id, writtenOrderDraftId(merchant.id));
+      }
+      setTextoMandadito(typeof savedText === "string" ? savedText : "");
+      setModalMandadito(merchant);
+    },
+    [loading, merchants, modalMandadito, props.session.user.id],
+  );
+
+  useEffect(
+    function () {
       const term = search.trim();
       if (!term) {
         setProductosBusqueda([]);
@@ -3122,7 +3165,44 @@ export default function Dashboard(props: DashboardProps) {
     });
   }
 
-  function agregarMandadito(merchant: Merchant, texto: string) {
+  function abrirMandadito(merchant: Merchant) {
+    const savedText = readFormDraft<unknown>(
+      props.session.user.id,
+      writtenOrderDraftId(merchant.id),
+    );
+    if (savedText !== null && typeof savedText !== "string") {
+      clearFormDraft(props.session.user.id, writtenOrderDraftId(merchant.id));
+    }
+    writeFormDraft<ActiveWrittenOrderDraft>(
+      props.session.user.id,
+      WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+      { merchantId: merchant.id },
+    );
+    const text = typeof savedText === "string" ? savedText : "";
+    writeFormDraft(props.session.user.id, writtenOrderDraftId(merchant.id), text);
+    setTextoMandadito(
+      text,
+    );
+    setModalMandadito(merchant);
+  }
+
+  function cambiarTextoMandadito(texto: string) {
+    setTextoMandadito(texto);
+    if (modalMandadito) {
+      writeFormDraft<ActiveWrittenOrderDraft>(
+        props.session.user.id,
+        WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+        { merchantId: modalMandadito.id },
+      );
+      writeFormDraft(
+        props.session.user.id,
+        writtenOrderDraftId(modalMandadito.id),
+        texto,
+      );
+    }
+  }
+
+  function agregarMandadito(merchant: Merchant, texto: string): boolean {
     const negociosActuales = new Set(
       props.carritoGlobal.map(function (i) {
         return i.negocio_id;
@@ -3130,7 +3210,7 @@ export default function Dashboard(props: DashboardProps) {
     );
     if (!negociosActuales.has(merchant.id) && negociosActuales.size >= 4) {
       setModalLimite(true);
-      return;
+      return false;
     }
     const item: CartItem = {
       id: merchant.id + "-" + Date.now(),
@@ -3144,6 +3224,7 @@ export default function Dashboard(props: DashboardProps) {
       emoji: "📝",
     };
     props.onUpdateCarritoGlobal([...props.carritoGlobal, item]);
+    return true;
   }
 
   function agregarProductoBusqueda(producto: any) {
@@ -3356,7 +3437,7 @@ export default function Dashboard(props: DashboardProps) {
                       merchant={m}
                       onClick={function () {
                         m.category?.toLowerCase() === "mandaditos"
-                          ? setModalMandadito(m)
+                          ? abrirMandadito(m)
                           : setSelectedMerchant(m);
                       }}
                     />
@@ -3794,7 +3875,7 @@ export default function Dashboard(props: DashboardProps) {
                           key={m.id}
                           merchant={m}
                           onClick={function () {
-                            setModalMandadito(m);
+                            abrirMandadito(m);
                           }}
                         />
                       );
@@ -4250,7 +4331,7 @@ export default function Dashboard(props: DashboardProps) {
 
               {/* - 1 - ChangoMonedero (SIEMPRE PRIMERO) - */}
               <button
-                onClick={function () { setMenuAbierto(false); typeof setView === 'function' ? setView('changomonedero') : (props.onIrMonedero && props.onIrMonedero()); }}
+                onClick={function () { setMenuAbierto(false); props.onIrMonedero?.(); }}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "14px 12px", borderRadius: "14px", backgroundColor: "rgba(250,204,21,0.1)", border: "1.5px solid rgba(250,204,21,0.45)", cursor: "pointer", color: "var(--text-primary)", fontSize: "14px", fontWeight: "900", textAlign: "left", marginBottom: "4px" }}
               >
                 <Wallet style={{ width: "20px", height: "20px", color: "#facc15", flexShrink: 0 }} />
@@ -4590,12 +4671,40 @@ export default function Dashboard(props: DashboardProps) {
       {modalMandadito && (
         <ModalMandadito
           merchant={modalMandadito}
+          texto={textoMandadito}
           onClose={function () {
+            const activeDraft = readFormDraft<ActiveWrittenOrderDraft>(
+              props.session.user.id,
+              WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+            );
+            if (activeDraft?.merchantId === modalMandadito.id) {
+              clearFormDraft(
+                props.session.user.id,
+                WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+              );
+            }
             setModalMandadito(null);
           }}
+          onTextoChange={cambiarTextoMandadito}
           onAgregar={function (texto) {
-            agregarMandadito(modalMandadito, texto);
-            setModalMandadito(null);
+            if (agregarMandadito(modalMandadito, texto)) {
+              clearFormDraft(
+                props.session.user.id,
+                writtenOrderDraftId(modalMandadito.id),
+              );
+              const activeDraft = readFormDraft<ActiveWrittenOrderDraft>(
+                props.session.user.id,
+                WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+              );
+              if (activeDraft?.merchantId === modalMandadito.id) {
+                clearFormDraft(
+                  props.session.user.id,
+                  WRITTEN_ORDER_ACTIVE_DRAFT_ID,
+                );
+              }
+              setTextoMandadito("");
+              setModalMandadito(null);
+            }
           }}
         />
       )}

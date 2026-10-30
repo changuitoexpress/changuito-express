@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
-
+import PedidoChat from "./components/PedidoChat";
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
   id: string;
@@ -30,14 +30,6 @@ interface Pedido {
   canal: string | null;
   created_at: string;
   repartidor_id: string | null;
-}
-
-interface MensajeChat {
-  id: string;
-  pedido_id: string;
-  autor: "repartidor" | "cliente" | "sistema";
-  texto: string;
-  hora: string;
 }
 
 interface Props {
@@ -87,36 +79,6 @@ const ESTATUS_CONFIG: Record<
   },
 };
 
-// ─── Palabras a corregir (IA básica de ortografía) ────────────────────────────
-const CORRECCIONES: Record<string, string> = {
-  q: "que",
-  xq: "porque",
-  pq: "porque",
-  bn: "bien",
-  tb: "también",
-  tmb: "también",
-  xfa: "por favor",
-  xfavor: "por favor",
-  k: "que",
-  wey: "estimado",
-  güey: "estimado",
-  puta: "caramba",
-  chinga: "demonios",
-  pinche: "maldito",
-  cabrón: "señor",
-  pendejo: "estimado",
-};
-
-function corregirTexto(texto: string): string {
-  return texto
-    .split(" ")
-    .map(function (palabra) {
-      const lower = palabra.toLowerCase().replace(/[^a-záéíóúüñ]/gi, "");
-      return CORRECCIONES[lower] || palabra;
-    })
-    .join(" ");
-}
-
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function RepasDashboard(props: Props) {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -124,12 +86,7 @@ export default function RepasDashboard(props: Props) {
   const [tab, setTab] = useState<"mis" | "disponibles" | "chat">("mis");
   const [pedidoAbierto, setPedAbi] = useState<string | null>(null);
   const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
-  const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
-  const [textoChat, setTextoChat] = useState("");
-  const [textoCorrecto, setTextoCorrecto] = useState("");
-  const [enviandoMsg, setEnviandoMsg] = useState(false);
   const [accessRevoked, setAccessRevoked] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const accessRevokedRef = useRef(false);
   const isDark = props.theme === "dark";
   const miId = props.session.user.id;
@@ -167,7 +124,6 @@ export default function RepasDashboard(props: Props) {
         accessRevokedRef.current = true;
         setAccessRevoked(true);
         setPedidos([]);
-        setMensajes([]);
         setChatPedido(null);
         setLoading(false);
       }
@@ -198,10 +154,7 @@ export default function RepasDashboard(props: Props) {
             if (!nextAccess) {
               setAccessRevoked(true);
               setPedidos([]);
-              setMensajes([]);
               setChatPedido(null);
-              setTextoChat("");
-              setTextoCorrecto("");
               setTab("mis");
               setLoading(false);
               return;
@@ -217,22 +170,6 @@ export default function RepasDashboard(props: Props) {
       };
     },
     [fetchPedidos, miId, props.session.user.email],
-  );
-
-  // Auto-scroll chat
-  useEffect(
-    function () {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    },
-    [mensajes],
-  );
-
-  // Actualizar texto corregido en tiempo real
-  useEffect(
-    function () {
-      setTextoCorrecto(corregirTexto(textoChat));
-    },
-    [textoChat],
   );
 
   const misPedidos = pedidos.filter(function (p) {
@@ -276,76 +213,10 @@ export default function RepasDashboard(props: Props) {
     fetchPedidos();
   }
 
-  async function cargarMensajes(pedidoId: string) {
-    if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
-    try {
-      const { data, error } = await supabase
-        .from('mensajes_chat')
-        .select('id, pedido_id, autor_id, autor_rol, texto, created_at')
-        .eq('pedido_id', pedidoId)
-        .order('created_at', { ascending: true });
-      if (error) {
-        if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
-        // tabla puede no existir aún — mostrar mensaje de setup
-        setMensajes([{ id: 'setup', pedido_id: pedidoId, autor: 'sistema', texto: '⚠️ Para activar el chat, crea la tabla "mensajes_chat" en Supabase con columnas: id (uuid pk), pedido_id (uuid), autor_id (uuid), autor_rol (text), texto (text), created_at (timestamptz).', hora: new Date().toISOString() }]);
-        return;
-      }
-      const uid = props.session.user.id;
-      const mapped: MensajeChat[] = (data ?? []).map(function(m: any) {
-        const rol: MensajeChat['autor'] = m.autor_rol === 'repartidor' ? 'repartidor' : m.autor_rol === 'cliente' ? 'cliente' : 'sistema';
-        return { id: m.id, pedido_id: m.pedido_id, autor: m.autor_id === uid ? 'repartidor' : rol, texto: m.texto, hora: m.created_at };
-      });
-      if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
-      if (mapped.length === 0) {
-        setMensajes([{ id: 'inicio', pedido_id: pedidoId, autor: 'sistema', texto: '🛵 Chat iniciado. Escríbele al cliente sobre su pedido.', hora: new Date().toISOString() }]);
-      } else {
-        setMensajes(mapped);
-      }
-    } catch(e) {
-      console.error('[Chat]', e);
-    }
-  }
-
   function abrirChat(pedido: Pedido) {
     if (!puedeAcceder || accessRevokedRef.current || !hasAccess) return;
     setChatPedido(pedido);
     setTab("chat");
-    setMensajes([]);
-    cargarMensajes(pedido.id);
-  }
-
-  async function enviarMensaje() {
-    if (!puedeAcceder || accessRevokedRef.current || !hasAccess || !textoCorrecto.trim() || !chatPedido) return;
-    setEnviandoMsg(true);
-    const texto = textoCorrecto.trim();
-    try {
-      const { error } = await supabase.from('mensajes_chat').insert({
-        pedido_id: chatPedido.id,
-        autor_id:  props.session.user.id,
-        autor_rol: 'repartidor',
-        texto:     texto,
-      });
-      if (error) {
-        // Fallback: mostrar mensaje localmente si la tabla no existe
-        setMensajes(function(prev) {
-          return [...prev, { id: 'local-' + Date.now(), pedido_id: chatPedido!.id, autor: 'repartidor' as const, texto: texto, hora: new Date().toISOString() }];
-        });
-      } else {
-        cargarMensajes(chatPedido.id);
-      }
-    } catch(e) {
-      console.error('[Chat enviar]', e);
-    }
-    setTextoChat("");
-    setTextoCorrecto("");
-    setEnviandoMsg(false);
-  }
-
-  function formatHora(iso: string): string {
-    return new Date(iso).toLocaleTimeString("es-MX", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   }
 
   function formatFecha(iso: string): string {
@@ -426,245 +297,19 @@ export default function RepasDashboard(props: Props) {
     );
   }
 
-  // ── PANTALLA CHAT ──────────────────────────────────────────────────────────
   if (tab === "chat" && chatPedido) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--bg-base)",
-          color: "var(--text-primary)",
-          fontFamily: "system-ui,sans-serif",
-          maxWidth: "480px",
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
+      <PedidoChat
+        key={chatPedido.id}
+        session={props.session}
+        theme={props.theme}
+        pedido={chatPedido}
+        role={props.session.user.rol === "admin" || props.session.user.email === "uliseseven.7@gmail.com" ? "admin" : "repartidor"}
+        onBack={function () {
+          setTab("mis");
+          setChatPedido(null);
         }}
-      >
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            background: "var(--bg-nav)",
-            backdropFilter: "blur(20px)",
-            borderBottom: "1px solid var(--border-subtle)",
-            padding: "14px 16px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <button
-              onClick={function () {
-                setTab("mis");
-                setChatPedido(null);
-              }}
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "12px",
-                background: isDark
-                  ? "rgba(255,255,255,0.06)"
-                  : "rgba(0,0,0,0.06)",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-              }}
-            >
-              <ArrowLeft
-                style={{
-                  width: "18px",
-                  height: "18px",
-                  color: "var(--text-primary)",
-                }}
-              />
-            </button>
-            <div>
-              <p
-                style={{
-                  fontSize: "10px",
-                  color: "var(--text-muted)",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  margin: 0,
-                }}
-              >
-                Chat del pedido
-              </p>
-              <h2
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 900,
-                  color: "var(--text-primary)",
-                  margin: 0,
-                }}
-              >
-                {chatPedido.negocio_nombre ?? "Pedido"}
-              </h2>
-            </div>
-          </div>
-        </div>
-
-        {/* Mensajes */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            paddingBottom: "80px",
-          }}
-        >
-          {mensajes.map(function (m) {
-            const esMio = m.autor === "repartidor";
-            const esSistema = m.autor === "sistema";
-            if (esSistema)
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    textAlign: "center",
-                    fontSize: "11px",
-                    color: "var(--text-muted)",
-                    padding: "6px 12px",
-                    borderRadius: "12px",
-                    background: "var(--border-subtle)",
-                  }}
-                >
-                  {m.texto}
-                </div>
-              );
-            return (
-              <div
-                key={m.id}
-                style={{
-                  display: "flex",
-                  justifyContent: esMio ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: "75%",
-                    padding: "10px 14px",
-                    borderRadius: esMio
-                      ? "18px 18px 4px 18px"
-                      : "18px 18px 18px 4px",
-                    background: esMio
-                      ? "var(--color-yellow)"
-                      : "var(--bg-card)",
-                    border: `1px solid var(--border-subtle)`,
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      color: esMio ? "#020617" : "var(--text-primary)",
-                      margin: "0 0 4px 0",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {m.texto}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: "10px",
-                      color: esMio ? "rgba(2,6,23,0.5)" : "var(--text-muted)",
-                      margin: 0,
-                    }}
-                  >
-                    {formatHora(m.hora)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Input chat */}
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "100%",
-            maxWidth: "480px",
-            background: "var(--bg-nav)",
-            backdropFilter: "blur(20px)",
-            borderTop: "1px solid var(--border-subtle)",
-            padding: "12px 16px",
-          }}
-        >
-          {textoChat && textoCorrecto !== textoChat && (
-            <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: "8px",
-                background: "var(--color-yellow-dim)",
-                border: "1px solid rgba(250,204,21,0.3)",
-                marginBottom: "8px",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: "var(--color-yellow)",
-                  margin: 0,
-                }}
-              >
-                ✨ Texto corregido: <strong>{textoCorrecto}</strong>
-              </p>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: "8px" }}>
-            <input
-              value={textoChat}
-              onChange={function (e) {
-                setTextoChat(e.target.value);
-              }}
-              onKeyPress={function (e) {
-                if (e.key === "Enter") enviarMensaje();
-              }}
-              placeholder="Escribe un mensaje..."
-              style={{
-                flex: 1,
-                padding: "12px 14px",
-                borderRadius: "14px",
-                border: "1px solid var(--border-subtle)",
-                background: isDark
-                  ? "rgba(255,255,255,0.05)"
-                  : "rgba(0,0,0,0.04)",
-                color: "var(--text-primary)",
-                fontSize: "13px",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={enviarMensaje}
-              disabled={enviandoMsg || !textoCorrecto.trim()}
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "14px",
-                background: "var(--color-yellow)",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: "18px",
-              }}
-            >
-              {enviandoMsg ? "⏳" : "➤"}
-            </button>
-          </div>
-        </div>
-      </div>
+      />
     );
   }
 

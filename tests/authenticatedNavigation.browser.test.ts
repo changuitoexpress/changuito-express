@@ -21,6 +21,17 @@ const fixtureMerchant = {
   phone_number: "5550000000",
   description: "Isolated browser fixture",
 };
+const fixtureWrittenOrderMerchant = {
+  ...fixtureMerchant,
+  id: "browser-fixture-mandadito",
+  name: "Browser Fixture Oxxo",
+  category: "mandaditos",
+};
+const fixtureSecondWrittenOrderMerchant = {
+  ...fixtureWrittenOrderMerchant,
+  id: "browser-fixture-second-mandadito",
+  name: "Browser Fixture Seven Eleven",
+};
 
 async function findAvailablePort(): Promise<number> {
   return new Promise(function (resolve, reject) {
@@ -65,10 +76,14 @@ async function mockSupabase(
   email = "uliseseven.7@gmail.com",
   requestLog?: string[],
   requestDetails?: Array<{ method: string; path: string }>,
+  courierOrders: Array<{ id: string; name: string }> = [
+    { id: "browser-fixture-order", name: "Browser Fixture Delivery Order" },
+  ],
 ) {
   const mockState = {
     role,
     businessMembership: true,
+    refreshFails: false,
   };
   const deviceSessions = [
     {
@@ -103,10 +118,25 @@ async function mockSupabase(
       url.pathname === "/auth/v1/token" &&
       url.searchParams.get("grant_type") === "refresh_token"
     ) {
+      if (mockState.refreshFails) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "Temporary session refresh failure.",
+          }),
+        });
+        return;
+      }
       data = {
         ...createFixtureSession(userId, email),
         access_token: "browser-fixture-refreshed-access-token",
       };
+    } else if (
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "password"
+    ) {
+      data = createFixtureSession(userId, email);
     } else if (url.pathname === "/auth/v1/user") {
       data = {
         id: userId,
@@ -149,7 +179,7 @@ async function mockSupabase(
         : mockState.role === "cliente"
           ? acceptsObject
             ? null
-            : []
+            : [fixtureWrittenOrderMerchant, fixtureSecondWrittenOrderMerchant]
           : acceptsObject
             ? fixtureMerchant
             : [fixtureMerchant];
@@ -158,10 +188,10 @@ async function mockSupabase(
       request.method() === "GET" &&
       mockState.role === "repartidor"
     ) {
-      data = [
-        {
-          id: "browser-fixture-order",
-          negocio_nombre: "Browser Fixture Delivery Order",
+      data = courierOrders.map(function (order) {
+        return {
+          id: order.id,
+          negocio_nombre: order.name,
           cliente_email: "customer@example.test",
           detalle: "Delivery-only customer order details",
           direccion: "Delivery-only street address",
@@ -171,8 +201,8 @@ async function mockSupabase(
           canal: "web",
           created_at: "2026-10-27T10:00:00.000Z",
           repartidor_id: userId,
-        },
-      ];
+        };
+      });
     } else if (
       url.pathname === "/rest/v1/pedidos" &&
       request.method() === "HEAD" &&
@@ -352,18 +382,58 @@ it("renders every authenticated screen and returns to the dashboard", async func
   page.on("pageerror", function (error) {
     pageErrors.push(error.message);
   });
-  await mockSupabase(page);
+  const authMockState = await mockSupabase(page);
   await page.goto(appUrl);
 
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   const expiryWarning = page.getByRole("alert");
   await expiryWarning.waitFor({ state: "visible" });
+  const originalViewport = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 700 });
   assert.equal(
     await expiryWarning.innerText(),
     "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
     "The signed-in session expiry warning should clearly explain the upcoming expiry.",
   );
+  const expiryWarningBounds = await expiryWarning.evaluate(function (element) {
+    const bounds = element.getBoundingClientRect();
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      viewportWidth: window.innerWidth,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    };
+  });
+  assert.ok(
+    expiryWarningBounds.left >= 0 &&
+      expiryWarningBounds.right <= expiryWarningBounds.viewportWidth &&
+      expiryWarningBounds.scrollWidth <= expiryWarningBounds.clientWidth &&
+      expiryWarningBounds.scrollHeight <= expiryWarningBounds.clientHeight,
+    "The session expiry alert and its text should fit without clipping at 320px.",
+  );
+  if (originalViewport) await page.setViewportSize(originalViewport);
 
+  authMockState.refreshFails = true;
+  const refreshFailure = await page.evaluate(async function () {
+    const app = await import("/src/App.tsx");
+    const { error } = await app.supabase.auth.refreshSession();
+    return error?.message ?? null;
+  });
+  assert.ok(
+    refreshFailure,
+    "The fixture should make session refresh fail before expiry is resolved.",
+  );
+  await expiryWarning.waitFor({ state: "visible" });
+  assert.equal(
+    await expiryWarning.innerText(),
+    "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
+    "The accessible session expiry warning should remain visible after a failed refresh.",
+  );
+
+  authMockState.refreshFails = false;
   const refreshedExpiry = await page.evaluate(async function () {
     const app = await import("/src/App.tsx");
     const { data, error } = await app.supabase.auth.refreshSession();
@@ -947,6 +1017,383 @@ it("renders every authenticated screen and returns to the dashboard", async func
 
   await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");
+});
+
+it("restores courier chat drafts by order and clears them after sending or sign-out", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  const courierId = "browser-fixture-courier-drafts";
+  const courierEmail = "courier-drafts@example.test";
+  const firstOrder = {
+    id: "browser-fixture-order-first",
+    name: "First Courier Draft Order",
+  };
+  const secondOrder = {
+    id: "browser-fixture-order-second",
+    name: "Second Courier Draft Order",
+  };
+  const firstDraft = "Voy en camino y llegaré en cinco minutos.";
+  const secondDraft = "Dejaré el pedido en recepción.";
+  const context = await browser.newContext();
+  await context.addInitScript(
+    function (storedSession) {
+      if (!sessionStorage.getItem("courier-draft-session-initialized")) {
+        localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+        sessionStorage.setItem("courier-draft-session-initialized", "1");
+      }
+      localStorage.setItem("changuito-theme", "light");
+    },
+    createFixtureSession(courierId, courierEmail),
+  );
+  const page = await context.newPage();
+  const pageErrors: string[] = [];
+  page.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+  await mockSupabase(
+    page,
+    "repartidor",
+    courierId,
+    courierEmail,
+    undefined,
+    undefined,
+    [firstOrder, secondOrder],
+  );
+  await page.goto(appUrl);
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /Panel Repartidor/ }).click();
+  await page.getByText(firstOrder.name, { exact: true }).waitFor();
+  await page.getByText(secondOrder.name, { exact: true }).waitFor();
+
+  const draftKey = function (orderId: string) {
+    return (
+      "changuito-form-draft:" +
+      encodeURIComponent(courierId) +
+      ":courier-chat:" +
+      encodeURIComponent(orderId)
+    );
+  };
+  const messageBox = function () {
+    return page.getByRole("textbox", { name: "Escribe un mensaje" });
+  };
+  const openOrderChat = async function (orderName: string) {
+    await page.getByText(orderName, { exact: true }).click();
+    await page.getByRole("button", { name: "Chat" }).click();
+    await messageBox().waitFor();
+  };
+  const returnToOrders = async function () {
+    await page.locator("button").first().click();
+    await page.getByText(firstOrder.name, { exact: true }).waitFor();
+  };
+
+  await openOrderChat(firstOrder.name);
+  await messageBox().fill(firstDraft);
+  await returnToOrders();
+  await openOrderChat(secondOrder.name);
+  await messageBox().fill(secondDraft);
+
+  assert.deepEqual(
+    await page.evaluate(function (keys) {
+      return keys.map(function (key) {
+        return JSON.parse(localStorage.getItem(key) ?? "null")?.values ?? null;
+      });
+    }, [draftKey(firstOrder.id), draftKey(secondOrder.id)]),
+    [firstDraft, secondDraft],
+    "Each courier's unsent message should be saved separately for its order.",
+  );
+
+  await page.evaluate(function () {
+    localStorage.removeItem("sb-fixture-auth-token");
+  });
+  await page.reload();
+  await page.getByRole("heading", { name: "Entra a Changuito" }).waitFor();
+  await page.getByLabel("Correo electrónico").fill(courierEmail);
+  await page.getByRole("textbox", { name: "Contraseña" }).fill("fixture-password");
+  await page.locator("form").getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: /Panel Repartidor/ }).click();
+  await page.getByText(firstOrder.name, { exact: true }).waitFor();
+
+  await openOrderChat(firstOrder.name);
+  assert.equal(
+    await messageBox().inputValue(),
+    firstDraft,
+    "Reopening the same order after reauthentication should restore its draft.",
+  );
+  await returnToOrders();
+  await openOrderChat(secondOrder.name);
+  assert.equal(
+    await messageBox().inputValue(),
+    secondDraft,
+    "A different order should restore only its own draft.",
+  );
+
+  await returnToOrders();
+  await openOrderChat(firstOrder.name);
+  await page.getByRole("button", { name: "Enviar mensaje" }).click();
+  await page.waitForFunction(function () {
+    return (
+      document.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Escribe un mensaje"]',
+      )?.value === ""
+    );
+  });
+  assert.equal(
+    await messageBox().inputValue(),
+    "",
+    "A successfully sent message should clear the chat input.",
+  );
+  assert.equal(
+    await page.evaluate(function (key) {
+      return localStorage.getItem(key);
+    }, draftKey(firstOrder.id)),
+    null,
+    "A successfully sent message should remove its saved draft.",
+  );
+
+  await returnToOrders();
+  await page.locator("button").first().click();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.getByRole("button", { name: "Cerrar sesión", exact: true }).click();
+  await page.getByRole("heading", { name: "Entra a Changuito" }).waitFor();
+  assert.equal(
+    await page.evaluate(function (key) {
+      return localStorage.getItem(key);
+    }, draftKey(secondOrder.id)),
+    null,
+    "Explicit sign-out should clear remaining courier chat drafts.",
+  );
+  assert.deepEqual(pageErrors, [], "Courier chat recovery should not throw in the browser.");
+  await context.close();
+});
+
+it("restores handwritten delivery requests after reauthentication", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  const customerId = "written-order-fixture-customer";
+  const customerEmail = "written-order@example.test";
+  const context = await browser.newContext();
+  await context.addInitScript(
+    function (storedSession) {
+      if (!sessionStorage.getItem("fixture-session-initialized")) {
+        localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+        sessionStorage.setItem("fixture-session-initialized", "1");
+      }
+      localStorage.setItem("changuito-theme", "light");
+    },
+    createFixtureSession(customerId, customerEmail),
+  );
+  const page = await context.newPage();
+  const pageErrors: string[] = [];
+  page.on("pageerror", function (error) {
+    pageErrors.push(error.message);
+  });
+  await mockSupabase(page, "cliente", customerId, customerEmail);
+  await page.goto(appUrl);
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+
+  await page.getByRole("button", { name: "🛵 Mandaditos" }).click();
+  await page.getByRole("button", { name: "🏪 Conveniencia (2)" }).click();
+  await page.getByText(fixtureWrittenOrderMerchant.name, { exact: true }).click();
+  const writtenOrderDialog = page.getByRole("dialog", {
+    name: fixtureWrittenOrderMerchant.name,
+  });
+  const writtenOrderText =
+    "Recoger un paquete y dejarlo en la entrada principal.";
+  const secondWrittenOrderText = "Comprar dos garrafones de agua.";
+  await writtenOrderDialog
+    .getByPlaceholder("Ej: 1 pizza pepperoni mediana, 2 refrescos de cola...")
+    .fill(writtenOrderText);
+  await writtenOrderDialog
+    .getByRole("button", { name: "Cerrar pedido por escrito" })
+    .click();
+
+  const writtenOrderFormId =
+    "customer-written-order:" +
+    encodeURIComponent(fixtureWrittenOrderMerchant.id);
+  const writtenOrderDraftKey =
+    "changuito-form-draft:" +
+    encodeURIComponent(customerId) +
+    ":" +
+    writtenOrderFormId;
+  const activeWrittenOrderDraftKey =
+    "changuito-form-draft:" +
+    encodeURIComponent(customerId) +
+    ":customer-written-order-active";
+  assert.deepEqual(
+    await page.evaluate(function (draftKey) {
+      const draft = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      return draft?.values ?? null;
+    }, writtenOrderDraftKey),
+    writtenOrderText,
+    "The unfinished request should be saved under its customer and merchant.",
+  );
+  await page.getByText(fixtureSecondWrittenOrderMerchant.name, { exact: true }).click();
+  const secondWrittenOrderDialog = page.getByRole("dialog", {
+    name: fixtureSecondWrittenOrderMerchant.name,
+  });
+  await secondWrittenOrderDialog
+    .getByPlaceholder("Ej: 1 pizza pepperoni mediana, 2 refrescos de cola...")
+    .fill(secondWrittenOrderText);
+  const secondWrittenOrderFormId =
+    "customer-written-order:" +
+    encodeURIComponent(fixtureSecondWrittenOrderMerchant.id);
+  const secondWrittenOrderDraftKey =
+    "changuito-form-draft:" +
+    encodeURIComponent(customerId) +
+    ":" +
+    secondWrittenOrderFormId;
+  assert.deepEqual(
+    await page.evaluate(function (draftKey) {
+      const draft = JSON.parse(localStorage.getItem(draftKey) ?? "null");
+      return draft?.values ?? null;
+    }, activeWrittenOrderDraftKey),
+    {
+      merchantId: fixtureSecondWrittenOrderMerchant.id,
+    },
+    "The active request should identify the dialog to restore.",
+  );
+
+  await page.evaluate(function () {
+    localStorage.removeItem("sb-fixture-auth-token");
+  });
+  await page.reload();
+  await page.getByRole("heading", { name: "Entra a Changuito" }).waitFor();
+  await page.getByLabel("Correo electrónico").fill(customerEmail);
+  await page.getByRole("textbox", { name: "Contraseña" }).fill("fixture-password");
+  await page.locator("form").getByRole("button", { name: "Entrar" }).click();
+
+  const restoredDialog = page.getByRole("dialog", {
+    name: fixtureSecondWrittenOrderMerchant.name,
+  });
+  await restoredDialog.waitFor({ state: "visible" });
+  assert.equal(
+    await restoredDialog
+      .getByPlaceholder("Ej: 1 pizza pepperoni mediana, 2 refrescos de cola...")
+      .inputValue(),
+    secondWrittenOrderText,
+    "Reauthentication should reopen the latest request for its merchant.",
+  );
+  await restoredDialog.getByRole("button", { name: "Agregar al carrito" }).click();
+  assert.equal(
+    await page.evaluate(function (draftKey) {
+      return localStorage.getItem(draftKey);
+    }, secondWrittenOrderDraftKey),
+    null,
+    "Adding the request should clear that merchant's saved draft.",
+  );
+  assert.equal(
+    await page.evaluate(function (draftKey) {
+      return localStorage.getItem(draftKey);
+    }, activeWrittenOrderDraftKey),
+    null,
+    "Adding the request to the cart should clear its restore marker.",
+  );
+  assert.equal(
+    await page.evaluate(function () {
+      const cart = JSON.parse(localStorage.getItem("changuito-cart") ?? "[]");
+      return cart.some(function (item: { nombre?: string }) {
+        return item.nombre === "Comprar dos garrafones de agua.";
+      });
+    }),
+    true,
+    "The restored request should be added to the cart.",
+  );
+  assert.equal(
+    await page.evaluate(function (draftKey) {
+      return JSON.parse(localStorage.getItem(draftKey) ?? "null")?.values ?? null;
+    }, writtenOrderDraftKey),
+    writtenOrderText,
+    "Adding another merchant's request should leave the first draft intact.",
+  );
+  await page.getByRole("button", { name: "🛵 Mandaditos" }).click();
+  await page.getByRole("button", { name: "🏪 Conveniencia (2)" }).click();
+  await page.getByText(fixtureWrittenOrderMerchant.name, { exact: true }).click();
+  assert.equal(
+    await page
+      .getByRole("dialog", { name: fixtureWrittenOrderMerchant.name })
+      .getByPlaceholder("Ej: 1 pizza pepperoni mediana, 2 refrescos de cola...")
+      .inputValue(),
+    writtenOrderText,
+    "Opening the first merchant again should restore its separate draft.",
+  );
+
+  assert.deepEqual(pageErrors, [], "The interrupted request flow should not throw.");
 });
 
 it("recovers an existing account profile and returns to sign-in after retry", async function (t) {
