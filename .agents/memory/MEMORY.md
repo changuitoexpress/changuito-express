@@ -17,3 +17,4 @@
 - [Supabase live verification](supabase-live-verification.md) — connector readiness and table row estimates do not establish real project access or deployed schema state.
 - [YARVIS approvals](yarvis-approvals.md) — the embedded admin assistant must request explicit confirmation before every change.
 - [Publishing integrations](publishing-integrations.md) — legacy GitHub REST connections need API-based publishing; verify file integrity and the exact Vercel project.
+- [Session expiry notice](session-expiry-notice.md) — keep the warning dismissible, unobtrusive, and hidden until the session expiry changes.

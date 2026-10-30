@@ -1063,6 +1063,23 @@ export default function App() {
   useEffect(
     function () {
       setSessionExpiryWarning(false);
+      const dismissalKey = session?.user.id
+        ? "changuito.session-expiry-dismissed:" + session.user.id
+        : null;
+      let dismissedExpiry: string | null = null;
+      try {
+        dismissedExpiry = dismissalKey
+          ? window.localStorage.getItem(dismissalKey)
+          : null;
+      } catch {
+        dismissedExpiry = null;
+      }
+      if (
+        typeof session?.expiresAt === "number" &&
+        dismissedExpiry === String(session.expiresAt)
+      ) {
+        return function () {};
+      }
       return scheduleSessionExpiryWarning(session?.expiresAt, function () {
         setSessionExpiryWarning(true);
       });
@@ -1115,29 +1132,73 @@ export default function App() {
       <ToastRack toasts={toasts} />
       {sessionExpiryWarning && (
         <div
-          role="alert"
-          aria-live="assertive"
+          role="status"
+          aria-live="polite"
           aria-atomic="true"
           style={{
             position: "fixed",
             zIndex: 10001,
-            top: "16px",
+            top: "calc(env(safe-area-inset-top, 0px) + 12px)",
             left: "50%",
             transform: "translateX(-50%)",
-            width: "min(680px, calc(100% - 32px))",
+            width: "min(520px, calc(100% - 32px))",
             boxSizing: "border-box",
-            padding: "14px 18px",
+            overflow: "hidden",
             borderRadius: "14px",
-            background: "var(--color-yellow-dim)",
-            border: "1px solid var(--color-yellow)",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-subtle)",
             color: "var(--text-primary)",
-            fontSize: "14px",
-            fontWeight: 600,
+            fontSize: "12px",
+            fontWeight: 550,
+            lineHeight: 1.4,
             boxShadow: "var(--shadow-float)",
           }}
         >
-          Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas
-          que iniciar sesión nuevamente.
+          <div
+            aria-hidden="true"
+            style={{
+              height: "4px",
+              background:
+                "linear-gradient(90deg, #159447 0% 25%, #F6C945 25% 50%, #E84844 50% 75%, #2979DA 75% 100%)",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 11px 10px 14px" }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              Tu sesión está por vencer. Guarda tu trabajo; quizá tengas que iniciar sesión nuevamente.
+            </span>
+            <button
+              type="button"
+              aria-label="Descartar aviso de vencimiento de sesión"
+              title="Cerrar aviso"
+              onClick={function () {
+                if (session?.user.id && typeof session.expiresAt === "number") {
+                  try {
+                    window.localStorage.setItem(
+                      "changuito.session-expiry-dismissed:" + session.user.id,
+                      String(session.expiresAt),
+                    );
+                  } catch {
+                    // Dismiss the current banner even when browser storage is unavailable.
+                  }
+                }
+                setSessionExpiryWarning(false);
+              }}
+              style={{
+                width: "32px",
+                height: "32px",
+                flexShrink: 0,
+                display: "grid",
+                placeItems: "center",
+                borderRadius: "10px",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-base)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+              }}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       )}
       {pwa.mostrar && (
