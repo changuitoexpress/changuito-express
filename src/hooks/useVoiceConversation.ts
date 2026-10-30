@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 interface Options {
   open: boolean;
   busy: boolean;
+  assistantName?: string;
   onTurn: (text: string) => Promise<void>;
   onNotice: (text: string) => void;
 }
@@ -25,6 +26,9 @@ export function useVoiceConversation(options: Options) {
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState("Conversación apagada");
   const [transcript, setTranscript] = useState("");
+  function assistantStatus(message: string) {
+    return (current.current.assistantName ?? "Changui") + " " + message;
+  }
 
   function normalizarVoz(texto: string) {
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -127,7 +131,7 @@ export function useVoiceConversation(options: Options) {
           return;
         }
         waitingRef.current = true;
-        setStatus("Changui está pensando…");
+        setStatus(assistantStatus("está pensando…"));
         setTranscript("");
         void current.current.onTurn(words).finally(function () {
           waitingRef.current = false;
@@ -185,7 +189,7 @@ export function useVoiceConversation(options: Options) {
         if (!enabledRef.current || !current.current.open) return;
         if (interruptedRef.current && words) {
           waitingRef.current = true;
-          setStatus("Changui está pensando…");
+          setStatus(assistantStatus("está pensando…"));
           setTranscript("");
           void current.current.onTurn(words).finally(function () {
             waitingRef.current = false;
@@ -252,7 +256,7 @@ export function useVoiceConversation(options: Options) {
     interruptedRef.current = false;
     spokenTextRef.current = text;
     utteranceRef.current = utterance;
-    setStatus("Changui te está hablando · puedes interrumpir");
+    setStatus(assistantStatus("te está hablando · puedes interrumpir"));
     utterance.onend = function () {
       utteranceRef.current = null;
       speakingRef.current = false;
