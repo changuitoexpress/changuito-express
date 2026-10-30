@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, ShoppingBag, Users, Store, TrendingUp, Clock,
-  CheckCircle, XCircle, RefreshCw, WifiOff, Phone, MessageCircle,
+  CheckCircle, XCircle, RefreshCw, WifiOff, Phone, MessageCircle, Bot,
   ChevronDown, ChevronUp, LogOut, Star, Package
 } from 'lucide-react';
 import { supabase, ThemeToggle } from './App';
@@ -13,6 +13,15 @@ import AdminNegocios from './admin/AdminNegocios';
 import AdminTablas from './admin/AdminTablas';
 import AdminMandaditos from './admin/AdminMandaditos';
 import PedidoChat from './components/PedidoChat';
+import YarvisPanel from './admin/yarvis-ui/YarvisPanel';
+import type {
+  YarvisActionType,
+  YarvisConfirmAction,
+  YarvisHistoryEntry,
+  YarvisPendingAction,
+  YarvisReply,
+  YarvisSendMessage,
+} from './admin/yarvisTypes';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
@@ -104,6 +113,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [solicitudes, setSolicitudes]     = useState<any[]>([]);
   const [resolviendoSol, setResolviendoSol] = useState<string | null>(null);
   const [syncMsg, setSyncMsg]             = useState('');
+  const [yarvisAbierto, setYarvisAbierto] = useState(false);
   const isDark = props.theme === 'dark';
 
   // Verificar que sea admin
@@ -283,6 +293,129 @@ export default function AdminGodMode(props: AdminProps) {
     fetchMerchants(); fetchMetricas();
   }
 
+  async function obtenerTokenYarvis(): Promise<string> {
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (sessionError || !token) throw new Error('Tu sesión venció. Vuelve a entrar.');
+    if (data.session?.user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      throw new Error('Solo el administrador general puede usar YARVIS.');
+    }
+    return token;
+  }
+
+  async function solicitarYarvis(
+    operation: 'chat' | 'execute',
+    payload: Record<string, unknown>,
+  ): Promise<any> {
+    const token = await obtenerTokenYarvis();
+    const response = await fetch('/api/admin-yarvis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ operation, ...payload }),
+    });
+    const body = await response.json().catch(function () { return null; });
+    if (!response.ok) throw new Error(body?.error ?? 'No se pudo completar la solicitud.');
+    return body;
+  }
+
+  const enviarMensajeYarvis: YarvisSendMessage = async function (
+    message: string,
+    history: YarvisHistoryEntry[],
+    imageName: string | null,
+  ): Promise<YarvisReply> {
+    const result = await solicitarYarvis('chat', { message, history, imageName });
+    if (typeof result?.reply !== 'string') throw new Error('La respuesta del asistente no es válida.');
+    const action = result.action;
+    if (action && (
+      typeof action !== 'object'
+      || typeof action.summary !== 'string'
+      || typeof action.confirmationToken !== 'string'
+    )) {
+      throw new Error('La propuesta de cambio no es válida.');
+    }
+    return { reply: result.reply, action: action ?? null };
+  };
+
+  const confirmarAccionYarvis: YarvisConfirmAction = async function (
+    action: YarvisPendingAction,
+    image: File | null,
+  ): Promise<string> {
+    if (!action.confirmationToken) throw new Error('La propuesta venció. Pídele a YARVIS que la prepare otra vez.');
+    const tiposFoto: YarvisActionType[] = ['upload_merchant_photo', 'upload_product_photo'];
+    const requiereFoto = tiposFoto.includes(action.type);
+    if (requiereFoto && !image) throw new Error('Adjunta la foto antes de confirmar este cambio.');
+    if (image && !requiereFoto) {
+      throw new Error('Esta propuesta no incluye la foto adjunta. Cancela y solicita el cambio de foto por separado.');
+    }
+
+    let uploadedPath: string | null = null;
+    let imageUrl: string | null = null;
+    if (image && requiereFoto) {
+      const extensions: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/heic': 'heic',
+      };
+      const extension = extensions[image.type];
+      if (!extension) throw new Error('Usa una imagen JPG, PNG, WebP o HEIC.');
+      if (image.size <= 0 || image.size > 5 * 1024 * 1024) {
+        throw new Error('La imagen debe pesar menos de 5 MB.');
+      }
+
+      const merchantId = String(action.payload.merchantId ?? '');
+      let folder = '';
+      if (action.type === 'upload_merchant_photo') {
+        const merchantTarget = String(action.payload.merchantId ?? '');
+        if (!merchantTarget) throw new Error('No encontré el negocio de la propuesta.');
+        folder = 'negocios/yarvis/' + merchantTarget;
+      } else {
+        const productId = String(action.payload.productId ?? '');
+        if (!merchantId || !productId) throw new Error('No encontré el producto de la propuesta.');
+        folder = 'productos/' + merchantId + '/yarvis/' + productId;
+      }
+      const safeFileId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now());
+      uploadedPath = folder + '/' + safeFileId + '.' + extension;
+      const upload = await supabase.storage.from('changuito-fotos').upload(uploadedPath, image, {
+        cacheControl: '3600',
+        contentType: image.type,
+        upsert: false,
+      });
+      if (upload.error) throw new Error('No se pudo subir la imagen: ' + upload.error.message);
+      imageUrl = supabase.storage.from('changuito-fotos').getPublicUrl(uploadedPath).data.publicUrl;
+    }
+
+    try {
+      const result = await solicitarYarvis('execute', {
+        confirmationToken: action.confirmationToken,
+        imageUrl,
+      });
+      if (result?.ok !== true || typeof result.message !== 'string') {
+        throw new Error('El servidor no confirmó el cambio.');
+      }
+      return result.message;
+    } catch (error) {
+      if (uploadedPath) {
+        const cleanup = await supabase.storage.from('changuito-fotos').remove([uploadedPath]);
+        if (cleanup.error) console.error('YARVIS could not remove the unused uploaded image.');
+      }
+      throw error;
+    }
+  };
+
+  async function actualizarPanelDesdeYarvis() {
+    const [merchantResult, courierResult] = await Promise.all([
+      supabase.from('merchants').select('*').order('name'),
+      supabase.from('perfiles').select('id, nombre').eq('rol', 'repartidor'),
+    ]);
+    if (merchantResult.error) setError('No pude actualizar los negocios: ' + merchantResult.error.message);
+    else setMerchants(merchantResult.data ?? []);
+    if (courierResult.error) setError('No pude actualizar los repartidores: ' + courierResult.error.message);
+    else setRepartidores(courierResult.data ?? []);
+    fetchPedidos();
+    fetchMetricas();
+  }
+
   function formatFecha(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleDateString('es-MX', { day:'2-digit', month:'short' }) + ' ' + d.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
@@ -306,6 +439,7 @@ export default function AdminGodMode(props: AdminProps) {
   }
 
   return (
+    <>
     <div style={{ minHeight:'100vh', background:'var(--bg-base)', color:'var(--text-primary)', fontFamily:'system-ui,sans-serif', maxWidth:'1100px', margin:'0 auto' }}>
 
       {/* Header */}
@@ -321,6 +455,11 @@ export default function AdminGodMode(props: AdminProps) {
             </div>
           </div>
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+            <button type="button" onClick={function () { setYarvisAbierto(true); }} aria-label="Abrir asistente YARVIS"
+              style={{ height:'36px', padding:'0 11px', borderRadius:'12px', background:'var(--color-yellow-dim)', color:'var(--color-yellow)', border:'1px solid rgba(250,204,21,.24)', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', cursor:'pointer', fontSize:'11px', fontWeight:850 }}>
+              <Bot style={{ width:'16px', height:'16px' }} />
+              <span>YARVIS</span>
+            </button>
             <button onClick={function(){ fetchMetricas(); fetchPedidos(); fetchMerchants(); fetchSolicitudes(); }} style={{ width:'36px', height:'36px', borderRadius:'12px', background:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
               <RefreshCw style={{ width:'16px', height:'16px', color:'var(--text-muted)' }} />
             </button>
@@ -725,5 +864,15 @@ export default function AdminGodMode(props: AdminProps) {
         )}
       </div>
     </div>
+    {yarvisAbierto && (
+      <YarvisPanel
+        theme={props.theme}
+        onClose={function () { setYarvisAbierto(false); }}
+        onSendMessage={enviarMensajeYarvis}
+        onConfirmAction={confirmarAccionYarvis}
+        onRefresh={actualizarPanelDesdeYarvis}
+      />
+    )}
+    </>
   );
 }
