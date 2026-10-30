@@ -11,8 +11,8 @@ Use inline styles, `function(){}` rather than runtime arrow functions, and prese
 **How to apply:** Follow these constraints when editing app code; do not translate
 the existing Spanish UI as part of setup or unrelated changes.
 
-The user wants Replit Agent to handle project changes through GitHub and Vercel, and Supabase SQL once that connection is available.
+The user wants Replit Agent to manage this project's changes and Vercel deployments, and Supabase SQL once that connection is available.
 
-**Why:** The user asked to connect these services so the agent can make the necessary changes directly.
+**Why:** The user asked Replit Agent to handle the connected services directly instead of guiding them through each deployment.
 
-**How to apply:** Prefer the connected GitHub and Vercel APIs for the project's code and deployments. Keep Supabase access scoped to this project and review SQL before applying it.
+**How to apply:** Prefer the connected GitHub and Vercel APIs for project changes and deployments. Keep Supabase access scoped to this project and review SQL before applying it.
