@@ -386,13 +386,15 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await page.goto(appUrl);
 
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
-  const expiryWarning = page.getByRole("alert");
+  const expiryWarning = page.getByRole("status").filter({
+    hasText: "Tu sesión está por vencer. Guarda tu trabajo; quizá tengas que iniciar sesión nuevamente.",
+  });
   await expiryWarning.waitFor({ state: "visible" });
   const originalViewport = page.viewportSize();
   await page.setViewportSize({ width: 320, height: 700 });
   assert.equal(
     await expiryWarning.innerText(),
-    "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
+    "Tu sesión está por vencer. Guarda tu trabajo; quizá tengas que iniciar sesión nuevamente.",
     "The signed-in session expiry warning should clearly explain the upcoming expiry.",
   );
   const expiryWarningBounds = await expiryWarning.evaluate(function (element) {
@@ -414,6 +416,17 @@ it("renders every authenticated screen and returns to the dashboard", async func
       expiryWarningBounds.scrollHeight <= expiryWarningBounds.clientHeight,
     "The session expiry alert and its text should fit without clipping at 320px.",
   );
+  const warningAppearance = await expiryWarning.evaluate(function (element) {
+    const stripe = element.firstElementChild;
+    return {
+      background: getComputedStyle(element).backgroundColor,
+      stripeHeight: stripe ? getComputedStyle(stripe).height : "",
+      stripeGradient: stripe ? getComputedStyle(stripe).backgroundImage : "",
+    };
+  });
+  assert.equal(warningAppearance.background, "rgb(255, 255, 255)");
+  assert.equal(warningAppearance.stripeHeight, "4px");
+  assert.match(warningAppearance.stripeGradient, /linear-gradient/);
   if (originalViewport) await page.setViewportSize(originalViewport);
 
   authMockState.refreshFails = true;
@@ -429,9 +442,21 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await expiryWarning.waitFor({ state: "visible" });
   assert.equal(
     await expiryWarning.innerText(),
-    "Tu sesión está por vencer. Guardá tu trabajo; es posible que tengas que iniciar sesión nuevamente.",
+    "Tu sesión está por vencer. Guarda tu trabajo; quizá tengas que iniciar sesión nuevamente.",
     "The accessible session expiry warning should remain visible after a failed refresh.",
   );
+  await expiryWarning.getByRole("button", { name: "Descartar aviso de vencimiento de sesión" }).click();
+  await expiryWarning.waitFor({ state: "hidden" });
+  await page.reload();
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+  await expiryWarning.waitFor({ state: "hidden" });
+  const repeatedRefreshFailure = await page.evaluate(async function () {
+    const app = await import("/src/App.tsx");
+    const { error } = await app.supabase.auth.refreshSession();
+    return error?.message ?? null;
+  });
+  assert.ok(repeatedRefreshFailure, "The session refresh should still fail in this fixture.");
+  await expiryWarning.waitFor({ state: "hidden" });
 
   authMockState.refreshFails = false;
   const refreshedExpiry = await page.evaluate(async function () {
