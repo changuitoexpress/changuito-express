@@ -210,6 +210,25 @@ export default function ChanguiAssistant(props: Props) {
         .in("id", propuesta.map(function (item) { return item.id; }));
       if (!mountedRef.current) return;
       if (error || !data) throw new Error("No pude revisar los precios actuales. Intenta confirmar de nuevo.");
+      const latestProducts = new Map(data.map(function (producto) {
+        return [String(producto.id), producto];
+      }));
+      const proposedIds = new Set(propuesta.map(function (item) { return item.id; }));
+      setProductos(function (current) {
+        return current.map(function (producto) {
+          if (!proposedIds.has(producto.id)) return producto;
+          const actual = latestProducts.get(producto.id);
+          if (!actual) return { ...producto, is_available: false };
+          const precioActual = Number(actual.price);
+          return {
+            ...producto,
+            merchant_id: String(actual.merchant_id),
+            name: actual.name,
+            price: Number.isFinite(precioActual) && precioActual >= 0 ? precioActual : producto.price,
+            is_available: Boolean(actual.is_available),
+          };
+        });
+      });
       const actualizados: PropuestaItem[] = [];
       let huboCambios = false;
       for (const item of propuesta) {

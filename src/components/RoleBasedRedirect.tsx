@@ -3,6 +3,7 @@ import React from "react";
 import { LogOut, Clock } from "lucide-react";
 // IMPORTANTE: Se agregaron los dos puntos (../) para buscar el archivo fuera de la carpeta components
 import DashboardMarketplace from "../Dashboard";
+import type { CartItem } from "../Dashboard";
 
 interface UserSession {
   user: { id: string; email?: string; aud: string; created_at: string };
@@ -19,6 +20,8 @@ interface Props {
   renderAdmin: () => React.ReactNode;
   theme?: 'light' | 'dark';
   onThemeToggle?: () => void;
+  carritoGlobal: CartItem[];
+  onUpdateCarritoGlobal: (items: CartItem[]) => void;
 }
 
 // Pantalla placeholder para roles aún sin dashboard propio
@@ -163,6 +166,8 @@ export default function RoleBasedRedirect(props: Props) {
           session={session}
           theme={themeValue}
           onThemeToggle={onThemeToggleFn}
+          carritoGlobal={props.carritoGlobal}
+          onUpdateCarritoGlobal={props.onUpdateCarritoGlobal}
         />
       );
   }
