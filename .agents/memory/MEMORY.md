@@ -1,5 +1,5 @@
 - [ChanguitoAI integration](changuitoai-integration.md) — keep controlled abierto/onCerrar props; cart items must match CartItem shape (negocio/negocio_id/phone_number) or checkout crashes.
-- [Project rules](project-rules.md) — preserve the user's coding conventions and manual GitHub → Vercel publishing process.
+- [Project rules](project-rules.md) — preserve coding conventions; use connected GitHub, Vercel and Supabase services for authorized project work.
 - [Admin access status](admin-access-status.md) — the user reports the Supabase SQL is applied and their account now has the admin role.
 - [Premium redesign direction](premium-redesign.md) — redesign Changuito Express one screen at a time, using the agent's visual judgment and preserving behavior.
 - [Isolated auth recovery](isolated-auth-recovery.md) — password verification for recovery flows must not mutate the app’s active session or trigger its auth listener.
@@ -14,3 +14,4 @@
 - [Customer navigation](customer-navigation.md) — Changui Súper opens products directly; restaurant shortcuts precede Mandaditos, including written restaurant orders.
 - [God Mode admin scope](god-mode-admin.md) — modular admin under src/admin; DB changes only in additive supabase_admin_upgrade.sql; one order row per business.
 - [Order communication](order-communication.md) — customers and assigned couriers should exchange messages and product photos directly, with admin supervision.
+- [Supabase live verification](supabase-live-verification.md) — connector readiness and table row estimates do not establish real project access or deployed schema state.
