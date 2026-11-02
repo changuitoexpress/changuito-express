@@ -160,6 +160,62 @@ it(
 );
 
 it(
+  "allows a fresh sign-in after global sign-out",
+  { skip: configuredPrimaryValues === 0 },
+  async function () {
+    assertLocalTestConfiguration(testEmail as string, testPassword as string);
+
+    const initiatingStorageKey = `task77-initiator-${randomUUID()}`;
+    const freshStorageKey = `task77-fresh-${randomUUID()}`;
+    const initiatingClient = createTestClient(
+      initiatingStorageKey,
+      new TestAuthStorage(),
+    );
+
+    try {
+      const initialSignIn = await initiatingClient.auth.signInWithPassword({
+        email: testEmail as string,
+        password: testPassword as string,
+      });
+      assert.equal(initialSignIn.error, null);
+      assert.ok(initialSignIn.data.session);
+
+      await signOutEverywhere(initiatingClient);
+      const signedOutSession = await initiatingClient.auth.getSession();
+      assert.equal(signedOutSession.data.session, null);
+
+      const freshClient = createTestClient(
+        freshStorageKey,
+        new TestAuthStorage(),
+      );
+      try {
+        const freshSignIn = await freshClient.auth.signInWithPassword({
+          email: testEmail as string,
+          password: testPassword as string,
+        });
+        assert.equal(freshSignIn.error, null);
+        assert.ok(freshSignIn.data.session);
+        assert.equal(
+          freshSignIn.data.session.user.id,
+          initialSignIn.data.session.user.id,
+        );
+
+        const restoredSession = await freshClient.auth.getSession();
+        assert.equal(restoredSession.error, null);
+        assert.equal(
+          restoredSession.data.session?.user.id,
+          initialSignIn.data.session.user.id,
+        );
+      } finally {
+        await freshClient.auth.signOut({ scope: "local" }).catch(function () {});
+      }
+    } finally {
+      await initiatingClient.auth.signOut({ scope: "local" }).catch(function () {});
+    }
+  },
+);
+
+it(
   "keeps a different account signed in after global sign-out",
   {
     skip:
