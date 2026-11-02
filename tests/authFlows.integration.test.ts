@@ -8,16 +8,33 @@ const testUrl = process.env.SUPABASE_TEST_URL;
 const testAnonKey = process.env.SUPABASE_TEST_ANON_KEY;
 const testEmail = process.env.SUPABASE_TEST_EMAIL;
 const testPassword = process.env.SUPABASE_TEST_PASSWORD;
-const configuredValues = [
+const otherTestEmail = process.env.SUPABASE_TEST_OTHER_EMAIL;
+const otherTestPassword = process.env.SUPABASE_TEST_OTHER_PASSWORD;
+const configuredPrimaryValues = [
   testUrl,
   testAnonKey,
   testEmail,
   testPassword,
 ].filter(Boolean).length;
+const configuredOtherAccountValues = [otherTestEmail, otherTestPassword].filter(
+  Boolean,
+).length;
 
-if (configuredValues > 0 && configuredValues < 4) {
+if (configuredPrimaryValues > 0 && configuredPrimaryValues < 4) {
   throw new Error(
     "Set SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY, SUPABASE_TEST_EMAIL, and SUPABASE_TEST_PASSWORD together.",
+  );
+}
+
+if (configuredPrimaryValues === 0 && configuredOtherAccountValues > 0) {
+  throw new Error(
+    "Configure the primary local test account before setting the second account.",
+  );
+}
+
+if (configuredOtherAccountValues === 1) {
+  throw new Error(
+    "Set SUPABASE_TEST_OTHER_EMAIL and SUPABASE_TEST_OTHER_PASSWORD together.",
   );
 }
 
@@ -37,7 +54,7 @@ class TestAuthStorage {
   }
 }
 
-function assertLocalTestConfiguration() {
+function assertLocalTestConfiguration(email: string, password: string) {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(testUrl as string);
@@ -57,8 +74,8 @@ function assertLocalTestConfiguration() {
   }
 
   if (
-    !(testEmail as string).toLowerCase().endsWith("@example.test") ||
-    !testPassword
+    !email.toLowerCase().endsWith("@example.test") ||
+    !password
   ) {
     throw new Error(
       "Use a dedicated local auth test account with an @example.test email.",
@@ -80,9 +97,9 @@ function createTestClient(storageKey: string, storage: TestAuthStorage) {
 
 it(
   "revokes another saved device session after global sign-out",
-  { skip: configuredValues === 0 },
+  { skip: configuredPrimaryValues === 0 },
   async function () {
-    assertLocalTestConfiguration();
+    assertLocalTestConfiguration(testEmail as string, testPassword as string);
 
     const initiatingStorageKey = `task39-initiator-${randomUUID()}`;
     const remoteStorageKey = `task39-remote-${randomUUID()}`;
@@ -137,6 +154,90 @@ it(
       await Promise.all([
         initiatingClient.auth.signOut({ scope: "local" }).catch(function () {}),
         remoteClient.auth.signOut({ scope: "local" }).catch(function () {}),
+      ]);
+    }
+  },
+);
+
+it(
+  "keeps a different account signed in after global sign-out",
+  {
+    skip:
+      configuredPrimaryValues === 0
+        ? "Local Supabase test credentials are not configured."
+        : configuredOtherAccountValues === 0
+          ? "Set SUPABASE_TEST_OTHER_EMAIL and SUPABASE_TEST_OTHER_PASSWORD to run the cross-account check."
+          : false,
+  },
+  async function () {
+    assertLocalTestConfiguration(testEmail as string, testPassword as string);
+    assertLocalTestConfiguration(
+      otherTestEmail as string,
+      otherTestPassword as string,
+    );
+    assert.notEqual(
+      (testEmail as string).toLowerCase(),
+      (otherTestEmail as string).toLowerCase(),
+      "The two test accounts must use different email addresses.",
+    );
+
+    const initiatingStorageKey = `task76-initiator-${randomUUID()}`;
+    const otherAccountStorageKey = `task76-other-account-${randomUUID()}`;
+    const initiatingClient = createTestClient(
+      initiatingStorageKey,
+      new TestAuthStorage(),
+    );
+    const otherAccountStorage = new TestAuthStorage();
+    const otherAccountClient = createTestClient(
+      otherAccountStorageKey,
+      otherAccountStorage,
+    );
+
+    try {
+      const initiatingSignIn = await initiatingClient.auth.signInWithPassword({
+        email: testEmail as string,
+        password: testPassword as string,
+      });
+      assert.equal(initiatingSignIn.error, null);
+      assert.ok(initiatingSignIn.data.session);
+
+      const otherAccountSignIn =
+        await otherAccountClient.auth.signInWithPassword({
+          email: otherTestEmail as string,
+          password: otherTestPassword as string,
+        });
+      assert.equal(otherAccountSignIn.error, null);
+      assert.ok(otherAccountSignIn.data.session);
+      assert.notEqual(
+        otherAccountSignIn.data.session.user.id,
+        initiatingSignIn.data.session.user.id,
+        "The test accounts must belong to different users.",
+      );
+
+      await signOutEverywhere(initiatingClient);
+      const initiatingSession = await initiatingClient.auth.getSession();
+      assert.equal(initiatingSession.data.session, null);
+
+      const refreshedOtherAccount =
+        await otherAccountClient.auth.refreshSession();
+      assert.equal(refreshedOtherAccount.error, null);
+      assert.ok(refreshedOtherAccount.data.session);
+      assert.equal(
+        refreshedOtherAccount.data.session.user.id,
+        otherAccountSignIn.data.session.user.id,
+      );
+
+      const restoredOtherAccount =
+        await otherAccountClient.auth.getSession();
+      assert.equal(restoredOtherAccount.error, null);
+      assert.equal(
+        restoredOtherAccount.data.session?.user.id,
+        otherAccountSignIn.data.session.user.id,
+      );
+    } finally {
+      await Promise.all([
+        initiatingClient.auth.signOut({ scope: "local" }).catch(function () {}),
+        otherAccountClient.auth.signOut({ scope: "local" }).catch(function () {}),
       ]);
     }
   },
