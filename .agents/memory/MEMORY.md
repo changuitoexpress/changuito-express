@@ -19,3 +19,4 @@
 - [YARVIS approvals](yarvis-approvals.md) — the embedded admin assistant must request explicit confirmation before every change.
 - [Publishing integrations](publishing-integrations.md) — legacy GitHub REST connections need API-based publishing; verify file integrity and the exact Vercel project.
 - [Session expiry notice](session-expiry-notice.md) — keep the warning dismissible, unobtrusive, and hidden until the session expiry changes.
+- [TypeScript browser tests](typescript-browser-tests.md) — Node 20 cannot execute browser `.test.ts` files directly; transpile them with the installed TypeScript compiler first.

@@ -84,6 +84,7 @@ async function mockSupabase(
     role,
     businessMembership: true,
     refreshFails: false,
+    deviceSessionListFailuresRemaining: 0,
   };
   const deviceSessions = [
     {
@@ -226,6 +227,15 @@ async function mockSupabase(
     } else if (url.pathname === "/storage/v1/object/public/changuito-fotos") {
       data = {};
     } else if (url.pathname === "/rest/v1/rpc/list_my_device_sessions") {
+      if (mockState.deviceSessionListFailuresRemaining > 0) {
+        mockState.deviceSessionListFailuresRemaining -= 1;
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Temporary device-list failure." }),
+        });
+        return;
+      }
       data = deviceSessions;
     } else if (url.pathname === "/rest/v1/rpc/revoke_my_device_session") {
       const body = request.postDataJSON() as { p_session_id?: string };
@@ -1109,16 +1119,36 @@ it("lets users add, edit, and remove a private device name", async function (t) 
     createFixtureSession(fixtureUserId, "uliseseven.7@gmail.com"),
   );
   const page = await context.newPage();
-  await mockSupabase(page);
+  const mockState = await mockSupabase(page);
+  mockState.deviceSessionListFailuresRemaining = 1;
   await page.goto(appUrl);
   await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
 
   await page.getByRole("button", { name: "Abrir menú" }).click();
   const deviceMenu = page.getByRole("dialog", { name: "Menú de navegación" });
   await deviceMenu.getByRole("button", { name: /Dispositivos conectados/ }).click();
+  await deviceMenu
+    .getByRole("alert")
+    .getByText(/No pudimos cargar tus dispositivos/)
+    .waitFor();
+  const retryDevicesButton = deviceMenu.getByRole("button", {
+    name: "Reintentar carga de dispositivos",
+  });
+  await retryDevicesButton.waitFor();
+  const localSignOutButton = deviceMenu.getByRole("button", {
+    name: "Cerrar sesión",
+    exact: true,
+  });
+  const globalSignOutButton = deviceMenu.getByRole("button", {
+    name: "Cerrar sesión en todos los dispositivos",
+  });
+  assert.equal(await localSignOutButton.isEnabled(), true);
+  assert.equal(await globalSignOutButton.isEnabled(), true);
+  await retryDevicesButton.click();
   const remoteDeviceCard = page
     .getByRole("listitem")
     .filter({ hasText: "Firefox · Mac" });
+  await remoteDeviceCard.waitFor();
   const labelInput = remoteDeviceCard.getByRole("textbox", {
     name: "Nombre privado para Firefox · Mac",
   });

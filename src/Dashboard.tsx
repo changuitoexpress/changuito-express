@@ -4499,7 +4499,11 @@ export default function Dashboard(props: DashboardProps) {
                       type="button"
                       onClick={function () { void cargarDispositivos(); }}
                       disabled={loadingDeviceSessions}
-                      aria-label="Actualizar dispositivos"
+                      aria-label={
+                        deviceSessionsError
+                          ? "Reintentar carga de dispositivos"
+                          : "Actualizar dispositivos"
+                      }
                       style={{ background: "transparent", border: "none", color: "var(--color-yellow)", cursor: loadingDeviceSessions ? "wait" : "pointer", padding: "5px", lineHeight: 0, flexShrink: 0 }}
                     >
                       <RefreshCw style={{ width: "15px", height: "15px", animation: loadingDeviceSessions ? "spin 1s linear infinite" : undefined }} />
