@@ -44,6 +44,7 @@ import type { AppSession, Theme } from "./App";
 import {
   listDeviceAuthSessions,
   revokeDeviceAuthSession,
+  saveDeviceAuthSessionLabel,
   signOut,
   signOutEverywhere,
 } from "./authFlows";
@@ -2859,6 +2860,8 @@ export default function Dashboard(props: DashboardProps) {
   const [deviceSessionsError, setDeviceSessionsError] = useState("");
   const [revokingDeviceSession, setRevokingDeviceSession] = useState("");
   const [deviceSessionsNotice, setDeviceSessionsNotice] = useState("");
+  const [deviceLabelDrafts, setDeviceLabelDrafts] = useState<Record<string, string>>({});
+  const [savingDeviceLabel, setSavingDeviceLabel] = useState("");
   const esAdmin =
     props.session.user.email === "uliseseven.7@gmail.com" ||
     props.session.user.rol === "admin";
@@ -3007,6 +3010,33 @@ export default function Dashboard(props: DashboardProps) {
       );
     } finally {
       setRevokingDeviceSession("");
+    }
+  }
+
+  async function guardarNombreDispositivo(session: DeviceAuthSession) {
+    const label = deviceLabelDrafts[session.session_id] ?? session.label ?? "";
+    setSavingDeviceLabel(session.session_id);
+    setDeviceSessionsError("");
+    setDeviceSessionsNotice("");
+    try {
+      await saveDeviceAuthSessionLabel(supabase, session.session_id, label);
+      setDeviceSessions(await listDeviceAuthSessions(supabase));
+      setDeviceLabelDrafts(function (drafts) {
+        const nextDrafts = { ...drafts };
+        delete nextDrafts[session.session_id];
+        return nextDrafts;
+      });
+      setDeviceSessionsNotice(
+        label.trim()
+          ? "Nombre del dispositivo guardado."
+          : "Nombre del dispositivo eliminado.",
+      );
+    } catch {
+      setDeviceSessionsError(
+        "No pudimos guardar el nombre. Revisá tu conexión e intentá de nuevo.",
+      );
+    } finally {
+      setSavingDeviceLabel("");
     }
   }
 
@@ -4507,8 +4537,13 @@ export default function Dashboard(props: DashboardProps) {
                             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "6px" }}>
                               <div style={{ minWidth: 0 }}>
                                 <p style={{ margin: "0 0 4px", color: "var(--text-primary)", fontSize: "12px", fontWeight: 800, overflowWrap: "anywhere" }}>
-                                  {deviceDescription(device.user_agent)}
+                                  {device.label || deviceDescription(device.user_agent)}
                                 </p>
+                                {device.label && (
+                                  <p style={{ margin: "0 0 4px", color: "var(--text-secondary)", fontSize: "10px", overflowWrap: "anywhere" }}>
+                                    {deviceDescription(device.user_agent)}
+                                  </p>
+                                )}
                                 <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "10px", lineHeight: 1.4 }}>
                                   {deviceActivityDate(device.updated_at ?? device.created_at)}
                                 </p>
@@ -4527,6 +4562,30 @@ export default function Dashboard(props: DashboardProps) {
                                   {revoking ? "Cerrando..." : "Cerrar sesión"}
                                 </button>
                               )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "9px" }}>
+                              <input
+                                type="text"
+                                aria-label={`Nombre privado para ${deviceDescription(device.user_agent)}`}
+                                placeholder="Agregar un nombre (opcional)"
+                                maxLength={40}
+                                value={deviceLabelDrafts[device.session_id] ?? device.label ?? ""}
+                                onChange={function (event) {
+                                  const value = event.currentTarget.value;
+                                  setDeviceLabelDrafts(function (drafts) {
+                                    return { ...drafts, [device.session_id]: value };
+                                  });
+                                }}
+                                style={{ minWidth: 0, flex: 1, padding: "7px 8px", borderRadius: "7px", border: "1px solid var(--border-subtle)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: "11px" }}
+                              />
+                              <button
+                                type="button"
+                                onClick={function () { void guardarNombreDispositivo(device); }}
+                                disabled={Boolean(savingDeviceLabel) || Boolean(revokingDeviceSession)}
+                                style={{ flexShrink: 0, borderRadius: "7px", padding: "7px 8px", border: "1px solid var(--border-subtle)", background: "var(--bg-card)", color: "var(--color-yellow)", fontSize: "10px", fontWeight: 800, cursor: savingDeviceLabel ? "wait" : "pointer", opacity: savingDeviceLabel && savingDeviceLabel !== device.session_id ? 0.55 : 1 }}
+                              >
+                                {savingDeviceLabel === device.session_id ? "Guardando..." : device.label ? "Guardar" : "Nombrar"}
+                              </button>
                             </div>
                           </li>
                         );

@@ -705,10 +705,23 @@ END $$;
 -- ─── 7. Sesiones de dispositivos ─────────────────────────────────────────────
 -- Expose only the signed-in user's session metadata. The caller's user and
 -- current session IDs come from Supabase's verified JWT, never from client input.
+CREATE TABLE IF NOT EXISTS public.device_session_labels (
+  user_id uuid NOT NULL,
+  session_id uuid NOT NULL,
+  label text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 40),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, session_id)
+);
+ALTER TABLE public.device_session_labels ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.device_session_labels FROM PUBLIC, anon, authenticated;
+
+-- Labels are only available through the authenticated, owner-scoped functions below.
+DROP FUNCTION IF EXISTS public.list_my_device_sessions();
 CREATE OR REPLACE FUNCTION public.list_my_device_sessions()
 RETURNS TABLE (
   session_id uuid,
   user_agent text,
+  label text,
   created_at timestamptz,
   updated_at timestamptz,
   is_current boolean
@@ -721,16 +734,62 @@ AS $$
   SELECT
     s.id,
     s.user_agent,
+    labels.label,
     s.created_at,
     s.updated_at,
     s.id = (auth.jwt() ->> 'session_id')::uuid
   FROM auth.sessions AS s
+  LEFT JOIN public.device_session_labels AS labels
+    ON labels.session_id = s.id
+    AND labels.user_id = s.user_id
   WHERE s.user_id = auth.uid()
     AND (s.not_after IS NULL OR s.not_after > now())
   ORDER BY COALESCE(s.updated_at, s.created_at) DESC;
 $$;
 REVOKE ALL ON FUNCTION public.list_my_device_sessions() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.list_my_device_sessions() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.set_my_device_session_label(
+  p_session_id uuid,
+  p_label text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_label text := btrim(p_label);
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Se requiere una sesión válida.';
+  END IF;
+  IF p_label IS NULL OR char_length(v_label) > 40 THEN
+    RAISE EXCEPTION 'El nombre del dispositivo debe tener 40 caracteres o menos.';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM auth.sessions AS s
+    WHERE s.id = p_session_id
+      AND s.user_id = auth.uid()
+      AND (s.not_after IS NULL OR s.not_after > now())
+  ) THEN
+    RETURN false;
+  END IF;
+
+  IF v_label = '' THEN
+    DELETE FROM public.device_session_labels
+    WHERE user_id = auth.uid() AND session_id = p_session_id;
+  ELSE
+    INSERT INTO public.device_session_labels (user_id, session_id, label, updated_at)
+    VALUES (auth.uid(), p_session_id, v_label, now())
+    ON CONFLICT (user_id, session_id)
+    DO UPDATE SET label = EXCLUDED.label, updated_at = EXCLUDED.updated_at;
+  END IF;
+  RETURN true;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.set_my_device_session_label(uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_my_device_session_label(uuid, text) TO authenticated;
 
 -- A user may revoke one of their own remote sessions, but cannot remove the
 -- session backing the current request or target another user's session.
@@ -746,6 +805,10 @@ BEGIN
   IF auth.uid() IS NULL OR auth.jwt() ->> 'session_id' IS NULL THEN
     RAISE EXCEPTION 'Se requiere una sesión válida.';
   END IF;
+
+  DELETE FROM public.device_session_labels AS labels
+  WHERE labels.session_id = p_session_id
+    AND labels.user_id = auth.uid();
 
   DELETE FROM auth.sessions AS s
   WHERE s.id = p_session_id

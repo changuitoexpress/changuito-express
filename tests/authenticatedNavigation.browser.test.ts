@@ -90,6 +90,7 @@ async function mockSupabase(
       session_id: "11111111-1111-4111-8111-111111111111",
       user_agent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",
+      label: null,
       created_at: "2026-10-26T10:00:00.000Z",
       updated_at: "2026-10-27T10:00:00.000Z",
       is_current: true,
@@ -98,6 +99,7 @@ async function mockSupabase(
       session_id: "22222222-2222-4222-8222-222222222222",
       user_agent:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Firefox/132.0",
+      label: null,
       created_at: "2026-10-25T08:00:00.000Z",
       updated_at: "2026-10-26T08:00:00.000Z",
       is_current: false,
@@ -232,6 +234,16 @@ async function mockSupabase(
       });
       if (sessionIndex >= 0) deviceSessions.splice(sessionIndex, 1);
       data = sessionIndex >= 0;
+    } else if (url.pathname === "/rest/v1/rpc/set_my_device_session_label") {
+      const body = request.postDataJSON() as {
+        p_session_id?: string;
+        p_label?: string;
+      };
+      const session = deviceSessions.find(function (item) {
+        return item.session_id === body.p_session_id;
+      });
+      if (session) session.label = body.p_label || null;
+      data = Boolean(session);
     }
 
     await route.fulfill({
@@ -480,6 +492,13 @@ it("renders every authenticated screen and returns to the dashboard", async func
   const remoteDeviceCard = page
     .getByRole("listitem")
     .filter({ hasText: "Firefox · Mac" });
+  await remoteDeviceCard
+    .getByRole("textbox", { name: "Nombre privado para Firefox · Mac" })
+    .fill("MacBook personal");
+  await remoteDeviceCard.getByRole("button", { name: "Nombrar" }).click();
+  await page.getByText("Nombre del dispositivo guardado.", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("MacBook personal", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("Firefox · Mac", { exact: true }).waitFor();
   page.once("dialog", function (dialog) {
     void dialog.accept();
   });
@@ -1042,6 +1061,84 @@ it("renders every authenticated screen and returns to the dashboard", async func
 
   await customerContext.close();
   assert.deepEqual(pageErrors, [], "Authenticated screens should not throw in the browser.");
+});
+
+it("lets users add, edit, and remove a private device name", async function (t) {
+  const port = await findAvailablePort();
+  const appUrl = `http://127.0.0.1:${port}`;
+  const vite = spawn(
+    process.execPath,
+    [
+      path.join(projectRoot, "node_modules/vite/bin/vite.js"),
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--strictPort",
+    ],
+    {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        VITE_SUPABASE_URL: supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: "browser-fixture-anon-key",
+      },
+      stdio: "ignore",
+    },
+  );
+  let browser: import("playwright").Browser | undefined;
+  t.after(async function () {
+    if (browser) await browser.close();
+    vite.kill("SIGTERM");
+  });
+
+  await waitForServer(appUrl, vite);
+  const browserExecutable =
+    process.env.CHROMIUM_PATH || "/repl/tools/bin/chromium";
+  browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(browserExecutable) ? { executablePath: browserExecutable } : {}),
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  });
+  const context = await browser.newContext();
+  await context.addInitScript(
+    function (storedSession) {
+      localStorage.setItem("sb-fixture-auth-token", JSON.stringify(storedSession));
+      localStorage.setItem("changuito-theme", "light");
+    },
+    createFixtureSession(fixtureUserId, "uliseseven.7@gmail.com"),
+  );
+  const page = await context.newPage();
+  await mockSupabase(page);
+  await page.goto(appUrl);
+  await page.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
+
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  const deviceMenu = page.getByRole("dialog", { name: "Menú de navegación" });
+  await deviceMenu.getByRole("button", { name: /Dispositivos conectados/ }).click();
+  const remoteDeviceCard = page
+    .getByRole("listitem")
+    .filter({ hasText: "Firefox · Mac" });
+  const labelInput = remoteDeviceCard.getByRole("textbox", {
+    name: "Nombre privado para Firefox · Mac",
+  });
+  await labelInput.fill("MacBook de casa");
+  await remoteDeviceCard.getByRole("button", { name: "Nombrar" }).click();
+  await page.getByText("Nombre del dispositivo guardado.", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("MacBook de casa", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("Firefox · Mac", { exact: true }).waitFor();
+
+  await labelInput.fill("MacBook de trabajo");
+  await remoteDeviceCard.getByRole("button", { name: "Guardar" }).click();
+  await remoteDeviceCard.getByText("MacBook de trabajo", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("MacBook de casa", { exact: true }).waitFor({
+    state: "detached",
+  });
+
+  await labelInput.fill("");
+  await remoteDeviceCard.getByRole("button", { name: "Guardar" }).click();
+  await page.getByText("Nombre del dispositivo eliminado.", { exact: true }).waitFor();
+  await remoteDeviceCard.getByText("Firefox · Mac", { exact: true }).waitFor();
 });
 
 it("restores courier chat drafts by order and clears them after sending or sign-out", async function (t) {

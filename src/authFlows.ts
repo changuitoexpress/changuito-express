@@ -36,6 +36,7 @@ const PROFILE_LOOKUP_TIMEOUT_MS = 1500;
 export interface DeviceAuthSession {
   session_id: string;
   user_agent: string | null;
+  label: string | null;
   created_at: string;
   updated_at: string | null;
   is_current: boolean;
@@ -487,6 +488,7 @@ export async function listDeviceAuthSessions(
         typeof session.session_id === "string" &&
         sessionIdPattern.test(session.session_id) &&
         (session.user_agent === null || typeof session.user_agent === "string") &&
+        (session.label === null || typeof session.label === "string") &&
         typeof session.created_at === "string" &&
         (session.updated_at === null || typeof session.updated_at === "string") &&
         typeof session.is_current === "boolean"
@@ -496,6 +498,33 @@ export async function listDeviceAuthSessions(
     throw new Error("Supabase devolvió una lista de sesiones no válida.");
   }
   return data;
+}
+
+export async function saveDeviceAuthSessionLabel(
+  client: SupabaseAuthClient,
+  sessionId: string,
+  label: string,
+): Promise<void> {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      sessionId,
+    )
+  ) {
+    throw new Error("El identificador de sesión no es válido.");
+  }
+  const normalizedLabel = label.trim();
+  if (normalizedLabel.length > 40) {
+    throw new Error("El nombre del dispositivo debe tener 40 caracteres o menos.");
+  }
+
+  const { data, error } = await client.rpc("set_my_device_session_label", {
+    p_session_id: sessionId,
+    p_label: normalizedLabel,
+  });
+  if (error) throw error;
+  if (data !== true) {
+    throw new Error("No se pudo guardar el nombre de ese dispositivo.");
+  }
 }
 
 export async function revokeDeviceAuthSession(

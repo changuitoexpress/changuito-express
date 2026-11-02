@@ -5,6 +5,7 @@ import {
   listDeviceAuthSessions,
   resendConfirmationEmail,
   revokeDeviceAuthSession,
+  saveDeviceAuthSessionLabel,
   restoreAuthSession,
   scheduleSessionExpiryWarning,
   signOut,
@@ -530,6 +531,7 @@ describe("sesión y cierre de sesión", function () {
           {
             session_id: "123e4567-e89b-12d3-a456-426614174000",
             user_agent: "Mozilla/5.0",
+            label: "Laptop de casa",
             created_at: "2026-10-27T10:00:00Z",
             updated_at: "2026-10-27T10:30:00Z",
             is_current: true,
@@ -543,6 +545,7 @@ describe("sesión y cierre de sesión", function () {
 
     assert.equal(sessions.length, 1);
     assert.equal(sessions[0].is_current, true);
+    assert.equal(sessions[0].label, "Laptop de casa");
     assert.deepEqual(rpcCall, {
       functionName: "list_my_device_sessions",
       args: undefined,
@@ -559,6 +562,63 @@ describe("sesión y cierre de sesión", function () {
       listDeviceAuthSessions(client),
       /RPC is not configured/,
     );
+  });
+
+  it("guarda un nombre privado normalizado para la sesión seleccionada", async function () {
+    let rpcCall: any;
+    const { client } = createClientFixture();
+    client.rpc = async function (functionName: string, args?: any) {
+      rpcCall = { functionName, args };
+      return { data: true, error: null };
+    };
+
+    await saveDeviceAuthSessionLabel(
+      client,
+      "123e4567-e89b-12d3-a456-426614174000",
+      "  Laptop de casa  ",
+    );
+
+    assert.deepEqual(rpcCall, {
+      functionName: "set_my_device_session_label",
+      args: {
+        p_session_id: "123e4567-e89b-12d3-a456-426614174000",
+        p_label: "Laptop de casa",
+      },
+    });
+  });
+
+  it("rechaza nombres demasiado largos antes de llamar a Supabase", async function () {
+    let rpcCalls = 0;
+    const { client } = createClientFixture();
+    client.rpc = async function () {
+      rpcCalls += 1;
+      return { data: true, error: null };
+    };
+
+    await assert.rejects(
+      saveDeviceAuthSessionLabel(
+        client,
+        "123e4567-e89b-12d3-a456-426614174000",
+        "x".repeat(41),
+      ),
+      /40 caracteres o menos/,
+    );
+    assert.equal(rpcCalls, 0);
+  });
+
+  it("rechaza identificadores inválidos al guardar nombres de dispositivo", async function () {
+    let rpcCalls = 0;
+    const { client } = createClientFixture();
+    client.rpc = async function () {
+      rpcCalls += 1;
+      return { data: true, error: null };
+    };
+
+    await assert.rejects(
+      saveDeviceAuthSessionLabel(client, "invalid-session-id", "Mi laptop"),
+      /identificador de sesión no es válido/,
+    );
+    assert.equal(rpcCalls, 0);
   });
 
   it("revoca solo el identificador de sesión seleccionado", async function () {
