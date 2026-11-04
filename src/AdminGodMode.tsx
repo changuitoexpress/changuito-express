@@ -38,6 +38,9 @@ interface Pedido {
   created_at:       string;
   repartidor_id:    string | null;
   repartidor_nombre?: string | null;
+  pago_estado?:     string | null;
+  pago_proveedor?:   string | null;
+  items_detalle?:    Array<{ nombre?: string; cantidad?: number; importe?: number }> | null;
 }
 
 interface Metricas {
@@ -583,6 +586,21 @@ export default function AdminGodMode(props: AdminProps) {
                             <p style={{ fontSize:'12px', color:'var(--text-secondary)', margin:0, lineHeight:1.5 }}>{pedido.detalle}</p>
                           </div>
                         )}
+                        {Array.isArray(pedido.items_detalle) && pedido.items_detalle.length > 0 && (
+                          <div>
+                            <p style={{ fontSize:'10px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', margin:'0 0 4px 0' }}>Productos del pedido</p>
+                            <div style={{ display:'flex', flexDirection:'column', gap:'3px' }}>
+                              {pedido.items_detalle.map(function(item, index){
+                                return (
+                                  <p key={index} style={{ fontSize:'12px', color:'var(--text-secondary)', margin:0 }}>
+                                    {Math.max(1, Number(item.cantidad) || 1)} × {item.nombre ?? 'Producto'}
+                                    {typeof item.importe === 'number' ? ' · $' + item.importe.toFixed(2) : ''}
+                                  </p>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         {pedido.direccion && (
                           <div>
                             <p style={{ fontSize:'10px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', margin:'0 0 4px 0' }}>📍 Dirección</p>
@@ -600,7 +618,11 @@ export default function AdminGodMode(props: AdminProps) {
                               {pedido.canal === 'webapp' ? '📱 App' : '💬 WhatsApp'}
                             </span>
                           )}
-                          {pedido.forma_pago === 'efectivo' ? (
+                          {pedido.pago_estado === 'aprobado' ? (
+                            <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'8px', background:'var(--color-green-dim)', color:'var(--color-green)', fontWeight:700 }}>
+                              ✓ Pago recibido · {pedido.pago_proveedor ?? 'en línea'}
+                            </span>
+                          ) : pedido.forma_pago === 'efectivo' ? (
                             <span style={{ fontSize:'11px', padding:'4px 10px', borderRadius:'8px', background:'rgba(34,197,94,0.12)', color:'var(--color-green)', fontWeight:700 }}>
                               💵 Cobrar al entregar
                             </span>

@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
+import { iniciarPagoMercadoPago } from "./mercadoPagoCheckout";
 import {
   listDeviceAuthSessions,
   revokeDeviceAuthSession,
@@ -1241,6 +1242,17 @@ function ModalCheckout(props: {
   async function confirmarPedido() {
     const usarEnvioGratis =
       envioGratis.status === "available" && aplicarEnvioGratis;
+    if (
+      formaPago === "en_linea" &&
+      props.carrito.some(function (item) { return item.tipo === "mandadito"; })
+    ) {
+      setError("Los mandaditos se cotizan por escrito. Elige efectivo o transferencia para este pedido.");
+      return;
+    }
+    if (formaPago === "en_linea" && usarEnvioGratis) {
+      setError("El envío gratis aún no se puede combinar con Mercado Pago. Desactiva la recompensa o elige otra forma de pago.");
+      return;
+    }
     setEnviando(true);
     setError("");
     try {
@@ -1251,6 +1263,20 @@ function ModalCheckout(props: {
           setEnviando(false);
           return;
         }
+      }
+
+      if (formaPago === "en_linea") {
+        const checkout = await iniciarPagoMercadoPago(
+          props.carrito.map(function (item) {
+            return { id: item.id, quantity: item.cantidad };
+          }),
+          dir
+            ? dir.calle + " " + dir.numero_casa + (dir.referencias ? ", " + dir.referencias : "")
+            : "",
+          fraccionamientoSel?.id ?? null,
+        );
+        window.location.assign(checkout.init_point);
+        return;
       }
 
       // Agrupar por negocio (para mensaje WhatsApp)
@@ -2352,10 +2378,17 @@ function ModalCheckout(props: {
             >
               {FORMAS_PAGO.map(function (f) {
                 const sel = formaPago === f.id;
+                const pagoOnlineBloqueado =
+                  f.id === "en_linea" &&
+                  (props.carrito.some(function (item) { return item.tipo === "mandadito"; }) ||
+                    (envioGratis.status === "available" && aplicarEnvioGratis));
                 return (
                   <button
                     key={f.id}
+                    type="button"
+                    disabled={pagoOnlineBloqueado}
                     onClick={function () {
+                      if (pagoOnlineBloqueado) return;
                       setFormaPago(f.id);
                     }}
                     style={{
@@ -2363,7 +2396,8 @@ function ModalCheckout(props: {
                       borderRadius: "16px",
                       border: `2px solid ${sel ? "var(--color-yellow)" : border}`,
                       background: sel ? "var(--color-yellow-dim)" : bgBase,
-                      cursor: "pointer",
+                      cursor: pagoOnlineBloqueado ? "not-allowed" : "pointer",
+                      opacity: pagoOnlineBloqueado ? 0.48 : 1,
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -2378,12 +2412,20 @@ function ModalCheckout(props: {
                         color: sel ? "var(--color-yellow)" : textPrim,
                       }}
                     >
-                      {f.label}
+                      {f.id === "en_linea" ? "Mercado Pago" : f.label}
                     </span>
                   </button>
                 );
               })}
             </div>
+            <p style={{ fontSize: "11px", color: textMuted, margin: "-10px 0 16px", textAlign: "center" }}>
+              Mercado Pago muestra los medios habilitados para tu cuenta, como tarjetas y, si está disponible, SPEI.
+              {props.carrito.some(function (item) { return item.tipo === "mandadito"; })
+                ? " Los mandaditos se pagan al cotizarse por escrito."
+                : envioGratis.status === "available" && aplicarEnvioGratis
+                  ? " Desactiva el envío gratis para pagar en línea."
+                  : ""}
+            </p>
             <div style={{ display: "flex", gap: "10px" }}>
               <button
                 onClick={function () {

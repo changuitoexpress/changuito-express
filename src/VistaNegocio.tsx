@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { supabase, ThemeToggle } from "./App";
+import { iniciarPagoMercadoPago } from "./mercadoPagoCheckout";
 import { parseImageUrls, ProductImageCarousel } from "./ChanguiShopping";
 import type { Theme } from "./App";
 import type { Merchant, CartItem } from "./Dashboard";
@@ -447,6 +448,16 @@ export default function VistaNegocio(props: VistaNegocioProps) {
 
   // ── Confirmar pedido (3-step) ─────────────────────────────────────────────────
   async function confirmarPedido() {
+    const carritoActual = props.carritoGlobal && props.carritoGlobal.length > 0
+      ? props.carritoGlobal
+      : carritoLocal;
+    if (
+      formaPago === 'en_linea' &&
+      carritoActual.some(function (item) { return item.tipo === 'mandadito'; })
+    ) {
+      setErrorPedido('Los mandaditos se cotizan por escrito. Elige efectivo o transferencia para este pedido.');
+      return;
+    }
     setEnviando(true);
     setErrorPedido('');
     try {
@@ -492,6 +503,18 @@ export default function VistaNegocio(props: VistaNegocioProps) {
       const baseEnvio = fraccionamientoSel ? fraccionamientoSel.costo_envio : costoEnvioModal;
       const totalEnvio = baseEnvio + Math.max(0, negCount - 1) * 15;
       const totalFinal = subtotalItems + totalEnvio;
+
+      if (formaPago === 'en_linea') {
+        const checkout = await iniciarPagoMercadoPago(
+          todosLosItems.map(function (item) {
+            return { id: item.id, quantity: item.cantidad };
+          }),
+          dirString,
+          fraccionamientoSel?.id ?? null,
+        );
+        window.location.assign(checkout.init_point);
+        return;
+      }
 
       // Group by negocio
       const porNegocio: Record<string, typeof todosLosItems> = {};
@@ -1390,16 +1413,23 @@ export default function VistaNegocio(props: VistaNegocioProps) {
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px", marginBottom:"20px" }}>
                   {FORMAS_PAGO_VN.map(function(fp) {
                     const sel = formaPago === fp.id;
+                    const pagoOnlineBloqueado =
+                      fp.id === 'en_linea' &&
+                      carritoParaMostrar.some(function (item) { return item.tipo === 'mandadito'; });
                     return (
-                      <div key={fp.id} onClick={function(){ setFormaPago(fp.id); }}
-                        style={{ display:"flex", alignItems:"center", gap:"12px", padding:"14px 16px", borderRadius:"14px", border: sel ? "2px solid var(--color-yellow)" : "1px solid var(--border-subtle)", background: sel ? "var(--color-yellow-dim)" : "var(--bg-card)", cursor:"pointer" }}>
+                      <div key={fp.id} role="button" aria-disabled={pagoOnlineBloqueado} tabIndex={pagoOnlineBloqueado ? -1 : 0} onClick={function(){ if (!pagoOnlineBloqueado) setFormaPago(fp.id); }}
+                        style={{ display:"flex", alignItems:"center", gap:"12px", padding:"14px 16px", borderRadius:"14px", border: sel ? "2px solid var(--color-yellow)" : "1px solid var(--border-subtle)", background: sel ? "var(--color-yellow-dim)" : "var(--bg-card)", cursor:pagoOnlineBloqueado?"not-allowed":"pointer", opacity:pagoOnlineBloqueado?0.48:1 }}>
                         <span style={{ fontSize:"20px" }}>{fp.emoji}</span>
-                        <span style={{ fontSize:"14px", fontWeight:800, color:"var(--text-primary)", flex:1 }}>{fp.label}</span>
+                        <span style={{ fontSize:"14px", fontWeight:800, color:"var(--text-primary)", flex:1 }}>{fp.id === 'en_linea' ? 'Mercado Pago' : fp.label}</span>
                         {sel && <Check style={{ width:"16px", height:"16px", color:"var(--color-yellow)" }} />}
                       </div>
                     );
                   })}
                 </div>
+                <p style={{ fontSize:"11px", color:"var(--text-muted)", margin:"-10px 0 16px", textAlign:"center" }}>
+                  Los medios disponibles, incluido SPEI si tu cuenta lo habilita, aparecerán en Mercado Pago.
+                  {carritoParaMostrar.some(function (item) { return item.tipo === 'mandadito'; }) ? ' Los mandaditos se pagan al cotizarse por escrito.' : ''}
+                </p>
                 <button onClick={function(){ setPaso('resumen'); }}
                   style={{ width:"100%", background:"var(--color-yellow)", color:"#020617", fontWeight:900, fontSize:"14px", padding:"15px", borderRadius:"16px", border:"none", cursor:"pointer" }}>
                   Continuar →

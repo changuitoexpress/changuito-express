@@ -1010,6 +1010,15 @@ export default function App() {
   const [sessionExpiryWarning, setSessionExpiryWarning] = useState(false);
   const [booting, setBooting] = useState<boolean>(true);
   const [pantalla, setPantalla] = useState<Pantalla>("dashboard");
+  const [mpNotice, setMpNotice] = useState<{
+    status: "checking" | "pending" | "approved" | "rejected" | "error";
+    checkoutId: string;
+    orderCount?: number;
+    total?: number;
+    checkoutUrl?: string;
+    error?: string;
+    whatsappUrl?: string;
+  } | null>(null);
   const { theme, toggle } = useTheme();
   const { toasts, push } = useToast();
   const [carritoGlobal, setCarritoGlobal] = useState<any[]>(function () {
@@ -1087,6 +1096,100 @@ export default function App() {
     [session?.user.id, session?.expiresAt],
   );
 
+  useEffect(function () {
+    const checkoutId = new URLSearchParams(window.location.search).get("mp_checkout") ?? "";
+    if (!checkoutId || !session?.user.id) return;
+    let activo = true;
+    let intervalo: number | null = null;
+    setMpNotice({ status: "checking", checkoutId: checkoutId });
+
+    async function revisarPago() {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data.session?.access_token;
+        if (!accessToken) return;
+        const response = await fetch(
+          "/api/mercadopago/status?checkout_id=" + encodeURIComponent(checkoutId),
+          { headers: { Authorization: "Bearer " + accessToken } },
+        );
+        let result: any = null;
+        try {
+          result = await response.json();
+        } catch {}
+        if (!activo) return;
+        if (!response.ok) {
+          setMpNotice({
+            status: "error",
+            checkoutId: checkoutId,
+            error: result?.error ?? "No pudimos consultar el pago.",
+          });
+          return;
+        }
+        if (result?.status === "approved") {
+          const items = Array.isArray(result.items) ? result.items : [];
+          let mensaje = "Pedido pagado en Mercado Pago";
+          if (typeof result.total === "number") mensaje += " · $" + result.total.toFixed(2) + " MXN";
+          mensaje += "\n";
+          items.forEach(function (item: any) {
+            mensaje += "• " + String(item.nombre ?? "Producto").slice(0, 100) +
+              " x" + Math.max(1, Number(item.cantidad) || 1) + "\n";
+          });
+          const whatsappUrl =
+            "https://wa.me/522223339999?text=" + encodeURIComponent(mensaje);
+          setMpNotice({
+            status: "approved",
+            checkoutId: checkoutId,
+            orderCount: Array.isArray(result.order_ids) ? result.order_ids.length : 0,
+            total: Number(result.total) || 0,
+            whatsappUrl: whatsappUrl,
+          });
+          setCarritoGlobal([]);
+          try {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete("mp_checkout");
+            window.history.replaceState(window.history.state, "", cleanUrl.toString());
+          } catch {}
+          if (intervalo !== null) window.clearInterval(intervalo);
+          intervalo = null;
+          return;
+        }
+        if (result?.status === "rejected" || result?.status === "expired" || result?.status === "failed") {
+          setMpNotice({
+            status: "rejected",
+            checkoutId: checkoutId,
+            checkoutUrl: result?.checkout_url,
+          });
+          if (intervalo !== null) window.clearInterval(intervalo);
+          intervalo = null;
+          return;
+        }
+        setMpNotice({
+          status: "pending",
+          checkoutId: checkoutId,
+          checkoutUrl: result?.checkout_url,
+          total: Number(result?.total) || undefined,
+        });
+      } catch {
+        if (activo) {
+          setMpNotice({
+            status: "error",
+            checkoutId: checkoutId,
+            error: "No pudimos consultar el pago. Vuelve a intentarlo en unos segundos.",
+          });
+        }
+      }
+    }
+
+    void revisarPago();
+    intervalo = window.setInterval(function () {
+      void revisarPago();
+    }, 12_000);
+    return function () {
+      activo = false;
+      if (intervalo !== null) window.clearInterval(intervalo);
+    };
+  }, [session?.user.id]);
+
   if (booting) {
     return <ChanguitoLoader />;
   }
@@ -1130,6 +1233,90 @@ export default function App() {
         {NOMBRES_PANTALLA[pantalla]}
       </div>
       <ToastRack toasts={toasts} />
+      {mpNotice && (
+        <div
+          role={mpNotice.status === "error" || mpNotice.status === "rejected" ? "alert" : "status"}
+          aria-live={mpNotice.status === "error" || mpNotice.status === "rejected" ? "assertive" : "polite"}
+          aria-atomic="true"
+          style={{
+            position: "fixed",
+            zIndex: 10002,
+            top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(520px, calc(100% - 32px))",
+            boxSizing: "border-box",
+            padding: "14px",
+            borderRadius: "16px",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-primary)",
+            boxShadow: "var(--shadow-float)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: "block", fontSize: "14px", marginBottom: "4px" }}>
+                {mpNotice.status === "approved"
+                  ? "Pago confirmado"
+                  : mpNotice.status === "rejected"
+                    ? "El pago no se completó"
+                    : mpNotice.status === "error"
+                      ? "No se pudo revisar el pago"
+                      : "Verificando tu pago"}
+              </strong>
+              <span style={{ display: "block", fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                {mpNotice.status === "approved"
+                  ? "Tu pedido" + (mpNotice.orderCount === 1 ? " ya está registrado." : " ya están registrados.") +
+                    (mpNotice.total ? " Total: $" + mpNotice.total.toFixed(2) + " MXN." : "")
+                  : mpNotice.status === "rejected"
+                    ? "Puedes volver al checkout para elegir otro medio de pago."
+                    : mpNotice.status === "error"
+                      ? mpNotice.error
+                      : "Mercado Pago todavía está procesando la transferencia. La confirmación se actualizará automáticamente."}
+              </span>
+              {mpNotice.status === "approved" && mpNotice.whatsappUrl && (
+                <a
+                  href={mpNotice.whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: "inline-block", marginTop: "9px", color: "var(--color-green)", fontSize: "12px", fontWeight: 800 }}
+                >
+                  Enviar el detalle del pedido por WhatsApp
+                </a>
+              )}
+              {mpNotice.status === "rejected" && mpNotice.checkoutUrl && (
+                <a
+                  href={mpNotice.checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: "inline-block", marginTop: "9px", color: "var(--color-blue)", fontSize: "12px", fontWeight: 800 }}
+                >
+                  Volver a Mercado Pago
+                </a>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label="Cerrar aviso de Mercado Pago"
+              onClick={function () { setMpNotice(null); }}
+              style={{
+                width: "30px",
+                height: "30px",
+                flexShrink: 0,
+                borderRadius: "9px",
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-base)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                fontSize: "18px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       {sessionExpiryWarning && (
         <div
           role="status"
