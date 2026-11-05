@@ -32,6 +32,32 @@ const fixtureSecondWrittenOrderMerchant = {
   id: "browser-fixture-second-mandadito",
   name: "Browser Fixture Seven Eleven",
 };
+const fixtureRestaurantCategoryMerchants = [
+  {
+    ...fixtureMerchant,
+    id: "browser-fixture-elotes",
+    name: "Browser Fixture Elotes",
+    category: "Elotes y Esquites",
+  },
+  {
+    ...fixtureMerchant,
+    id: "browser-fixture-memelas",
+    name: "Browser Fixture Memelas",
+    category: "Memelas",
+  },
+  {
+    ...fixtureMerchant,
+    id: "browser-fixture-cafeteria",
+    name: "Browser Fixture Cafetería",
+    category: "Cafeterías",
+  },
+  {
+    ...fixtureMerchant,
+    id: "browser-fixture-pizzerias",
+    name: "Browser Fixture Pizzerías",
+    category: "Pizzerías",
+  },
+];
 
 async function findAvailablePort(): Promise<number> {
   return new Promise(function (resolve, reject) {
@@ -182,7 +208,11 @@ async function mockSupabase(
         : mockState.role === "cliente"
           ? acceptsObject
             ? null
-            : [fixtureWrittenOrderMerchant, fixtureSecondWrittenOrderMerchant]
+            : [
+                fixtureWrittenOrderMerchant,
+                fixtureSecondWrittenOrderMerchant,
+                ...fixtureRestaurantCategoryMerchants,
+              ]
           : acceptsObject
             ? fixtureMerchant
             : [fixtureMerchant];
@@ -773,6 +803,31 @@ it("renders every authenticated screen and returns to the dashboard", async func
   await customerPage.goto(appUrl);
   await customerPage.getByRole("heading", { name: "¿Qué se te antoja?" }).waitFor();
   await merchantAdminLookup;
+  for (const section of [
+    {
+      title: "Elotes y Antojitos",
+      merchant: "Browser Fixture Elotes",
+    },
+    {
+      title: "Memelas",
+      merchant: "Browser Fixture Memelas",
+    },
+    {
+      title: "Cafeterías",
+      merchant: "Browser Fixture Cafetería",
+    },
+    {
+      title: "Pizzerías",
+      merchant: "Browser Fixture Pizzerías",
+    },
+  ]) {
+    await customerPage
+      .getByRole("heading", { name: section.title, exact: true })
+      .waitFor({ timeout: 10_000 });
+    await customerPage.getByText(section.merchant, { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+  }
 
   const checkoutCart = [
     {

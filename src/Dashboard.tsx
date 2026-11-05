@@ -218,6 +218,24 @@ function deviceActivityDate(value: string | null): string {
 }
 
 // ─── Secciones Restaurantes ───────────────────────────────────────────────────
+function normalizarCategoriaRestaurante(
+  value: string | null | undefined,
+): string {
+  const categoria = (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+  const alias: Record<string, string> = {
+    "elotes y esquites": "elotes y antojitos",
+    cafeterias: "cafeteria",
+    pizzerias: "pizzeria",
+    cheesesteaks: "cheesesteak",
+  };
+  return alias[categoria] ?? categoria;
+}
+
 const SECCIONES_REST = [
   { titulo: "Desayunos y Comidas", cats: ["desayunos y comidas"], emoji: "🍳" },
   { titulo: "Cemitas", cats: ["cemitas"], emoji: "🫓" },
@@ -509,7 +527,7 @@ function getEmoji(cat: string): string {
     mandaditos: "🛒",
     tiendita: "🏪",
   };
-  return m[cat?.toLowerCase().trim()] ?? "🍽️";
+  return m[normalizarCategoriaRestaurante(cat)] ?? "🍽️";
 }
 
 function buildGrad(cat: string): string {
@@ -535,7 +553,8 @@ function buildGrad(cat: string): string {
     tiendita: "linear-gradient(135deg,#1e3a5f,#0369a1)",
   };
   return (
-    m[cat?.toLowerCase().trim()] ?? "linear-gradient(135deg,#1a1a2e,#2d2d44)"
+    m[normalizarCategoriaRestaurante(cat)] ??
+      "linear-gradient(135deg,#1a1a2e,#2d2d44)"
   );
 }
 
@@ -3216,7 +3235,10 @@ export default function Dashboard(props: DashboardProps) {
   function porCats(cats: string[], names?: string[]): Merchant[] {
     return merchants.filter(function (m) {
       const byCategory = cats.some(function (c) {
-        return m.category?.toLowerCase().trim() === c.toLowerCase();
+        return (
+          normalizarCategoriaRestaurante(m.category) ===
+          normalizarCategoriaRestaurante(c)
+        );
       });
       if (byCategory) return true;
       if (!names || names.length === 0) return false;
@@ -3667,6 +3689,7 @@ export default function Dashboard(props: DashboardProps) {
                 secId: "seccion-desayunos-y-comidas",
               },
               { emoji: "🫓", label: "Cemitas", secId: "seccion-cemitas" },
+              { emoji: "🫔", label: "Memelas", secId: "seccion-memelas" },
               { emoji: "🥖", label: "Tortas", secId: "seccion-tortas" },
               { emoji: "🌮", label: "Taquerías", secId: "seccion-taquerias" },
               { emoji: "🍕", label: "Pizzerías", secId: "seccion-pizzerias" },
