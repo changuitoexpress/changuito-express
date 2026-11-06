@@ -15,6 +15,7 @@
 - [Customer navigation](customer-navigation.md) — Changui Súper opens products directly; restaurant shortcuts precede Mandaditos, including written restaurant orders.
 - [God Mode admin scope](god-mode-admin.md) — modular admin under src/admin; DB changes only in additive supabase_admin_upgrade.sql; one order row per business.
 - [Order communication](order-communication.md) — customers and assigned couriers should exchange messages and product photos directly, with admin supervision.
+- [WhatsApp CRM scope](whatsapp-crm-scope.md) — independent phone-based inbox with its own courier assignment; not an extension of internal order chat.
 - [Supabase live verification](supabase-live-verification.md) — connector readiness and table row estimates do not establish real project access or deployed schema state.
 - [YARVIS approvals](yarvis-approvals.md) — the embedded admin assistant must request explicit confirmation before every change.
 - [Publishing integrations](publishing-integrations.md) — legacy GitHub REST connections need API-based publishing; verify file integrity and the exact Vercel project.
