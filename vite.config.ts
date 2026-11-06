@@ -31,6 +31,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    strictPort: true,
     allowedHosts: true,
     watch: {
       ignored: ["**/.local/**", "**/node_modules/**", "**/.git/**"],
@@ -38,7 +39,8 @@ export default defineConfig({
   },
   preview: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 5174,
+    strictPort: true,
     allowedHosts: true,
   },
 });
