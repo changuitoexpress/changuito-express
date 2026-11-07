@@ -23,3 +23,4 @@
 - [Payment processing](payment-processing.md) — Changuito Express is registered in Mexico; customer payments should go to one central account before separate business settlements.
 - [Session expiry notice](session-expiry-notice.md) — keep the warning dismissible, unobtrusive, and hidden until the session expiry changes.
 - [TypeScript browser tests](typescript-browser-tests.md) — Node 20 cannot execute browser `.test.ts` files directly; transpile them with the installed TypeScript compiler first.
+- [Development server ownership](development-server-ownership.md) — a failed workflow can coexist with a shell-owned server; keep only one managed dev server.
