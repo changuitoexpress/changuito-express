@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import { handleGeminiChatRequest } from "./server/geminiChat.js";
 import { handleAdminYarvisRequest } from "./server/adminYarvis.js";
 import { handleMercadoPagoRequest } from "./server/mercadoPago.js";
+import { handleWhatsAppCrm } from "./server/whatsapp/crm.js";
+import { handleWhatsAppWebhook } from "./server/whatsapp/webhook.js";
 
 export default defineConfig({
   plugins: [
@@ -10,6 +12,12 @@ export default defineConfig({
     {
       name: "changuito-gemini-chat-api",
       configureServer(server) {
+        server.middlewares.use("/api/whatsapp/webhook", function (req, res) {
+          void handleWhatsAppWebhook(req, res);
+        });
+        server.middlewares.use("/api/whatsapp/crm", function (req, res) {
+          void handleWhatsAppCrm(req, res);
+        });
         server.middlewares.use("/api/gemini-chat", function (req, res) {
           void handleGeminiChatRequest(req, res);
         });

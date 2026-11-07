@@ -741,5 +741,256 @@ REVOKE ALL ON FUNCTION public.crear_pedido_con_envio_gratis(uuid, text, numeric,
 GRANT EXECUTE ON FUNCTION public.crear_pedido_con_envio_gratis(uuid, text, numeric, text, text, text)
   TO authenticated;
 
+-- WHATSAPP_CRM_BEGIN
+-- Independent WhatsApp test-channel CRM. Never references pedidos/mensajes_chat.
+CREATE TABLE IF NOT EXISTS public.whatsapp_contactos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text NOT NULL UNIQUE CHECK (phone ~ '^[1-9][0-9]{6,14}$'),
+  display_name text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.whatsapp_conversaciones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  contact_id uuid NOT NULL REFERENCES public.whatsapp_contactos(id),
+  phone_number_id text NOT NULL,
+  status text NOT NULL DEFAULT 'abierta' CHECK (status IN ('abierta','archivada')),
+  assigned_to uuid REFERENCES public.perfiles(id),
+  last_inbound_at timestamptz,
+  last_message_at timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz,
+  send_lock uuid,
+  send_lock_until timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(phone_number_id,contact_id)
+);
+CREATE TABLE IF NOT EXISTS public.whatsapp_mensajes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL REFERENCES public.whatsapp_conversaciones(id),
+  direction text NOT NULL CHECK (direction IN ('in','out')),
+  kind text NOT NULL CHECK (kind IN ('text','image','unsupported')),
+  body text NOT NULL DEFAULT '',
+  actor_id uuid REFERENCES public.perfiles(id),
+  wa_message_id text UNIQUE,
+  client_nonce uuid UNIQUE,
+  media_id text,
+  image_path text,
+  status text NOT NULL DEFAULT 'received' CHECK (status IN ('received','sending','sent','delivered','read','failed','unknown')),
+  error text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.whatsapp_asignaciones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL REFERENCES public.whatsapp_conversaciones(id),
+  previous_courier uuid REFERENCES public.perfiles(id),
+  next_courier uuid REFERENCES public.perfiles(id),
+  actor_id uuid REFERENCES public.perfiles(id),
+  event text NOT NULL CHECK (event IN ('assign','archive','reopen')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.whatsapp_webhook_events (
+  id text PRIMARY KEY,
+  payload jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','processed','failed')),
+  lease_until timestamptz,
+  attempts integer NOT NULL DEFAULT 0,
+  error text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS whatsapp_conversations_assignee ON public.whatsapp_conversaciones(assigned_to,status,last_message_at DESC);
+CREATE INDEX IF NOT EXISTS whatsapp_conversations_inbox ON public.whatsapp_conversaciones(phone_number_id,status,last_message_at DESC);
+CREATE INDEX IF NOT EXISTS whatsapp_messages_history ON public.whatsapp_mensajes(conversation_id,created_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS whatsapp_assignments_history ON public.whatsapp_asignaciones(conversation_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS whatsapp_events_pending ON public.whatsapp_webhook_events(status,created_at);
+
+CREATE OR REPLACE FUNCTION public.whatsapp_actor_admin(p_actor uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT EXISTS(SELECT 1 FROM public.perfiles WHERE id=p_actor AND rol='admin')
+$$;
+CREATE OR REPLACE FUNCTION public.whatsapp_can_read(p_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT EXISTS(SELECT 1 FROM public.whatsapp_conversaciones c
+    WHERE c.id=p_id AND (public.whatsapp_actor_admin(auth.uid()) OR
+      (c.assigned_to=auth.uid() AND EXISTS(SELECT 1 FROM public.perfiles WHERE id=auth.uid() AND rol='repartidor'))))
+$$;
+ALTER TABLE public.whatsapp_contactos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_conversaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_mensajes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_asignaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.whatsapp_webhook_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.whatsapp_contactos,public.whatsapp_conversaciones,public.whatsapp_mensajes,
+  public.whatsapp_asignaciones,public.whatsapp_webhook_events FROM PUBLIC,anon,authenticated;
+GRANT ALL ON public.whatsapp_contactos,public.whatsapp_conversaciones,public.whatsapp_mensajes,
+  public.whatsapp_asignaciones,public.whatsapp_webhook_events TO service_role;
+GRANT SELECT ON public.whatsapp_contactos,public.whatsapp_conversaciones,
+  public.whatsapp_mensajes,public.whatsapp_asignaciones TO authenticated;
+DROP POLICY IF EXISTS whatsapp_contact_read ON public.whatsapp_contactos;
+CREATE POLICY whatsapp_contact_read ON public.whatsapp_contactos FOR SELECT TO authenticated
+  USING (EXISTS(SELECT 1 FROM public.whatsapp_conversaciones c WHERE c.contact_id=whatsapp_contactos.id AND public.whatsapp_can_read(c.id)));
+DROP POLICY IF EXISTS whatsapp_conversation_read ON public.whatsapp_conversaciones;
+CREATE POLICY whatsapp_conversation_read ON public.whatsapp_conversaciones FOR SELECT TO authenticated
+  USING(public.whatsapp_can_read(id));
+DROP POLICY IF EXISTS whatsapp_message_read ON public.whatsapp_mensajes;
+CREATE POLICY whatsapp_message_read ON public.whatsapp_mensajes FOR SELECT TO authenticated
+  USING(public.whatsapp_can_read(conversation_id));
+DROP POLICY IF EXISTS whatsapp_assignment_read ON public.whatsapp_asignaciones;
+CREATE POLICY whatsapp_assignment_read ON public.whatsapp_asignaciones FOR SELECT TO authenticated
+  USING(public.whatsapp_can_read(conversation_id));
+INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+  VALUES('whatsapp-crm','whatsapp-crm',false,5242880,ARRAY['image/jpeg','image/png'])
+  ON CONFLICT(id) DO NOTHING;
+-- No browser storage policies: authorized backend issues short-lived signed URLs.
+
+CREATE OR REPLACE FUNCTION public.whatsapp_ingest(
+  p_number text,p_phone text,p_name text,p_wamid text,p_text text,p_kind text,p_media text,p_time timestamptz)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_contact uuid; v_conv public.whatsapp_conversaciones; v_msg public.whatsapp_mensajes; v_inserted boolean;
+BEGIN
+  INSERT INTO public.whatsapp_contactos(phone,display_name) VALUES(p_phone,left(p_name,160))
+    ON CONFLICT(phone) DO UPDATE SET display_name=coalesce(nullif(EXCLUDED.display_name,''),whatsapp_contactos.display_name)
+    RETURNING id INTO v_contact;
+  INSERT INTO public.whatsapp_conversaciones(contact_id,phone_number_id)
+    VALUES(v_contact,p_number) ON CONFLICT(phone_number_id,contact_id) DO NOTHING;
+  SELECT * INTO v_conv FROM public.whatsapp_conversaciones WHERE contact_id=v_contact AND phone_number_id=p_number FOR UPDATE;
+  INSERT INTO public.whatsapp_mensajes(conversation_id,direction,kind,body,wa_message_id,media_id,created_at)
+    VALUES(v_conv.id,'in',p_kind,left(p_text,4096),p_wamid,p_media,p_time)
+    ON CONFLICT(wa_message_id) DO NOTHING RETURNING * INTO v_msg;
+  v_inserted := FOUND;
+  IF NOT v_inserted THEN SELECT * INTO v_msg FROM public.whatsapp_mensajes WHERE wa_message_id=p_wamid; END IF;
+  IF v_inserted THEN
+    IF v_conv.status='archivada' AND p_time>v_conv.archived_at THEN
+      INSERT INTO public.whatsapp_asignaciones(conversation_id,previous_courier,event)
+        VALUES(v_conv.id,v_conv.assigned_to,'reopen');
+      UPDATE public.whatsapp_conversaciones SET status='abierta',assigned_to=NULL,archived_at=NULL WHERE id=v_conv.id;
+    END IF;
+    UPDATE public.whatsapp_conversaciones SET
+      last_inbound_at=greatest(coalesce(last_inbound_at,p_time),p_time),
+      last_message_at=greatest(last_message_at,p_time) WHERE id=v_conv.id;
+  END IF;
+  RETURN to_jsonb(v_msg);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_change_case(p_id uuid,p_actor uuid,p_action text,p_courier uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE c public.whatsapp_conversaciones;
+BEGIN
+  IF NOT public.whatsapp_actor_admin(p_actor) THEN RAISE EXCEPTION 'Solo un administrador puede cambiar el caso'; END IF;
+  SELECT * INTO c FROM public.whatsapp_conversaciones WHERE id=p_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Conversación no encontrada'; END IF;
+  IF c.send_lock_until>now() THEN RAISE EXCEPTION 'Hay un envío en curso. Espera antes de cambiar el caso'; END IF;
+  IF p_action='assign' THEN
+    IF c.status<>'abierta' THEN RAISE EXCEPTION 'El caso está archivado'; END IF;
+    IF p_courier IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.perfiles WHERE id=p_courier AND rol='repartidor')
+      THEN RAISE EXCEPTION 'Elige un repartidor válido'; END IF;
+    IF c.assigned_to IS DISTINCT FROM p_courier THEN
+      INSERT INTO public.whatsapp_asignaciones(conversation_id,previous_courier,next_courier,actor_id,event)
+        VALUES(c.id,c.assigned_to,p_courier,p_actor,'assign');
+      UPDATE public.whatsapp_conversaciones SET assigned_to=p_courier WHERE id=c.id;
+    END IF;
+  ELSIF p_action='archive' THEN
+    IF c.status<>'archivada' THEN
+      INSERT INTO public.whatsapp_asignaciones(conversation_id,previous_courier,next_courier,actor_id,event)
+        VALUES(c.id,c.assigned_to,c.assigned_to,p_actor,'archive');
+      UPDATE public.whatsapp_conversaciones SET status='archivada',archived_at=now() WHERE id=c.id;
+    END IF;
+  ELSE RAISE EXCEPTION 'Acción no válida'; END IF;
+  RETURN jsonb_build_object('ok',true);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_reserve_send(
+  p_id uuid,p_actor uuid,p_nonce uuid,p_text text,p_kind text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE c public.whatsapp_conversaciones; m public.whatsapp_mensajes;
+BEGIN
+  SELECT * INTO c FROM public.whatsapp_conversaciones WHERE id=p_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Conversación no encontrada'; END IF;
+  IF NOT coalesce((public.whatsapp_actor_admin(p_actor) OR (c.assigned_to=p_actor AND
+    EXISTS(SELECT 1 FROM public.perfiles WHERE id=p_actor AND rol='repartidor'))),false) THEN
+    RAISE EXCEPTION 'Ya no tienes acceso a esta conversación'; END IF;
+  SELECT * INTO m FROM public.whatsapp_mensajes WHERE client_nonce=p_nonce;
+  IF FOUND THEN
+    IF m.conversation_id<>p_id OR m.actor_id<>p_actor OR m.body<>p_text OR m.kind<>p_kind
+      THEN RAISE EXCEPTION 'Identificador de envío utilizado para otro mensaje'; END IF;
+    RETURN jsonb_build_object('existing',true,'message',to_jsonb(m));
+  END IF;
+  IF c.status<>'abierta' THEN RAISE EXCEPTION 'El caso está archivado'; END IF;
+  IF c.last_inbound_at IS NULL OR c.last_inbound_at < now()-interval '24 hours'
+    THEN RAISE EXCEPTION 'La ventana de 24 horas terminó; se necesita una plantilla aprobada'; END IF;
+  IF c.send_lock_until>now() THEN RAISE EXCEPTION 'Hay otro envío en curso'; END IF;
+  INSERT INTO public.whatsapp_mensajes(conversation_id,direction,kind,body,actor_id,client_nonce,status)
+    VALUES(p_id,'out',p_kind,p_text,p_actor,p_nonce,'sending') RETURNING * INTO m;
+  UPDATE public.whatsapp_conversaciones SET send_lock=m.id,send_lock_until=now()+interval '2 minutes'
+    WHERE id=p_id;
+  RETURN jsonb_build_object('existing',false,'message',to_jsonb(m));
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_finish_send(
+  p_message uuid,p_status text,p_wamid text,p_error text,p_image text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE m public.whatsapp_mensajes;
+BEGIN
+  SELECT * INTO m FROM public.whatsapp_mensajes WHERE id=p_message;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Mensaje no encontrado'; END IF;
+  PERFORM 1 FROM public.whatsapp_conversaciones WHERE id=m.conversation_id FOR UPDATE;
+  UPDATE public.whatsapp_mensajes SET
+    status=CASE WHEN status IN ('read','delivered') THEN status ELSE p_status END,
+    wa_message_id=coalesce(wa_message_id,p_wamid),
+    error=CASE WHEN status IN ('read','delivered') THEN NULL ELSE left(p_error,300) END,
+    image_path=coalesce(image_path,p_image)
+    WHERE id=p_message RETURNING * INTO m;
+  UPDATE public.whatsapp_conversaciones SET send_lock=NULL,send_lock_until=NULL,last_message_at=greatest(last_message_at,m.created_at)
+    WHERE id=m.conversation_id AND send_lock=p_message;
+  RETURN to_jsonb(m);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_claim_event(p_id text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+BEGIN
+  UPDATE public.whatsapp_webhook_events SET status='processing',lease_until=now()+interval '2 minutes',attempts=attempts+1,error=NULL
+    WHERE id=p_id AND (status IN ('pending','failed') OR (status='processing' AND lease_until<now()));
+  RETURN FOUND;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_delivery_status(p_wamid text,p_status text,p_error text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+BEGIN
+  UPDATE public.whatsapp_mensajes SET status=p_status,error=left(p_error,300)
+    WHERE wa_message_id=p_wamid AND direction='out' AND
+      ((p_status='read' AND status IN ('sending','sent','delivered','unknown')) OR
+       (p_status='delivered' AND status IN ('sending','sent','unknown')) OR
+       (p_status='sent' AND status IN ('sending','unknown')) OR
+       (p_status='failed' AND status IN ('sending','sent','unknown')));
+END $$;
+
+CREATE OR REPLACE FUNCTION public.whatsapp_expire_sends()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE c public.whatsapp_conversaciones;
+BEGIN
+  FOR c IN SELECT * FROM public.whatsapp_conversaciones
+    WHERE send_lock IS NOT NULL AND send_lock_until<now() FOR UPDATE SKIP LOCKED
+  LOOP
+    UPDATE public.whatsapp_mensajes SET status='unknown',
+      error='El envío se interrumpió sin confirmación. No reenviar automáticamente.'
+      WHERE id=c.send_lock AND status='sending';
+    UPDATE public.whatsapp_conversaciones SET send_lock=NULL,send_lock_until=NULL WHERE id=c.id;
+  END LOOP;
+END $$;
+
+REVOKE ALL ON FUNCTION public.whatsapp_actor_admin(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.whatsapp_can_read(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.whatsapp_can_read(uuid) TO authenticated,service_role;
+REVOKE ALL ON FUNCTION public.whatsapp_ingest(text,text,text,text,text,text,text,timestamptz),
+  public.whatsapp_change_case(uuid,uuid,text,uuid),
+  public.whatsapp_reserve_send(uuid,uuid,uuid,text,text),
+  public.whatsapp_finish_send(uuid,text,text,text,text),
+  public.whatsapp_claim_event(text),public.whatsapp_delivery_status(text,text,text),public.whatsapp_expire_sends()
+  FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.whatsapp_actor_admin(uuid),
+  public.whatsapp_ingest(text,text,text,text,text,text,text,timestamptz),
+  public.whatsapp_change_case(uuid,uuid,text,uuid),
+  public.whatsapp_reserve_send(uuid,uuid,uuid,text,text),
+  public.whatsapp_finish_send(uuid,text,text,text,text),
+  public.whatsapp_claim_event(text),public.whatsapp_delivery_status(text,text,text),public.whatsapp_expire_sends() TO service_role;
+-- WHATSAPP_CRM_END
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;

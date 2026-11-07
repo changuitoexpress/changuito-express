@@ -13,6 +13,7 @@ import AdminNegocios from './admin/AdminNegocios';
 import AdminTablas from './admin/AdminTablas';
 import AdminMandaditos from './admin/AdminMandaditos';
 import PedidoChat from './components/PedidoChat';
+import WhatsAppCrm from './components/WhatsAppCrm';
 import YarvisPanel from './admin/yarvis-ui/YarvisPanel';
 import type {
   YarvisActionType,
@@ -108,7 +109,7 @@ export default function AdminGodMode(props: AdminProps) {
   const [filtroEstatus, setFiltro]  = useState('todos');
   const [pedidoAbierto, setPedAbi]  = useState<string | null>(null);
   const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
-  const [tab, setTab]               = useState<'resumen'|'pedidos'|'catalogo'|'negocios'|'otros'|'clientes'>('resumen');
+  const [tab, setTab]               = useState<'resumen'|'pedidos'|'catalogo'|'negocios'|'otros'|'clientes'|'whatsapp'>('resumen');
   const [merchants, setMerchants]         = useState<any[]>([]);
   const [repartidores, setRepartidores]   = useState<any[]>([]);
   const [selRep, setSelRep]               = useState<Record<string, string>>({});
@@ -478,6 +479,7 @@ export default function AdminGodMode(props: AdminProps) {
           <button style={tabStyle('negocios')} onClick={function(){ setTab('negocios'); }}>🍽️ Restaurantes</button>
           <button style={tabStyle('otros')}    onClick={function(){ setTab('otros');    }}>🛍️ Otros</button>
           <button style={tabStyle('clientes')} onClick={function(){ setTab('clientes'); }}>👥 Gestión</button>
+          <button style={tabStyle('whatsapp')} onClick={function(){ setTab('whatsapp'); }}>WhatsApp</button>
         </div>
       </div>
 
@@ -490,8 +492,18 @@ export default function AdminGodMode(props: AdminProps) {
         )}
 
         {tab === 'resumen' && (
-          <AdminResumen totalClientes={metricas?.totalClientes ?? 0} negociosAbiertos={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} totalNegocios={merchants.length} />
+          <>
+            <AdminResumen totalClientes={metricas?.totalClientes ?? 0} negociosAbiertos={merchants.filter(function(m){ return estaAbiertoAhora(m); }).length} totalNegocios={merchants.length} />
+            <button type="button" onClick={function(){ setTab('whatsapp'); }} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'14px', marginTop:'16px', padding:'16px', borderRadius:'16px', border:'1px solid var(--border-subtle)', background:'var(--bg-card)', color:'var(--text-primary)', boxShadow:'var(--shadow-card)', cursor:'pointer', textAlign:'left' }}>
+              <span style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                <span style={{ width:'38px', height:'38px', display:'grid', placeItems:'center', borderRadius:'12px', color:'var(--color-green)', background:'rgba(34,197,94,.12)' }}><MessageCircle style={{ width:'18px', height:'18px' }} /></span>
+                <span><strong style={{ display:'block', fontSize:'13px', marginBottom:'3px' }}>Abrir WhatsApp CRM</strong><span style={{ fontSize:'11px', color:'var(--text-muted)' }}>Conversaciones de negocios y coordinación de repartidores</span></span>
+              </span>
+              <ArrowLeft style={{ width:'16px', height:'16px', transform:'rotate(180deg)', color:'var(--text-muted)' }} />
+            </button>
+          </>
         )}
+        {tab === 'whatsapp' && <WhatsAppCrm isAdmin={true} />}
         {tab === 'catalogo' && <AdminMandaditos merchants={merchants} onCambio={fetchMerchants} />}
         {tab === 'otros' && <AdminTablas />}
 

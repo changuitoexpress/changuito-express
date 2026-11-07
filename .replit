@@ -43,3 +43,9 @@ outputType = "console"
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
+
+[userenv]
+
+[userenv.shared]
+WHATSAPP_GRAPH_VERSION = "v27.0"
+WHATSAPP_MODE = "test"

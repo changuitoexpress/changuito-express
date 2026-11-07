@@ -60,3 +60,15 @@ The official WhatsApp Business webhook is required; `wa.me` links cannot
 receive messages. Confirm the existing number's setup before migrating or
 enabling it. Do not change the current number's registration as part of a
 configuration audit.
+
+Implementation and test-channel setup:
+[docs/whatsapp-crm.md](whatsapp-crm.md).
+
+The reusable [direct WhatsApp CRM procedure](../.agents/skills/whatsapp-cloud-api-crm/SKILL.md)
+captures the tested raw-signature, independent-assignment, private-media and
+verification boundaries. Its library installation requires the skill-saving
+approval. CRM frontend work also used the platform `design` and `delegation`
+instructions; UI test guidance is in `testing`. The specialized tester callback
+was unavailable in this environment, so reproducible Playwright tests were run
+directly instead. Supabase connector instructions live under
+`.local/integration_skills/supabase_17453363_mcp/SKILL.md`.

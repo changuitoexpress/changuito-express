@@ -53,3 +53,9 @@ See [docs/operations.md](docs/operations.md) for the integration audit
 procedure, reusable skill references and deployment verification limits.
 Preserve the independent WhatsApp CRM model in
 `.agents/memory/whatsapp-crm-scope.md`; never replace the existing order chat.
+
+The independent WhatsApp CRM uses `server/whatsapp/`, `api/whatsapp/` and
+`src/components/WhatsAppCrm.tsx`. See [docs/whatsapp-crm.md](docs/whatsapp-crm.md)
+for its additive SQL block, server-only configuration and Meta test-number
+activation. The real business cellphone number must not be migrated or
+registered in this test phase.

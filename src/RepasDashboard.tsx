@@ -17,6 +17,7 @@ import {
 import { supabase, ThemeToggle } from "./App";
 import type { AppSession, Theme } from "./App";
 import PedidoChat from "./components/PedidoChat";
+import WhatsAppCrm from "./components/WhatsAppCrm";
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Pedido {
   id: string;
@@ -83,7 +84,7 @@ const ESTATUS_CONFIG: Record<
 export default function RepasDashboard(props: Props) {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"mis" | "disponibles" | "chat">("mis");
+  const [tab, setTab] = useState<"mis" | "disponibles" | "chat" | "whatsapp">("mis");
   const [pedidoAbierto, setPedAbi] = useState<string | null>(null);
   const [chatPedido, setChatPedido] = useState<Pedido | null>(null);
   const [accessRevoked, setAccessRevoked] = useState(false);
@@ -510,6 +511,14 @@ export default function RepasDashboard(props: Props) {
             }}
           >
             🟢 Disponibles
+          </button>
+          <button
+            style={tabStyle("whatsapp")}
+            onClick={function () {
+              setTab("whatsapp");
+            }}
+          >
+            WhatsApp
           </button>
         </div>
       </div>
@@ -1026,6 +1035,11 @@ export default function RepasDashboard(props: Props) {
               );
             })}
           </div>
+        )}
+        {tab === "whatsapp" && (
+          <WhatsAppCrm
+            isAdmin={props.session.user.rol === "admin" || props.session.user.email === "uliseseven.7@gmail.com"}
+          />
         )}
       </div>
     </div>
