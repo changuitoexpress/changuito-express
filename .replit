@@ -49,3 +49,8 @@ timeoutMs = 180000
 [userenv.shared]
 WHATSAPP_GRAPH_VERSION = "v27.0"
 WHATSAPP_MODE = "test"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npm", "start"]
+build = ["npm", "run", "build"]

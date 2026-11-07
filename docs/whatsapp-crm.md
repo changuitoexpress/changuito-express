@@ -141,6 +141,33 @@ receptor autorizado, despliegue y webhook suscrito.
 
 ## Referencias oficiales
 
+## Publicación en Replit
+
+El servidor de producción es `npm start` (`server/production.js`), no
+`vite preview`: sirve `dist` y las rutas API con los cuerpos originales para
+verificar firmas. Construir con `npm run build` y publicar como Autoscale.
+El servidor escucha en `PORT` o 5000 y no arranca si falta la configuración
+de WhatsApp de prueba o de Supabase. No registrar claves en archivos.
+
+Antes de publicar, revisar **Publishing → Production app secrets** para
+incluir `WHATSAPP_TEST_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`,
+`WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`,
+`WHATSAPP_ALLOWED_RECIPIENTS`, `SUPABASE_SERVICE_ROLE_KEY`,
+`VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
+Conservar `WHATSAPP_MODE=test` y `WHATSAPP_GRAPH_VERSION=v27.0`.
+La existencia de secretos en desarrollo no acredita su instalación en el
+proceso publicado. Los asistentes y pagos mantienen sus variables actuales.
+
+El usuario confirma Publish en el panel. Después obtener el dominio real
+desde el estado del despliegue y verificar por HTTPS el challenge con el
+verify token (sin imprimirlo) y rechazo de POST sin firma antes de entregar
+`<dominio-publicado>/api/whatsapp/webhook`. No usar la URL de desarrollo ni
+afirmar publicación o suscripción de Meta a partir de una prueba local.
+El webhook debe ser accesible para Meta, sin una pantalla de acceso del
+alojamiento; la bandeja conserva la autenticación de la aplicación.
+
+### Referencias oficiales
+
 - [Mensajes y ventana de atención](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 - [Inicio con Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started)
 - [Webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
