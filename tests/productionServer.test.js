@@ -4,7 +4,38 @@ import { once } from "node:events";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { productionServer, validateProductionEnvironment } from "../server/production.js";
+import { logWhatsAppEnvironment, productionServer, validateProductionEnvironment } from "../server/production.js";
+
+test("startup diagnostic lists WhatsApp variable names without exposing values", function () {
+  const names = [
+    "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_TEST_PHONE_NUMBER_ID", "WHATSAPP_ALLOWED_RECIPIENTS", "WHATSAPP_MODE",
+  ];
+  const previous = Object.fromEntries(names.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    WHATSAPP_ACCESS_TOKEN: "hidden-token-value",
+    WHATSAPP_APP_SECRET: "hidden-app-secret",
+    WHATSAPP_VERIFY_TOKEN: "hidden-verify-token",
+    WHATSAPP_TEST_PHONE_NUMBER_ID: "123456789012345",
+    WHATSAPP_ALLOWED_RECIPIENTS: "15555550123",
+    WHATSAPP_MODE: "test",
+  });
+  const originalInfo = console.info;
+  const lines = [];
+  console.info = (...args) => lines.push(args.join(" "));
+  try {
+    logWhatsAppEnvironment();
+    assert.equal(lines.length, 1);
+    for (const key of names) assert.match(lines[0], new RegExp(key));
+    assert.match(lines[0], /"WHATSAPP_MODE":"test"/);
+    assert.doesNotMatch(lines[0], /hidden-token-value|hidden-app-secret|hidden-verify-token|123456789012345|15555550123/);
+  } finally {
+    console.info = originalInfo;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
 
 test("production serves SPA and authenticated CRM without exposing source or secrets", async function () {
   const root = await mkdtemp(join(tmpdir(), "changuito-production-"));

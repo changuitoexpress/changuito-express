@@ -29,6 +29,21 @@ export function validateProductionEnvironment() {
   }
 }
 
+export function logWhatsAppEnvironment() {
+  const required = [
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_TEST_PHONE_NUMBER_ID",
+    "WHATSAPP_ALLOWED_RECIPIENTS",
+  ];
+  const present = required.filter(function (key) { return Boolean(process.env[key]?.trim()); });
+  console.info("[whatsapp-config] startup " + JSON.stringify({
+    present,
+    WHATSAPP_MODE: process.env.WHATSAPP_MODE ?? "unset",
+  }));
+}
+
 export function productionServer(root = resolve("dist")) {
   return createServer(async function (req, res) {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -91,6 +106,7 @@ export function productionServer(root = resolve("dist")) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
+    logWhatsAppEnvironment();
     validateProductionEnvironment();
     const port = Number(process.env.PORT || 5000);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Puerto no válido.");

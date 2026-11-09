@@ -164,10 +164,21 @@ function crm(action, body, method = "POST") {
 
 test("WhatsApp verifies challenge and rejects invalid signatures before storage", async t => {
   const s = harness(t);
+  const originalWarn = console.warn;
+  const diagnostics = [];
+  console.warn = (...args) => diagnostics.push(args.join(" "));
+  t.after(() => { console.warn = originalWarn; });
   const ok = await invoke(handleWhatsAppWebhook, { method: "GET", url: "/?hub.mode=subscribe&hub.verify_token=fixture-verify&hub.challenge=12345" });
   assert.equal(ok.status, 200); assert.equal(ok.body, 12345);
   assert.equal((await invoke(handleWhatsAppWebhook, { method: "GET", url: "/?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=1" })).status, 403);
   assert.equal((await invoke(handleWhatsAppWebhook, { body: Buffer.from("{}"), headers: { "x-hub-signature-256": "sha256=invalid" } })).status, 401);
+  assert.deepEqual(diagnostics, ["[whatsapp-webhook] rejected reason=signature"]);
+  const invalidObject = signed({ object: "not_whatsapp_business_account", entry: [] });
+  assert.equal((await invoke(handleWhatsAppWebhook, invalidObject)).status, 400);
+  assert.equal(diagnostics.at(-1), "[whatsapp-webhook] rejected reason=object_type");
+  process.env.WHATSAPP_MODE = "production";
+  assert.equal((await invoke(handleWhatsAppWebhook, signed(webhookPayload()))).status, 503);
+  assert.equal(diagnostics.at(-1), "[whatsapp-webhook] rejected reason=test_configuration");
   assert.equal(s.calls.length, 0);
   assert.equal(verifySignature(Buffer.from("other"), "sha256=" + "a".repeat(64)), false);
 });
@@ -181,16 +192,36 @@ test("WhatsApp stores an independent phone conversation and deduplicates webhook
 });
 test("WhatsApp test mode refuses the real sender, wrong channel and unauthorized recipient", async t => {
   const s = harness(t);
+  const originalWarn = console.warn;
+  const diagnostics = [];
+  console.warn = (...args) => diagnostics.push(args.join(" "));
+  t.after(() => { console.warn = originalWarn; });
   assert.throws(() => assertSafeSender("+52 222 333 9999"), /protegido/);
   const wrongChannel = webhookPayload();
   wrongChannel.entry[0].changes[0].value.metadata.phone_number_id = "9999999999";
   assert.equal((await invoke(handleWhatsAppWebhook, signed(wrongChannel))).status, 403);
+  assert.equal(diagnostics.at(-1), "[whatsapp-webhook] rejected reason=phone_number_id");
   const stranger = webhookPayload(); stranger.entry[0].changes[0].value.messages[0].from = "15555550999";
   assert.equal((await invoke(handleWhatsAppWebhook, signed(stranger))).status, 200);
+  assert.equal(diagnostics.at(-1), "[whatsapp-webhook] rejected reason=allowlist");
+  assert.equal(diagnostics.some(line => /15555550999|fixture-meta-signature|sha256=/.test(line)), false);
   assert.equal(s.events.size, 0);
   s.sender = "+52 222 333 9999";
   assert.equal((await crm("send", { id: ids.conversation, nonce: ids.nonce, text: "Hola" })).status, 403);
   assert.equal(s.sends, 0);
+});
+
+test("WhatsApp logs real-number protection with a reason code only", async t => {
+  harness(t);
+  const originalWarn = console.warn;
+  const diagnostics = [];
+  console.warn = (...args) => diagnostics.push(args.join(" "));
+  t.after(() => { console.warn = originalWarn; });
+  const payload = webhookPayload();
+  payload.entry[0].changes[0].value.metadata.display_phone_number = "+52 222 333 9999";
+  assert.equal((await invoke(handleWhatsAppWebhook, signed(payload))).status, 403);
+  assert.deepEqual(diagnostics, ["[whatsapp-webhook] rejected reason=real_number_protection"]);
+  assert.equal(/222|fixture-meta-signature|sha256=/.test(diagnostics.join(" ")), false);
 });
 test("WhatsApp incoming photo is private and retries a durable failed media event", async t => {
   const s = harness(t, { photoFail: true });
