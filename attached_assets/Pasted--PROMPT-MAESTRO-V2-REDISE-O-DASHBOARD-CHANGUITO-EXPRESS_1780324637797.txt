@@ -1,0 +1,518 @@
+# PROMPT MAESTRO V2: REDISEÑO DASHBOARD CHANGUITO EXPRESS — NIVEL UBER/DIDI
+
+**INSTRUCCIONES PARA EL AGENTE DE REPLIT:**
+
+Reemplaza completamente `src/Dashboard.tsx` con una nueva versión que implemente la interfaz visual de **Uber Eats + Rappi Turbo + DiDi Food**, manteniendo toda la funcionalidad de carrito pero con esta arquitectura visual ESPECÍFICA:
+
+---
+
+## 🎨 IDENTIDAD VISUAL CHANGUITO EXPRESS
+
+### Paleta de Colores
+- **Primario:** `#F59E0B` (Naranja Changuito — energía, rapidez, confianza)
+- **Secundario:** `#22C55E` (Verde éxito — Turbo, entrega rápida)
+- **Fondo:** `#FFFFFF` (Blanco principal) y `#F5F5F5` (Gris claro — cards)
+- **Acentos:** `#8B5CF6` (Púrpura — promociones), `#000000` (Textos principales)
+
+### Tipografía
+- Fuente sans-serif moderna: `Inter`, `SF Pro`, o sistema `system-ui`
+- Títulos: `font-weight: 700` (bold)
+- Subtítulos: `font-weight: 600`
+- Texto regular: `font-weight: 400`
+- Precios: `font-weight: 700` + tamaño aumentado
+
+---
+
+## 📐 ESTRUCTURA DEL LAYOUT (VERTICAL SCROLL) — GALLO'S VERSION
+
+```
+┌─────────────────────────────────┐
+│ HEADER COMPACTO                 │
+│ 📍 Dirección + Cambiar          │
+│ [🔍 Buscar negocios/comida]    │
+├─────────────────────────────────┤
+│ BANNER PROMOCIONAL (ROTATIVO)   │
+│ [Imagen 1] [Imagen 2] [Imagen 3]│
+│ Cada 5 segundos cambia          │
+├─────────────────────────────────┤
+│ ⭐ ACCESOS DIRECTOS ⭐           │
+│ [🛒 Súper] [🍕 Comida]          │
+│ [💊 Farmacia] [🚗 Traslados]   │
+│ [🏠 Servicios] [📦 Mandaditos]  │
+├─────────────────────────────────┤
+│ 🐒 CHANGUIBOT IA                │
+│ [Botón destacado - Ver abajo]   │
+│ Hablá con tu IA personal        │
+├─────────────────────────────────┤
+│ CATEGORÍAS (Carrusel Horiz.)    │
+│ 🍕 Comida  🛒 Supermercado      │
+│ 💊 Farmacia 🚗 Traslados        │
+├─────────────────────────────────┤
+│ MARCAS DESTACADAS (Grid)        │
+│ [Logo] [Logo] [Logo]            │
+├─────────────────────────────────┤
+│ SECCIÓN TURBO (Verde #22C55E)   │
+│ ⚡ 15 MIN · Recibe Ahora        │
+│ [Productos rápidos]             │
+├─────────────────────────────────┤
+│ PROMOCIONES (Cards)             │
+│ [62% OFF] [Envío Gratis]        │
+├─────────────────────────────────┤
+│ PRODUCTOS (Grid 2 columnas)     │
+│ [Card] [Card]                   │
+│ [Card] [Card]                   │
+├─────────────────────────────────┤
+│ TAB BAR FIJO (Sticky Bottom)    │
+│ 🏠 Inicio | ⭐ Ofertas          │
+│ ❤️ Favoritos | 👤 Cuenta        │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🔧 COMPONENTES A IMPLEMENTAR (EN ORDEN DE APARICIÓN)
+
+### 1. HEADER
+```
+Elementos:
+- Icono de atrás (← ) — circular, 40px
+- "📍 Mi Ubicación" — Lomas 1 / Lomas 2 / etc.
+- Selector de dirección clickeable
+- Debajo: Buscador grande con icono 🔍
+
+Estilos:
+- Padding: 16px (top/bottom)
+- Fondo: #FFFFFF
+- Sombra suave: 0 2px 8px rgba(0,0,0,0.1)
+- Border-radius: 0 (sin esquinas arriba)
+```
+
+### 2. BUSCADOR
+```
+Input:
+- Placeholder: "🔍 Busca tacos, supermercado, farmacia..."
+- Altura: 48px
+- Padding: 12px 16px
+- Border-radius: 16px
+- Border: 1px solid #E5E7EB
+- Foco: Border #F59E0B
+
+Botón BUSCAR:
+- Fondo: #F59E0B
+- Color texto: #FFFFFF
+- Height: 48px
+- Border-radius: 16px
+- Font-weight: 700
+```
+
+### 3. BANNER PRINCIPAL (ROTATIVO/CARRUSEL)
+```
+Diseño:
+- Carrusel automático (rotación cada 5 segundos)
+- Imagen de fondo (comida bonita)
+- Overlay oscuro semi-transparente
+- Texto blanco encima
+- Dots indicadores abajo (para saber cuál es la imagen actual)
+
+Contenido de cada banner:
+🎁 LA HORA CHANGUITO / PROMO 2 / PROMO 3
+Pide cualquier cosa
+Recibe en 15 minutos
+[ORDENA AHORA] — CTA naranja
+
+Estilos:
+- Altura: 240px
+- Border-radius: 24px
+- Margin: 16px
+- Box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3)
+- Dots navigation: pequeños círculos blancos en la base
+
+IMPORTANTE: Este carrusel DEBE ocupar espacio significativo
+para que el usuario vea que hay contenido promocional rotativo
+```
+
+### 4. ⭐ ACCESOS DIRECTOS (NUEVO — GRID 2x3)
+```
+SECCIÓN DESTACADA:
+Title: "¿Qué necesitas hoy?"
+Subtitle: (opcional)
+
+Layout:
+Grid con 6 botones grandes (2 columnas × 3 filas)
+
+Cada Botón:
+┌──────────────────┐
+│   [Icono 64px]   │
+│                  │
+│   Texto Acción   │
+└──────────────────┘
+
+Botones:
+1. [🛒] "Mi Súper" → navega a Supermercados
+2. [🍕] "Comida" → navega a Restaurantes
+3. [💊] "Farmacia" → navega a Farmacias
+4. [🚗] "Traslados" → navega a Traslados
+5. [🏠] "Servicios" → navega a Servicios/Directorio
+6. [📦] "Mandaditos" → navega a Mandaditos
+
+Estilos:
+- Cada botón: ancho 100% del 50% de pantalla
+- Altura: 120px
+- Fondo: #F5F5F5 (gris suave)
+- Borde: 1px solid #E5E7EB
+- Border-radius: 16px
+- Padding: 16px
+- Hover: Background #FEF3C7, Border #F59E0B (naranja)
+- Transición: 0.2s ease
+- Font: 14px, bold, #000000
+
+Spacing:
+- Gap horizontal: 12px
+- Gap vertical: 12px
+- Margin externo: 16px
+
+IMPORTANTE: Estos botones deben ser GRANDES y PROMINENTES
+para que el usuario acceda fácilmente a cada sección
+```
+
+### 5. 🐒 CHANGUIBOT IA (DESTACADO)
+```
+SECCIÓN ESPECIAL:
+Fondo: Gradiente naranja (#F59E0B → #F97316)
+Padding: 24px 16px
+Border-radius: 20px
+Margin: 16px
+Box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4)
+
+Layout:
+┌─────────────────────┐
+│  🐒 CHANGUIBOT      │
+│  IA                 │
+│                     │
+│ Tu asistente        │
+│ inteligente         │
+│ personal            │
+│                     │
+│ [ABRIR CHAT]        │
+└─────────────────────┘
+
+Elementos:
+- Icono grande del mono: 80px × 80px, centrado
+- "CHANGUIBOT" — Font: 20px, bold, #FFFFFF
+- "IA" — Font: 14px, bold, #FFFFFF, debajo del nombre
+- Descripción: "Tu asistente inteligente personal" — Font: 13px, regular, #FFFFFF, opacity 0.9
+- Botón [ABRIR CHAT] — Fondo: #FFFFFF, Color texto: #F59E0B, Font: bold, Border-radius: 12px
+
+Estados:
+- Normal: Sombra naranja
+- Hover: Sombra más grande, scale 1.02
+- Click: Abre ChanguitoAI (botón flotante 🐒)
+
+IMPORTANTE: Este componente DEBE DESTACAR porque es la joya
+de la corona de Changuito Express. El usuario debe saber
+que tiene un IA personal disponible.
+```
+
+### 6. CATEGORÍAS (CARRUSEL)
+```
+Layout:
+- Scroll horizontal (snap)
+- Cards de 100px x 120px
+- Spacing: 12px entre cards
+
+Cada Card:
+┌──────────┐
+│ [Icono]  │  50px × 50px
+│          │  Emoji o SVG
+│          │
+│ Comida   │  Font: 12px, bold
+└──────────┘
+
+Estados:
+- Normal: Fondo #F5F5F5
+- Activo: Fondo #FEF3C7, Border 2px #F59E0B
+- Border-radius: 20px
+```
+
+### 7. MARCAS DESTACADAS
+```
+Layout:
+- Grid con scroll horizontal
+- 5-6 logos en línea
+- Cada uno: 90px × 90px
+
+Estilos:
+- Fondo blanco
+- Border: 1px solid #E5E7EB
+- Border-radius: 16px
+- Sombra: 0 2px 8px rgba(0,0,0,0.08)
+- Padding: 12px
+
+Ejemplos:
+Los Cubiertos | La Atómica | Bazar | Servicios
+```
+
+### 8. SECCIÓN TURBO (PREMIUM)
+```
+Fondo:
+- Color: #DBEAFE (azul muy claro) O #D1FAE5 (verde muy claro)
+- Border-radius: 20px
+- Padding: 20px
+- Margin: 16px
+
+Header:
+⚡ TURBO EXPRESS
+Recibe en 10-15 minutos
+Font: 18px, bold, #22C55E
+
+Productos:
+Grid 2 columnas con cards:
+[Imagen]
+Nombre Producto
+$XX.XX
+10-13 min ⏱️
+
+Botón flotante verde (+) para agregar
+```
+
+### 9. TARJETAS DE PRODUCTOS (Grid)
+```
+Layout:
+- 2 columnas
+- Spacing: 12px
+- Margin: 16px
+
+Cada Card:
+┌──────────────┐
+│   [Imagen]   │ ← Ocupa 80% de la tarjeta
+│              │
+│   [+]        │ ← Botón flotante naranja
+└──────────────┘
+[62% OFF]      ← Badge (si aplica)
+Nombre Producto
+$99.99 → $49.99
+★ 4.8 (120 reseñas)
+
+Estilos:
+- Fondo: #FFFFFF
+- Border-radius: 20px
+- Sombra: 0 2px 8px rgba(0,0,0,0.1)
+- Hover: Sombra aumenta, scale 1.02
+```
+
+### 10. BADGES DE PROMOCIÓN
+```
+Estilos:
+- Posición: Arriba-izquierda de la card
+- Fondo: #8B5CF6 (púrpura) O #F59E0B (naranja)
+- Color texto: #FFFFFF
+- Padding: 4px 8px
+- Border-radius: 8px
+- Font-size: 11px, bold
+- Text-transform: uppercase
+
+Ejemplos:
+[62% OFF] [ENVÍO GRATIS] [SOLO HABLANTES] [NUEVO]
+```
+
+### 11. TAB BAR (STICKY BOTTOM)
+```
+Posición: Fixed, bottom: 0
+Altura: 64px
+Fondo: #FFFFFF
+Border-top: 1px solid #E5E7EB
+Box-shadow: 0 -2px 12px rgba(0,0,0,0.1)
+
+4 Tabs:
+┌─────┬─────┬─────┬─────┐
+│ 🏠  │ ⭐  │ ❤️  │ 👤  │
+│Inicio│Ofertas│Favoritos│Cuenta│
+└─────┴─────┴─────┴─────┘
+
+Espaciado: Distribuido equitativamente (25% ancho cada uno)
+
+Estado Activo:
+- Color icono: #F59E0B
+- Color texto: #F59E0B
+- Font-weight: 600
+
+Estado Inactivo:
+- Color icono: #9CA3AF
+- Color texto: #9CA3AF
+- Font-weight: 400
+```
+
+---
+
+## 🎯 FUNCIONALIDAD A MANTENER
+
+- ✅ Carrito global multi-negocio (ya existe, no tocar)
+- ✅ Búsqueda por negocio/categoría (mejorar styling)
+- ✅ Selector de dirección/fraccionamiento
+- ✅ Integración con Supabase
+- ✅ Dark mode (aplicar misma lógica)
+- ✅ Responsive (Mobile first)
+
+---
+
+## 🎯 NUEVAS FUNCIONALIDADES
+
+- ✅ **Banner rotativo** (carrusel automático cada 5 segundos)
+- ✅ **Accesos directos** (6 botones grandes para categorías)
+- ✅ **ChanguiBot IA destacado** (con gradiente naranja, icono mono, descripción)
+- ✅ **Al tocar ChanguiBot**: abre el componente ChanguitoAI (botón flotante 🐒)
+- ✅ **Todos los accesos directos deben ser clickeables y navegar a su sección**
+
+---
+
+## 💻 ESTRUCTURA DE CÓDIGO (React)
+
+```tsx
+export default function Dashboard(props) {
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  // Carrusel automático cada 5 segundos
+
+  useEffect(function() {
+    const timer = setInterval(function() {
+      setCurrentBannerIndex(function(prev) { return (prev + 1) % 3; });
+    }, 5000);
+    return function() { clearInterval(timer); };
+  }, []);
+
+  return (
+    <div style={styles.container}>
+      
+      {/* HEADER */}
+      <HeaderChanguito currentLocation={} onChangeLocation={} />
+      
+      {/* BUSCADOR */}
+      <SearchBarChanguito onSearch={} />
+      
+      {/* BANNER ROTATIVO */}
+      <BannerCarousel currentIndex={currentBannerIndex} onIndexChange={setCurrentBannerIndex} />
+      
+      {/* ACCESOS DIRECTOS */}
+      <QuickAccessButtons onNavigate={function(section) { /* navegar a sección */ }} />
+      
+      {/* CHANGUIBOT IA DESTACADO */}
+      <ChanguiBotHighlight onOpenChat={function() { /* abrir ChanguitoAI */ }} />
+      
+      {/* CATEGORÍAS */}
+      <CategoriesCarousel onSelectCategory={} />
+      
+      {/* MARCAS */}
+      <BrandsCarousel />
+      
+      {/* TURBO SECTION */}
+      <TurboExpressSection />
+      
+      {/* PROMOCIONES */}
+      <PromotionsSection />
+      
+      {/* GRID DE PRODUCTOS */}
+      <ProductsGrid products={} onAddToCart={} />
+      
+      {/* TAB BAR */}
+      <TabBar currentTab={} onTabChange={} />
+      
+      {/* CARRITO FLOTANTE (mover arriba del tab bar) */}
+      <CartButton carritoGlobal={} />
+      
+    </div>
+  );
+}
+```
+
+---
+
+## 🚀 PASO A PASO PARA REPLIT
+
+1. **Crea nuevos archivos de componentes:**
+   - `src/components/HeaderChanguito.tsx`
+   - `src/components/SearchBarChanguito.tsx`
+   - `src/components/BannerCarousel.tsx` (NUEVO — carrusel rotativo)
+   - `src/components/QuickAccessButtons.tsx` (NUEVO — 6 botones grandes)
+   - `src/components/ChanguiBotHighlight.tsx` (NUEVO — caja destacada IA)
+   - `src/components/CategoriesCarousel.tsx`
+   - `src/components/ProductCard.tsx`
+   - `src/components/TabBar.tsx`
+
+2. **Reescribe `src/Dashboard.tsx`** usando estos componentes
+
+3. **Estilos inline** (sin Tailwind):
+   - Usa `style={{}}` directamente
+   - Colores en hex: `#F59E0B`, `#22C55E`, etc.
+   - Shadows, borders, border-radius según spec
+
+4. **No toques:**
+   - `src/App.tsx`
+   - `src/ChanguitoAI.tsx`
+   - Lógica de carrito
+
+5. **Prueba en local:**
+   - `npm run dev`
+   - Abre en tablet (responsive)
+   - Verifica colores, espaciado, clicks
+   - **Verifica que el banner rota cada 5 segundos**
+   - **Verifica que los 6 botones son grandes y clickeables**
+   - **Verifica que ChanguiBot abre el chat flotante**
+
+6. **Push:**
+   ```bash
+   git add -A && git commit -m "feat: Dashboard redesign Uber/Didi level con accesos directos y ChanguiBot destacado" && git push origin main
+   ```
+
+---
+
+## 📏 RESPETO A VARIABLES CSS GLOBALES
+
+El código actual usa `var(--bg-card)`, `var(--text-primary)`, etc.
+
+**MANTÉN esa lógica de temas** pero SOBRESCRIBE con colores específicos:
+
+```tsx
+const isDark = props.theme === 'dark';
+
+// En estilos:
+background: isDark ? '#1F2937' : '#FFFFFF',
+color: isDark ? '#F3F4F6' : '#000000',
+// Pero siempre usa #F59E0B para botones, independiente del tema
+```
+
+---
+
+## ✅ CHECKLIST FINAL
+
+- [ ] Header con ubicación
+- [ ] Buscador prominente
+- [ ] **Banner rotativo (5 segundos)**
+- [ ] **6 Accesos directos grandes (2×3 grid)**
+- [ ] **ChanguiBot IA destacado con gradiente naranja**
+- [ ] Categorías en carrusel
+- [ ] Marcas destacadas
+- [ ] Sección Turbo (verde/azul)
+- [ ] Grid de productos 2 columnas
+- [ ] Tab bar sticky bottom
+- [ ] Carrito flotante movido arriba del tab bar
+- [ ] Colores exactos (#F59E0B, #22C55E, #FFFFFF)
+- [ ] Border-radius 16-24px en cards
+- [ ] Sombras sutiles (0 2px 8px rgba...)
+- [ ] Hover effects en cards
+- [ ] Dark mode compatible
+- [ ] Mobile responsive
+- [ ] Zero Tailwind (inline styles only)
+- [ ] **Banner automático funciona**
+- [ ] **Accesos directos navegan a secciones**
+- [ ] **ChanguiBot abre ChanguitoAI**
+
+---
+
+## 🎬 DEADLINE
+
+Cuando termines:
+1. Push a GitHub
+2. Vercel auto-deploya en 2-3 minutos
+3. Verifica en tablet: changuito-express-369.vercel.app
+4. Confírmate cuando esté live
+
+¡Vamo' a hacerlo!
