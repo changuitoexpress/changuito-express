@@ -4,6 +4,7 @@ import { ArrowLeft, Wallet, Gift, Star, TrendingUp, Package, RefreshCw, ChevronR
 import { supabase, ThemeToggle } from './App';
 import type { AppSession, Theme } from './App';
 import { getFreeShippingProgress } from './freeShippingProgress';
+import { getOrderTrackingStage, ORDER_TRACKING_STEPS } from './orderTracking.js';
 import PedidoChat from './components/PedidoChat';
 
 interface Props {
@@ -30,18 +31,61 @@ interface PedidoResumen {
   repartidor_id: string | null;
 }
 
-const ESTATUS_COLOR: Record<string, string> = {
-  pendiente:  '#facc15',
-  en_camino:  '#3b82f6',
-  entregado:  '#22c55e',
-  cancelado:  '#ef4444',
-};
-const ESTATUS_LABEL: Record<string, string> = {
-  pendiente:  'Pendiente',
-  en_camino:  'En camino',
-  entregado:  'Entregado',
-  cancelado:  'Cancelado',
-};
+function etiquetaEstatus(estatus: string) {
+  const paso = getOrderTrackingStage(estatus);
+  return paso < 0 ? 'Cancelado' : ORDER_TRACKING_STEPS[paso] ?? estatus;
+}
+
+function colorEstatus(estatus: string) {
+  const paso = getOrderTrackingStage(estatus);
+  if (paso < 0) return 'var(--color-red)';
+  if (paso === 2) return 'var(--color-blue)';
+  if (paso === 3) return 'var(--color-green)';
+  return 'var(--color-yellow)';
+}
+
+function SeguimientoPedido(props: { estatus: string }) {
+  const pasoActual = getOrderTrackingStage(props.estatus);
+  if (pasoActual < 0) return null;
+
+  const colorActual = pasoActual === 2
+    ? 'var(--color-blue)'
+    : pasoActual === 3
+      ? 'var(--color-green)'
+      : 'var(--color-yellow)';
+  const progreso = (pasoActual / (ORDER_TRACKING_STEPS.length - 1)) * 75;
+
+  return (
+    <div
+      role="group"
+      aria-label={'Seguimiento del pedido: ' + ORDER_TRACKING_STEPS[pasoActual]}
+      style={{ marginTop: '14px', padding: '11px 9px 8px', borderRadius: '12px', background: 'var(--bg-base)', border: '1px solid var(--border-subtle)' }}
+    >
+      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+        <div aria-hidden="true" style={{ position: 'absolute', top: '8px', left: '12.5%', right: '12.5%', height: '2px', borderRadius: '2px', background: 'var(--border-medium)' }} />
+        <div aria-hidden="true" style={{ position: 'absolute', top: '8px', left: '12.5%', width: progreso + '%', height: '2px', borderRadius: '2px', background: 'var(--color-green)' }} />
+        {ORDER_TRACKING_STEPS.map(function (etapa, indice) {
+          const completado = indice < pasoActual || pasoActual === 3;
+          const activo = indice === pasoActual;
+          const color = completado ? 'var(--color-green)' : activo ? colorActual : 'var(--border-medium)';
+          return (
+            <div key={etapa} aria-current={activo ? 'step' : undefined} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+              <span style={{ width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: completado ? color : 'var(--bg-card)', border: '2px solid ' + color, color: completado ? 'var(--text-inverse)' : color, fontSize: '9px', lineHeight: 1, fontWeight: 900 }}>
+                {completado ? '✓' : indice + 1}
+              </span>
+              <span style={{ maxWidth: '100%', textAlign: 'center', color: activo || completado ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '8px', lineHeight: 1.15, fontWeight: activo ? 800 : 600 }}>
+                {etapa}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p aria-live="polite" aria-atomic="true" style={{ margin: '8px 0 0', textAlign: 'center', color: colorActual, fontSize: '9px', fontWeight: 800 }}>
+        Actualizado en tiempo real · {ORDER_TRACKING_STEPS[pasoActual]}
+      </p>
+    </div>
+  );
+}
 
 async function cargarResumenEntregados(uid: string): Promise<{ entregados: number; totalGastado: number }> {
   const pageSize = 1000;
@@ -394,9 +438,10 @@ export default function ChangoMonedero(props: Props) {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <p style={{ fontSize: '13px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 2px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
-                          <span style={{ fontSize: '9px', fontWeight: 800, color: ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)', textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: colorEstatus(p.estatus), textTransform: 'uppercase' }}>{etiquetaEstatus(p.estatus)}</span>
                         </div>
                       </div>
+                      <SeguimientoPedido estatus={p.estatus} />
                       {p.repartidor_id && p.estatus !== 'entregado' && p.estatus !== 'cancelado' && (
                         <button type="button" onClick={function () { setChatPedido(p); }}
                           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 9, padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 10, background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
@@ -434,7 +479,7 @@ export default function ChangoMonedero(props: Props) {
             {pedidosHistorial.map(function(p) {
               const fecha = new Date(p.created_at);
               const label = fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) + ' · ' + fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-              const color = ESTATUS_COLOR[p.estatus] ?? 'var(--text-muted)';
+              const color = colorEstatus(p.estatus);
               return (
                 <div key={p.id} style={{ padding: '14px 16px', borderRadius: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
@@ -451,9 +496,10 @@ export default function ChangoMonedero(props: Props) {
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <p style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-yellow)', margin: '0 0 3px 0' }}>${(p.total_pagar ?? 0).toFixed(0)}</p>
-                      <span style={{ fontSize: '9px', fontWeight: 800, color: color, textTransform: 'uppercase' }}>{ESTATUS_LABEL[p.estatus] ?? p.estatus}</span>
+                      <span style={{ fontSize: '9px', fontWeight: 800, color: color, textTransform: 'uppercase' }}>{etiquetaEstatus(p.estatus)}</span>
                     </div>
                   </div>
+                  <SeguimientoPedido estatus={p.estatus} />
                   {p.repartidor_id && p.estatus !== 'entregado' && p.estatus !== 'cancelado' && (
                     <button type="button" onClick={function () { setChatPedido(p); }}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 10, padding: '9px 12px', border: '1px solid var(--border-subtle)', borderRadius: 11, background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>

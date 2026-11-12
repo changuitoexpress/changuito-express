@@ -40,7 +40,7 @@ const orderHistory = Array.from({ length: 125 }, function (_, index) {
     id: `wallet-fixture-order-${index}`,
     negocio_nombre: `Fixture Store ${index}`,
     total_pagar: 10,
-    estatus: "entregado",
+    estatus: index === 0 ? "en_camino" : "entregado",
     created_at: new Date(Date.UTC(2026, 0, 2, 12, 0, 0) - index * 60_000).toISOString(),
   };
 });
@@ -477,6 +477,8 @@ it("keeps the wallet summary hidden after each query failure and restores it on 
   await page.getByText("$42.75", { exact: true }).waitFor();
   await page.getByText("$10,050", { exact: true }).waitFor();
   await page.getByText("50%", { exact: true }).waitFor();
+  await page.getByRole("group", { name: "Seguimiento del pedido: En camino" }).first().waitFor();
+  await page.getByText("Actualizado en tiempo real · En camino", { exact: true }).first().waitFor();
   assert.equal(
     orderQueries.filter(function(query) {
       return new URLSearchParams(query).get("select") === "total_pagar";

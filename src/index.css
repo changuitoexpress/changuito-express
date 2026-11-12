@@ -5,21 +5,21 @@
 ═══════════════════════════════════════ */
 :root {
   color-scheme: light;
-  --bg-base:          #f3f8f4;
+  --bg-base:          #ffffff;
   --bg-card:          #ffffff;
-  --bg-card-hover:    #f0f0f5;
+  --bg-card-hover:    #f5f5f5;
   --bg-nav:           rgba(255,255,255,0.95);
   --text-primary:     #14291f;
   --text-secondary:   #50645c;
   --text-muted:       #687970;
   --text-inverse:     #ffffff;
-  --color-yellow:     #F6C945;
+  --color-yellow:     #F4B400;
   --color-yellow-dim: rgba(250,204,21,0.15);
-  --color-red:        #E84844;
+  --color-red:        #E53935;
   --color-red-dim:    rgba(239,68,68,0.15);
-  --color-green:      #159447;
+  --color-green:      #16A34A;
   --color-green-dim:  rgba(34,197,94,0.15);
-  --color-blue:       #2979DA;
+  --color-blue:       #2563EB;
   --color-blue-dim:   rgba(59,130,246,0.15);
   --border-subtle:    rgba(0,0,0,0.08);
   --border-medium:    rgba(0,0,0,0.14);
@@ -33,43 +33,39 @@
 }
 
 /* ═══════════════════════════════════════
-   MODO OSCURO — COLORES DE MARCA
+   MODO OSCURO — NEÓN SOBRE NEGRO
 ═══════════════════════════════════════ */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg-base:          #0c1b17;
-  --bg-card:          #162b24;
-  --bg-card-hover:    #203a30;
-  --bg-nav:           rgba(12,27,23,0.98);
-  --text-primary:     #FFFFFF;
-  --text-secondary:   #c2d5c9;
-  --text-muted:       #9ab3a4;
-  --text-inverse:     #0A0A0A;
-  --color-yellow:     #F6C945;
-  --color-yellow-dim: rgba(212,175,55,0.15);
-  --color-red:        #f36b66;
-  --color-red-dim:    rgba(239,68,68,0.12);
-  --color-green:      #21ad5a;
-  --color-green-dim:  rgba(34,197,94,0.12);
-  --color-blue:       #4a95ed;
-  --color-blue-dim:   rgba(59,130,246,0.12);
-  --border-subtle:    rgba(139,193,159,0.16);
-  --border-medium:    rgba(139,193,159,0.32);
-  --shadow-card:      0 2px 16px rgba(0,0,0,0.65);
-  --shadow-float:     0 8px 40px rgba(0,0,0,0.85);
-  --neon-tl: #D4AF37;
-  --neon-tr: #E5C158;
-  --neon-bl: #B8960C;
-  --neon-br: #D4AF37;
-  --neon-size: 100px;
+  --bg-base:          #050507;
+  --bg-card:          #101014;
+  --bg-card-hover:    #1a1a21;
+  --bg-nav:           rgba(5,5,7,0.97);
+  --text-primary:     #f7f7ff;
+  --text-secondary:   #d0d3e0;
+  --text-muted:       #a5a9b9;
+  --text-inverse:     #050507;
+  --color-yellow:     #ffe632;
+  --color-yellow-dim: rgba(255,230,50,0.16);
+  --color-red:        #ff3b61;
+  --color-red-dim:    rgba(255,59,97,0.15);
+  --color-green:      #4dff88;
+  --color-green-dim:  rgba(77,255,136,0.14);
+  --color-blue:       #38d9ff;
+  --color-blue-dim:   rgba(56,217,255,0.14);
+  --border-subtle:    rgba(77,255,136,0.15);
+  --border-medium:    rgba(56,217,255,0.30);
+  --shadow-card:      0 0 0 1px rgba(77,255,136,0.08), 0 0 18px rgba(56,217,255,0.08), 0 2px 16px rgba(0,0,0,0.75);
+  --shadow-float:     0 0 20px rgba(77,255,136,0.16), 0 0 34px rgba(56,217,255,0.12), 0 10px 40px rgba(0,0,0,0.9);
+  --neon-tl: #4dff88;
+  --neon-tr: #ffe632;
+  --neon-bl: #38d9ff;
+  --neon-br: #ff3b61;
+  --neon-size: 120px;
 }
 
 /* ═══════════════════════════════════════
-   RESET — SIN NINGUNA TRANSICIÓN
-   El parpadeo viene de transiciones CSS
-   compitiendo con el cambio de atributo.
-   La solución es: CERO transiciones en
-   body, html, y .theme-transition
+   RESET
 ═══════════════════════════════════════ */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -81,7 +77,6 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
-  /* SIN transition — el cambio es instantáneo */
 }
 
 body {
@@ -90,11 +85,18 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
-  /* SIN transition */
 }
 
-/* theme-transition vacío — sin animación */
-.theme-transition {}
+html, body, #root, #root *, #root *::before, #root *::after {
+  transition: background 240ms ease, color 240ms ease, border-color 240ms ease,
+    box-shadow 240ms ease, fill 240ms ease, stroke 240ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html, body, #root, #root *, #root *::before, #root *::after {
+    transition-duration: 0.01ms;
+  }
+}
 
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
@@ -105,7 +107,11 @@ img { display: block; max-width: 100%; }
 
 .brand-stripe {
   height: 5px;
-  background: linear-gradient(90deg, #159447 0% 25%, #F6C945 25% 50%, #E84844 50% 75%, #2979DA 75% 100%);
+  background: linear-gradient(90deg, var(--color-green) 0% 25%, var(--color-yellow) 25% 50%, var(--color-red) 50% 75%, var(--color-blue) 75% 100%);
+}
+
+[data-theme="dark"] .brand-stripe {
+  box-shadow: 0 0 14px rgba(56,217,255,0.32), 0 0 24px rgba(255,59,97,0.16);
 }
 
 button:focus-visible, a:focus-visible {
@@ -121,8 +127,6 @@ button:focus-visible, a:focus-visible {
   min-height: 100vh;
   isolation: isolate;
 }
-
-/* Neon strobing eliminado — fondo oscuro sólido sin animación */
 
 /* ═══════════════════════════════════════
    UTILIDADES

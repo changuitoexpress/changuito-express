@@ -37,7 +37,9 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     const merchants = [
       { ...merchant, category: "hamburguesas" },
       { ...merchant, id: "taco-shop", name: "Taco Prueba", category: "taqueria" },
+      { ...merchant, id: "cuellar", name: "Tortas y Cemitas Cuellar", category: "tortas" },
       { ...merchant, id: "written", name: "Domino de prueba", category: "mandaditos" },
+      { ...merchant, id: "walmart", name: "Walmart", category: "mandaditos" },
       { ...merchant, id: "super", name: "Negocio interno de súper", category: "tiendita" },
     ];
     const user = {
@@ -182,7 +184,14 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     await page.getByLabel("Correo electrónico", { exact: true }).fill(user.email);
     await page.getByLabel("Contraseña", { exact: true }).fill("fixture-password");
     await page.getByRole("button", { name: "Entrar", exact: true }).last().click();
-    await page.getByTitle("ChanguiBot IA", { exact: true }).first().click({ timeout: 15000 });
+    const quickAccess = page.getByRole("navigation", { name: "Accesos rápidos" });
+    await quickAccess.waitFor();
+    await quickAccess.getByRole("button", { name: /Qué comida quieres/ }).click();
+    await page.getByRole("heading", { name: "Restaurantes", exact: true }).waitFor();
+    assert.equal(await page.getByText("Tortas y Cemitas Cuellar", { exact: true }).count(), 2);
+    await quickAccess.getByRole("button", { name: /Arma tu paquete/ }).click();
+    await page.getByRole("button", { name: "Ver Arroz de prueba", exact: true }).waitFor();
+    await quickAccess.getByRole("button", { name: /Pedir de varios lugares/ }).click();
     const input = page.getByLabel("Escribe o dicta tu pedido", { exact: true });
     await input.waitFor();
     await page.getByRole("button", { name: "Dictar pedido", exact: true }).click();
@@ -253,7 +262,25 @@ test("dictates, quotes, rechecks prices and confirms once without real data writ
     const micStartsAtClose = await page.evaluate(function () { return window.__micStarts; });
     assert.ok(await page.evaluate(function () { return window.__micAborts > 0; }));
 
+    // Natural-language store errands open the existing written Mandadito flow.
+    await page.getByTitle("ChanguiBot IA", { exact: true }).first().click();
+    const errandText = "Ve al Walmart y cómprame leche y huevos";
+    await page.getByLabel("Escribe o dicta tu pedido", { exact: true }).fill(errandText);
+    await page.getByRole("button", { name: "Enviar pedido", exact: true }).click();
+    const walmartDialog = page.getByRole("dialog", { name: "Walmart", exact: true });
+    await walmartDialog.waitFor();
+    assert.match(await walmartDialog.innerText(), /Walmart/);
+    assert.equal(await walmartDialog.getByLabel("Tu pedido por escrito").inputValue(), errandText);
+    assert.equal(apiCalls, 3);
+    await walmartDialog.getByRole("button", { name: "Agregar al carrito", exact: true }).click();
+    await page.waitForFunction(function () {
+      return JSON.parse(localStorage.getItem("changuito-cart") || "[]").some(function (item) {
+        return item.tipo === "mandadito" && item.negocio_id === "walmart" && item.nombre === "Ve al Walmart y cómprame leche y huevos";
+      });
+    });
+
     // Correct category order and visible headings below the sticky header.
+    await page.getByRole("button", { name: "🍽️ Restaurantes", exact: true }).first().click();
     const restaurantHeading = await page.getByRole("heading", { name: "Restaurantes", exact: true }).boundingBox();
     const errandsHeading = await page.getByRole("heading", { name: "Mandaditos", exact: true }).boundingBox();
     assert.ok(restaurantHeading.y < errandsHeading.y);

@@ -54,6 +54,7 @@ export default function BazarVecinal(props: BazarProps) {
   const [catActiva, setCatActiva]       = useState('todos');
   const [search, setSearch]             = useState('');
   const [modalPublicar, setModalPublicar] = useState(false);
+  const [detalleItem, setDetalleItem]   = useState<BazarItem | null>(null);
 
   const isDark      = props.theme === 'dark';
   const miId        = props.session.user.id;
@@ -182,7 +183,9 @@ export default function BazarVecinal(props: BazarProps) {
               return (
                 <div key={item.id} style={{ borderRadius:'18px', overflow:'hidden', background:card, border:`1px solid var(--border-subtle)`, boxShadow:'var(--shadow-card)', cursor:'pointer' }}>
                   {/* Imagen/emoji */}
-                  <div style={{ height:'140px', background:'linear-gradient(135deg,#14532d,#15803d)', position:'relative', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', overflow:'hidden' }}>
+                  <button type="button" aria-label={'Ver detalles de ' + item.titulo}
+                    onClick={function(){ setDetalleItem(item); }}
+                    style={{ width:'100%', height:'140px', padding:0, border:0, background:'linear-gradient(135deg,#14532d,#15803d)', position:'relative', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'48px', overflow:'hidden', cursor:'pointer' }}>
                     {item.fotos && item.fotos.length > 0
                       ? <img src={item.fotos[0]} alt={item.titulo} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                       : <span style={{ opacity:0.5 }}>{EMOJI_CAT[item.categoria] ?? '📦'}</span>
@@ -193,7 +196,7 @@ export default function BazarVecinal(props: BazarProps) {
                     {esMio && (
                       <div style={{ position:'absolute', top:'8px', right:'8px', padding:'3px 8px', borderRadius:'8px', background:'var(--color-yellow)', color:'#020617', fontSize:'9px', fontWeight:900 }}>TU ANUNCIO</div>
                     )}
-                  </div>
+                  </button>
                   <div style={{ padding:'12px' }}>
                     <p style={{ fontSize:'13px', fontWeight:800, color:'var(--text-primary)', margin:'0 0 4px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.titulo}</p>
                     {item.descripcion && <p style={{ fontSize:'11px', color:'var(--text-muted)', margin:'0 0 8px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.descripcion}</p>}
@@ -216,6 +219,33 @@ export default function BazarVecinal(props: BazarProps) {
           </div>
         )}
       </div>
+
+      {detalleItem && (
+        <div role="presentation"
+          onClick={function(){ setDetalleItem(null); }}
+          style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'flex-end' }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="bazar-detalle-titulo"
+            onClick={function(e){ e.stopPropagation(); }}
+            style={{ width:'100%', maxWidth:'480px', margin:'0 auto', maxHeight:'85vh', overflowY:'auto', background:'var(--bg-card)', color:'var(--text-primary)', borderRadius:'28px 28px 0 0', padding:'20px 20px 32px', position:'relative' }}>
+            <div style={{ width:'40px', height:'4px', borderRadius:'2px', background:'var(--border-medium)', margin:'0 auto 16px' }} />
+            <button type="button" aria-label="Cerrar detalles" onClick={function(){ setDetalleItem(null); }}
+              style={{ position:'absolute', top:'16px', right:'16px', width:'34px', height:'34px', borderRadius:'50%', background:'var(--bg-base)', color:'var(--text-primary)', border:'1px solid var(--border-subtle)', display:'grid', placeItems:'center', cursor:'pointer' }}>
+              <X style={{ width:'18px', height:'18px' }} />
+            </button>
+            <div style={{ height:'220px', marginBottom:'16px', borderRadius:'16px', overflow:'hidden', background:'linear-gradient(135deg,#14532d,#15803d)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'64px' }}>
+              {detalleItem.fotos && detalleItem.fotos.length > 0
+                ? <img src={detalleItem.fotos[0]} alt={detalleItem.titulo} style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+                : <span style={{ opacity:0.6 }}>{EMOJI_CAT[detalleItem.categoria] ?? '📦'}</span>}
+            </div>
+            <p style={{ fontSize:'11px', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', margin:'0 0 6px' }}>{detalleItem.categoria}</p>
+            <h2 id="bazar-detalle-titulo" style={{ fontSize:'20px', fontWeight:900, margin:'0 0 8px' }}>{detalleItem.titulo}</h2>
+            {detalleItem.descripcion && <p style={{ fontSize:'13px', lineHeight:1.6, color:'var(--text-secondary)', margin:'0 0 16px', whiteSpace:'pre-wrap' }}>{detalleItem.descripcion}</p>}
+            <p style={{ fontSize:'28px', fontWeight:900, color:detalleItem.es_gratis ? 'var(--color-green)' : 'var(--color-yellow)', margin:0 }}>
+              {detalleItem.es_gratis ? '¡Gratis!' : detalleItem.precio != null ? '$' + detalleItem.precio.toLocaleString('es-MX') : 'A negociar'}
+            </p>
+          </section>
+        </div>
+      )}
 
       {/* Modal Publicar */}
       {modalPublicar && (

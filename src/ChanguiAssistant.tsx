@@ -28,6 +28,7 @@ interface Negocio {
   id: string;
   name: string;
   phone_number?: string | null;
+  category?: string | null;
 }
 
 interface PropuestaItem extends ItemCarrito {}
@@ -45,6 +46,7 @@ interface Props {
   carritoGlobal: any[];
   onAddToCart: (items: ItemCarrito[]) => void;
   onRemoveFromCart?: (id: string) => void;
+  onMandaditoRequest?: (merchantId: string, text: string) => boolean;
   abierto: boolean;
   onCerrar: () => void;
 }
@@ -66,6 +68,28 @@ function normalizar(texto: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function detectarComerciosMandadito(texto: string, negocios: Negocio[]): Negocio[] {
+  const mensaje = normalizar(texto);
+  if (!/\b(?:ve|vete|vayas|ir|pasa|pasate|compra|comprame|comprar|compras|trae|traeme|consigue|consigueme|encarga|encargar|mandame)\b/.test(mensaje)) {
+    return [];
+  }
+  const palabrasGenericas = new Set([
+    "mandadito", "mandaditos", "tienda", "tiendas", "supermercado",
+    "supermercados", "servicio", "de", "del", "la", "el", "los", "las",
+  ]);
+  return negocios.filter(function (negocio) {
+    if (normalizar(negocio.category ?? "") !== "mandaditos") return false;
+    const palabrasNombre = normalizar(negocio.name)
+      .split(/\s+/)
+      .filter(function (palabra) {
+        return palabra.length >= 3 && !palabrasGenericas.has(palabra);
+      });
+    return palabrasNombre.some(function (palabra) {
+      return mensaje.split(/\s+/).includes(palabra);
+    });
+  });
 }
 
 function esConfirmacion(texto: string): boolean {
@@ -136,7 +160,7 @@ export default function ChanguiAssistant(props: Props) {
           .limit(600),
         supabase
           .from("merchants")
-          .select("id, name, phone_number")
+          .select("id, name, phone_number, category")
           .limit(200),
       ]);
         if (!activo) return;
@@ -312,10 +336,28 @@ export default function ChanguiAssistant(props: Props) {
       agregarMensajeBot("Estoy cargando el catálogo. Intenta de nuevo en unos segundos.");
       return;
     }
-    if (errorCatalogo || productos.length === 0) {
+    if (errorCatalogo) {
       agregarMensajeBot(
-        errorCatalogo || "No hay productos disponibles para preparar una propuesta.",
+        errorCatalogo,
       );
+      return;
+    }
+
+    const comerciosMandadito = detectarComerciosMandadito(texto, negocios);
+    if (comerciosMandadito.length > 1) {
+      agregarMensajeBot(
+        "Encontré varios negocios de Mandaditos con ese nombre. Abre Mandaditos y elige el negocio exacto para guardar tu encargo.",
+      );
+      return;
+    }
+    if (comerciosMandadito.length === 1) {
+      const comercio = comerciosMandadito[0];
+      if (props.onMandaditoRequest?.(comercio.id, texto)) return;
+      agregarMensajeBot("No pude abrir el encargo. Intenta elegir el negocio desde Mandaditos.");
+      return;
+    }
+    if (productos.length === 0) {
+      agregarMensajeBot("No hay productos disponibles para preparar una propuesta.");
       return;
     }
 

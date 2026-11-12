@@ -4,6 +4,7 @@ import { ArrowLeft, ImagePlus, LoaderCircle, Send, X } from "lucide-react";
 import { supabase } from "../App";
 import type { AppSession, Theme } from "../App";
 import { clearFormDraft, readFormDraft, writeFormDraft } from "../formDrafts";
+import { isInsultingCourierMessage } from "../courierMessageModeration.js";
 
 type ChatRole = "cliente" | "repartidor" | "admin";
 
@@ -135,6 +136,10 @@ export default function PedidoChat(props: Props) {
   async function enviarMensaje() {
     const messageText = text.trim();
     if ((!messageText && !image) || sending) return;
+    if (props.role === "repartidor" && isInsultingCourierMessage(messageText)) {
+      setError("Revisa tu mensaje, no podemos enviar este mensaje.");
+      return;
+    }
     setSending(true);
     setError("");
     let uploadedPath: string | null = null;
