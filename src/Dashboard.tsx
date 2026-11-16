@@ -4890,7 +4890,7 @@ export default function Dashboard(props: DashboardProps) {
           [
             {
               key: "tiendita",
-              label: "Changui Súper",
+              label: "Súper",
               emoji: "🛒",
               onClick: function () {
                 setTabActiva("tiendita");
@@ -4925,7 +4925,7 @@ export default function Dashboard(props: DashboardProps) {
             },
             {
               key: "bazar",
-              label: "Bazar Lomas",
+              label: "Bazar",
               emoji: "🏘",
               onClick: function () {
                 props.onIrBazar && props.onIrBazar();
