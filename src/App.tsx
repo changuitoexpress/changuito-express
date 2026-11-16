@@ -112,14 +112,36 @@ const NOMBRES_PANTALLA: Record<Pantalla, string> = {
   monedero: "ChangoMonedero",
 };
 
+function actualizarColorBarras(theme: Theme) {
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.setAttribute(
+      "content",
+      theme === "dark" ? "#050507" : "#ffffff",
+    );
+  }
+
+  const appleStatusBar = document.querySelector(
+    'meta[name="apple-mobile-web-app-status-bar-style"]',
+  );
+  if (appleStatusBar) {
+    appleStatusBar.setAttribute(
+      "content",
+      theme === "dark" ? "black-translucent" : "default",
+    );
+  }
+}
+
 // ─── Tema: aplicar antes del primer paint ─────────────────────────────────────
 try {
   const t = localStorage.getItem("changuito-theme");
   const d = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const initialTheme = t === "dark" || t === "light" ? t : d ? "dark" : "light";
   document.documentElement.setAttribute(
     "data-theme",
-    t === "dark" || t === "light" ? t : d ? "dark" : "light",
+    initialTheme,
   );
+  actualizarColorBarras(initialTheme);
 } catch (e) {}
 
 // ─── Hook Tema ────────────────────────────────────────────────────────────────
@@ -140,6 +162,7 @@ function useTheme() {
     setTheme(function (prev) {
       const next = prev === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
+      actualizarColorBarras(next);
       try {
         localStorage.setItem("changuito-theme", next);
       } catch (e) {}
