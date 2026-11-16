@@ -2894,7 +2894,7 @@ export default function Dashboard(props: DashboardProps) {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
-  const [tabActiva, setTabActiva] = useState<MainTab>("restaurantes");
+  const [tabActiva, setTabActiva] = useState<MainTab>("tiendita");
   const [search, setSearch] = useState<string>("");
   const [productosBusqueda, setProductosBusqueda] = useState<any[]>([]);
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(
@@ -4299,6 +4299,15 @@ export default function Dashboard(props: DashboardProps) {
           }}
         >
           <button
+            style={tabStyle("tiendita")}
+            onClick={function () {
+              setTabActiva("tiendita");
+              setSearch("");
+            }}
+          >
+            🛒 Changui Súper
+          </button>
+          <button
             style={tabStyle("restaurantes")}
             onClick={function () {
               setTabActiva("restaurantes");
@@ -4315,15 +4324,6 @@ export default function Dashboard(props: DashboardProps) {
             }}
           >
             🛵 Mandaditos
-          </button>
-          <button
-            style={tabStyle("tiendita")}
-            onClick={function () {
-              setTabActiva("tiendita");
-              setSearch("");
-            }}
-          >
-            🛒 Changui Súper
           </button>
         </div>
       </div>
@@ -4436,7 +4436,14 @@ export default function Dashboard(props: DashboardProps) {
                 </div>
               </button>
 
-               {/* ─ 2 · Restaurantes / Mandaditos / La Tiendita ─ */}
+               {/* ─ 2 · Changui Súper / Restaurantes / Mandaditos ─ */}
+              <button
+                onClick={function () { setTabActiva("tiendita"); setSearch(""); setMenuAbierto(false); }}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
+              >
+                <ShoppingCart style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
+                <span>Changui Súper</span>
+              </button>
               <button
                 onClick={function () { setTabActiva("restaurantes"); setSearch(""); setMenuAbierto(false); }}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
@@ -4450,13 +4457,6 @@ export default function Dashboard(props: DashboardProps) {
               >
                 <Bike style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
                 <span>Mandaditos</span>
-              </button>
-              <button
-                onClick={function () { setTabActiva("tiendita"); setSearch(""); setMenuAbierto(false); }}
-                style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px", borderRadius:"12px", background:"transparent", border:"none", cursor:"pointer", color:"var(--text-primary)", fontSize:"14px", fontWeight:700, textAlign:"left" }}
-              >
-                <ShoppingCart style={{ width:"18px", height:"18px", color:"var(--color-yellow)", flexShrink:0 }} />
-                <span>Changui Súper</span>
               </button>
 
               <div style={{ height:"1px", background:"var(--border-subtle)", margin:"10px 8px" }} />
@@ -4889,7 +4889,16 @@ export default function Dashboard(props: DashboardProps) {
         {(
           [
             {
-              key: "inicio",
+              key: "tiendita",
+              label: "Changui Súper",
+              emoji: "🛒",
+              onClick: function () {
+                setTabActiva("tiendita");
+                setSearch("");
+              },
+            },
+            {
+              key: "restaurantes",
               label: "Restaurantes",
               emoji: "🍽️",
               onClick: function () {
@@ -4898,11 +4907,11 @@ export default function Dashboard(props: DashboardProps) {
               },
             },
             {
-              key: "tiendita",
-              label: "Changui Súper",
-              emoji: "🛒",
+              key: "mandaditos",
+              label: "Mandaditos",
+              emoji: "🛵",
               onClick: function () {
-                setTabActiva("tiendita");
+                setTabActiva("mandaditos");
                 setSearch("");
               },
             },
@@ -4933,7 +4942,8 @@ export default function Dashboard(props: DashboardProps) {
           ] as const
         ).map(function (it) {
           const activo =
-            (it.key === "inicio" && tabActiva === "restaurantes") ||
+            (it.key === "restaurantes" && tabActiva === "restaurantes") ||
+            (it.key === "mandaditos" && tabActiva === "mandaditos") ||
             (it.key === "tiendita" && tabActiva === "tiendita");
           return (
             <button
